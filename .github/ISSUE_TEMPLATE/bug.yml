@@ -1,0 +1,67 @@
+name: Bug report
+description: Report a reproducible AutoRE-CLI, installer, verifier, or Skill defect
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not upload malware, recovered payloads, secrets, private paths, or proprietary output.
+        Report exploitable security issues through private vulnerability reporting instead.
+  - type: input
+    id: version
+    attributes:
+      label: AutoRE-CLI version
+      description: Paste the output of `auto-re-cli --version`.
+    validations:
+      required: true
+  - type: input
+    id: host
+    attributes:
+      label: Host
+      description: Operating system and architecture, for example macOS arm64 or Linux x86_64.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Affected surface
+      options:
+        - CLI analysis
+        - JSON or bundle output
+        - Installer or uninstaller
+        - Distribution verifier
+        - Auto-RE Skill
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Provide the minimal sanitized command and steps.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include sanitized warnings, exit status, and stop reason when available.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: I did not execute the target, recovered payload, or any target-derived artifact.
+          required: true
+        - label: I removed samples, secrets, private paths, and proprietary output.
+          required: true

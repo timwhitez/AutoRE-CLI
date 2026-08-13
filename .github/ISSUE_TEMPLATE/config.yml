@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Private security report
+    url: https://github.com/timwhitez/AutoRE-CLI/security/advisories/new
+    about: Report exploitable vulnerabilities without exposing samples or sensitive details.

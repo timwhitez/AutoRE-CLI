@@ -1,0 +1,114 @@
+name: Validate Distribution
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-linux-x86-64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Verify distribution
+        run: ./verify.sh
+
+      - name: Validate the Auto-RE Skill
+        run: python3 scripts/quick_validate_skill.py skills/auto-re
+
+      - name: Test emitted action preparation
+        run: |
+          set -euo pipefail
+          work="${RUNNER_TEMP}/autore-action"
+          mkdir -p "$work"
+          cat > "$work/result.json" <<'JSON'
+          {
+            "schema_version": "0.1.0",
+            "next_actions": [
+              {
+                "id": "function.selected",
+                "reason": "inspect one selected function",
+                "expected_output": "bounded function JSON",
+                "stop_condition": "selected function is inspected",
+                "argv": [
+                  "auto-re-cli",
+                  "function",
+                  "controlled.o",
+                  "--addr",
+                  "0x0",
+                  "--format",
+                  "json"
+                ]
+              }
+            ]
+          }
+          JSON
+          python3 skills/auto-re/scripts/run_next_action.py \
+            "$work/result.json" \
+            --action-id function.selected \
+            --output "$work/function.json" \
+            --dry-run > "$work/prepared.json"
+          python3 - "$work/prepared.json" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+          assert payload["ok"] is True
+          assert payload["argv"][0] == "auto-re-cli"
+          assert payload["argv"][-2] == "--output"
+          PY
+
+      - name: Install in isolated homes
+        env:
+          AUTORE_INSTALL_DIR: ${{ runner.temp }}/autore-bin
+          TRAE_HOME: ${{ runner.temp }}/trae
+        run: |
+          set -euo pipefail
+          ./install.sh \
+            --codex-home "${RUNNER_TEMP}/codex-legacy"
+          "${AUTORE_INSTALL_DIR}/auto-re-cli" --version
+          test -f "${TRAE_HOME}/skills/auto-re/SKILL.md"
+          test -f "${RUNNER_TEMP}/codex-legacy/skills/auto-re/SKILL.md"
+
+      - name: Analyze a controlled object without execution
+        env:
+          AUTORE_INSTALL_DIR: ${{ runner.temp }}/autore-bin
+        run: |
+          set -euo pipefail
+          work="${RUNNER_TEMP}/autore-controlled-object"
+          mkdir -p "$work"
+          cat > "$work/fixture.c" <<'C'
+          int controlled_add(int left, int right) {
+              return left + right;
+          }
+          C
+          cc -c "$work/fixture.c" -o "$work/fixture.o"
+          "${AUTORE_INSTALL_DIR}/auto-re-cli" analyze "$work/fixture.o" \
+            --format json \
+            --output "$work/analyze.json"
+          python3 - "$work/analyze.json" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+          assert isinstance(payload.get("schema_version"), str)
+          assert payload.get("metadata", {}).get("format") in {"elf", "coff"}
+          PY
+
+      - name: Uninstall managed files
+        env:
+          AUTORE_INSTALL_DIR: ${{ runner.temp }}/autore-bin
+          TRAE_HOME: ${{ runner.temp }}/trae
+        run: |
+          set -euo pipefail
+          ./uninstall.sh \
+            --codex-home "${RUNNER_TEMP}/codex-legacy"
+          test ! -e "${AUTORE_INSTALL_DIR}/auto-re-cli"
+          test ! -e "${TRAE_HOME}/skills/auto-re"
+          test ! -e "${RUNNER_TEMP}/codex-legacy/skills/auto-re"

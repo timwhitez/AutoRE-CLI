@@ -1,0 +1,86 @@
+{
+  "artifacts": [
+    {
+      "bytes": 16382176,
+      "file_identity": "Mach-O 64-bit executable arm64",
+      "path": "bin/macos-arm64/auto-re-cli",
+      "rust_target": "aarch64-apple-darwin",
+      "sha256": "8f7501202ef7caff55b6955e3d8809c0cd485f7b1d45861defd78d7d19b37ac2",
+      "signing": "adhoc",
+      "target": "macos-arm64"
+    },
+    {
+      "bytes": 18555136,
+      "file_identity": "Mach-O 64-bit executable x86_64",
+      "path": "bin/macos-x86_64/auto-re-cli",
+      "rust_target": "x86_64-apple-darwin",
+      "sha256": "1d07faaafcc7b095806f402a1b13c76a319279742202ef3e6d3852420258674c",
+      "signing": "adhoc",
+      "target": "macos-x86_64"
+    },
+    {
+      "bytes": 19452256,
+      "file_identity": "ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 2.0.0, stripped",
+      "path": "bin/linux-x86_64/auto-re-cli",
+      "rust_target": "x86_64-unknown-linux-gnu",
+      "sha256": "a06695248a3007e1329fb73bcf61e9efe4a01d26465fb4c060f1b3ab4c66b518",
+      "signing": "not_applicable",
+      "target": "linux-x86_64"
+    },
+    {
+      "bytes": 21842256,
+      "file_identity": "ELF 32-bit LSB pie executable, Intel 80386, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux.so.2, for GNU/Linux 2.0.0, stripped",
+      "path": "bin/linux-x86/auto-re-cli",
+      "rust_target": "i686-unknown-linux-gnu",
+      "sha256": "0fcb1e5ad85ab7b5c600ad8179e1c15b40805d25cf9ee667315237b9081ad049",
+      "signing": "not_applicable",
+      "target": "linux-x86"
+    },
+    {
+      "bytes": 16365320,
+      "file_identity": "ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, for GNU/Linux 2.0.0, stripped",
+      "path": "bin/linux-arm64/auto-re-cli",
+      "rust_target": "aarch64-unknown-linux-gnu",
+      "sha256": "a88bfdcdf7fddbd2277139ef2f35b201e0a9ccb0c926cd11eb41d60123b5d9c9",
+      "signing": "not_applicable",
+      "target": "linux-arm64"
+    }
+  ],
+  "kind": "autore_cli_binary_distribution",
+  "product": "AutoRE-CLI",
+  "publisher": "timwhitez",
+  "repository": "AutoRE-CLI",
+  "repository_url": "https://github.com/timwhitez/AutoRE-CLI",
+  "safety": {
+    "dynamic_analysis": false,
+    "dynamic_evidence": false,
+    "generated_artifact_execution": false,
+    "shellcode_execution": false,
+    "target_execution": false
+  },
+  "schema_version": 1,
+  "skill": {
+    "managed_files": [
+      "skills/auto-re/SKILL.md",
+      "skills/auto-re/agents/openai.yaml",
+      "skills/auto-re/references/command-routing.md",
+      "skills/auto-re/references/evidence-contract.md",
+      "skills/auto-re/references/investigation-workflows.md",
+      "skills/auto-re/references/safety-and-claims.md",
+      "skills/auto-re/scripts/run_next_action.py",
+      "skills/auto-re/scripts/verify_bundle.py"
+    ],
+    "name": "auto-re",
+    "path": "skills/auto-re",
+    "version": "0.1.0"
+  },
+  "source_repository": "auto-re_source",
+  "source_revision": "11f13319f17abfbca869c77d63a7b185b2a997a3",
+  "third_party_dependency_count": 54,
+  "toolchain": {
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "pinned_channel": "1.97.1",
+    "rust": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
+  },
+  "version": "0.1.0"
+}

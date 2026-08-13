@@ -1,0 +1,4 @@
+interface:
+  display_name: "Auto-RE Static Analysis"
+  short_description: "Bounded static reverse engineering with traceable evidence"
+  default_prompt: "Use $auto-re to inspect this binary statically, follow only validated bounded actions, and report evidence without executing target bytes."
