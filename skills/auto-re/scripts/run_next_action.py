@@ -31,18 +31,19 @@ def load_json_object(path: pathlib.Path) -> dict[str, Any]:
     return value
 
 
-def select_action(result: dict[str, Any], action_id: str) -> dict[str, Any]:
+def select_action(result: dict[str, Any], action_stage: str) -> dict[str, Any]:
     actions = result.get("next_actions")
     if not isinstance(actions, list):
         raise ActionError("result next_actions must be an array")
     matches = [
         action
         for action in actions
-        if isinstance(action, dict) and action.get("id") == action_id
+        if isinstance(action, dict) and action.get("stage") == action_stage
     ]
     if len(matches) != 1:
         raise ActionError(
-            f"action id must select exactly one next action: {action_id!r}"
+            "action stage must select exactly one next action: "
+            f"{action_stage!r}"
         )
     action = matches[0]
     for field in ("reason", "expected_output", "stop_condition"):
@@ -75,11 +76,11 @@ def validate_argv(value: Any) -> list[str]:
 
 def prepare_action(
     result_path: pathlib.Path,
-    action_id: str,
+    action_stage: str,
     output: Optional[pathlib.Path],
 ) -> dict[str, Any]:
     result_path = result_path.expanduser().resolve()
-    action = select_action(load_json_object(result_path), action_id)
+    action = select_action(load_json_object(result_path), action_stage)
     argv = validate_argv(action.get("argv"))
     command_owned_sink = any(
         argument == flag or argument.startswith(f"{flag}=")
@@ -106,7 +107,7 @@ def prepare_action(
 
     return {
         "ok": True,
-        "action_id": action_id,
+        "action_stage": action_stage,
         "reason": action["reason"],
         "expected_output": action["expected_output"],
         "stop_condition": action["stop_condition"],
@@ -120,7 +121,7 @@ def parse_args() -> argparse.Namespace:
         description="Validate and run one exact static next_actions[] command."
     )
     parser.add_argument("result", type=pathlib.Path)
-    parser.add_argument("--action-id", required=True)
+    parser.add_argument("--action-stage", required=True)
     parser.add_argument("--output", type=pathlib.Path)
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
@@ -129,7 +130,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     try:
-        prepared = prepare_action(args.result, args.action_id, args.output)
+        prepared = prepare_action(args.result, args.action_stage, args.output)
         if args.dry_run:
             json.dump(prepared, sys.stdout, indent=2, sort_keys=True)
             sys.stdout.write("\n")

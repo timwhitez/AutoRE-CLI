@@ -133,7 +133,7 @@ To prepare one emitted action without shell interpolation:
 ```sh
 python3 skills/auto-re/scripts/run_next_action.py \
   ./analysis-results/sample.bundle/manifest.json \
-  --action-id function.selected \
+  --action-stage function.selected \
   --output ./analysis-results/function-selected.json \
   --dry-run
 ```

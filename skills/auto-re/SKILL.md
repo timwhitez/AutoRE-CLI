@@ -71,7 +71,7 @@ Then:
    ```bash
    python3 <skill-dir>/scripts/run_next_action.py \
      <result-json> \
-     --action-id <id> \
+     --action-stage <stage> \
      --output <new-result.json> \
      --dry-run
    ```

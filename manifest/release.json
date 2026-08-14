@@ -5,16 +5,16 @@
       "file_identity": "Mach-O 64-bit executable arm64",
       "path": "bin/macos-arm64/auto-re-cli",
       "rust_target": "aarch64-apple-darwin",
-      "sha256": "8f7501202ef7caff55b6955e3d8809c0cd485f7b1d45861defd78d7d19b37ac2",
+      "sha256": "eed485e43290cdb2a9ce8fc78a1f700fab0fe2f839c2f0c08012d7eb3499427d",
       "signing": "adhoc",
       "target": "macos-arm64"
     },
     {
-      "bytes": 18555136,
+      "bytes": 18555984,
       "file_identity": "Mach-O 64-bit executable x86_64",
       "path": "bin/macos-x86_64/auto-re-cli",
       "rust_target": "x86_64-apple-darwin",
-      "sha256": "1d07faaafcc7b095806f402a1b13c76a319279742202ef3e6d3852420258674c",
+      "sha256": "cdf2b9da6114e5f83ccb27cf5fc66430723f3340b5005db88d1abcf480a5a4f3",
       "signing": "adhoc",
       "target": "macos-x86_64"
     },
@@ -23,16 +23,16 @@
       "file_identity": "ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 2.0.0, stripped",
       "path": "bin/linux-x86_64/auto-re-cli",
       "rust_target": "x86_64-unknown-linux-gnu",
-      "sha256": "a06695248a3007e1329fb73bcf61e9efe4a01d26465fb4c060f1b3ab4c66b518",
+      "sha256": "0eebba3f653b838516924734656542b7e4c16b46c671653356dd573da784191e",
       "signing": "not_applicable",
       "target": "linux-x86_64"
     },
     {
-      "bytes": 16365320,
+      "bytes": 16365368,
       "file_identity": "ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, for GNU/Linux 2.0.0, stripped",
       "path": "bin/linux-arm64/auto-re-cli",
       "rust_target": "aarch64-unknown-linux-gnu",
-      "sha256": "a88bfdcdf7fddbd2277139ef2f35b201e0a9ccb0c926cd11eb41d60123b5d9c9",
+      "sha256": "c8652d6fa339f9e48faccca764be7fad8df50db28f25964d3bbeea0276eb3080",
       "signing": "not_applicable",
       "target": "linux-arm64"
     },
@@ -63,7 +63,7 @@
         "timestamp": 0
       },
       "rust_target": "x86_64-pc-windows-gnullvm",
-      "sha256": "bac486d25a081e7e492e26e189201737e9270e77c538819caa8239dc6a0f11e3",
+      "sha256": "7a5533ee1e7fc0ba460c52d166c548a92dd7932eb6ddc290345c7e659ad1c26f",
       "signing": "not_applicable",
       "target": "windows-x86_64"
     }
@@ -94,15 +94,15 @@
     ],
     "name": "auto-re",
     "path": "skills/auto-re",
-    "version": "0.1.0"
+    "version": "0.1.1"
   },
   "source_repository": "auto-re_source",
-  "source_revision": "3c1ff60a8ce61413f554f92fc47151a9b0176b84",
+  "source_revision": "abca804d5773b055c29fccbc52f8d2a2e83517cb",
   "third_party_dependency_count": 54,
   "toolchain": {
     "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
     "pinned_channel": "1.97.1",
     "rust": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
   },
-  "version": "0.1.0"
+  "version": "0.1.1"
 }

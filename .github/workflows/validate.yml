@@ -30,7 +30,7 @@ jobs:
             "schema_version": "0.1.0",
             "next_actions": [
               {
-                "id": "function.selected",
+                "stage": "function.selected",
                 "reason": "inspect one selected function",
                 "expected_output": "bounded function JSON",
                 "stop_condition": "selected function is inspected",
@@ -49,7 +49,7 @@ jobs:
           JSON
           python3 skills/auto-re/scripts/run_next_action.py \
             "$work/result.json" \
-            --action-id function.selected \
+            --action-stage function.selected \
             --output "$work/function.json" \
             --dry-run > "$work/prepared.json"
           python3 - "$work/prepared.json" <<'PY'
@@ -59,6 +59,7 @@ jobs:
 
           payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
           assert payload["ok"] is True
+          assert payload["action_stage"] == "function.selected"
           assert payload["argv"][0] == "auto-re-cli"
           assert payload["argv"][-2] == "--output"
           PY
@@ -127,7 +128,7 @@ jobs:
         shell: pwsh
         run: |
           $actual = & "bin/windows-x86_64/auto-re-cli.exe" --version
-          if ($LASTEXITCODE -ne 0 -or $actual -ne "auto-re-cli 0.1.0") {
+          if ($LASTEXITCODE -ne 0 -or $actual -ne "auto-re-cli 0.1.1") {
             throw "unexpected windows-x86_64 version output: $actual"
           }
 
@@ -140,7 +141,7 @@ jobs:
             --install-dir $install
           $installed = Join-Path $install "auto-re-cli.exe"
           $actual = & $installed --version
-          if ($LASTEXITCODE -ne 0 -or $actual -ne "auto-re-cli 0.1.0") {
+          if ($LASTEXITCODE -ne 0 -or $actual -ne "auto-re-cli 0.1.1") {
             throw "unexpected installed version output: $actual"
           }
           py -3 scripts/autore_distribution.py uninstall `

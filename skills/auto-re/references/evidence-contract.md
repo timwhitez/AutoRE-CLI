@@ -44,7 +44,7 @@ manifest before loading the complete payload.
 
 Each action should include:
 
-- `id`
+- `stage`
 - `reason`
 - `expected_output`
 - `stop_condition`
@@ -59,7 +59,7 @@ Prefer the deterministic helper:
 
 ```bash
 python3 scripts/run_next_action.py <result-json> \
-  --action-id <id> \
+  --action-stage <stage> \
   --output <new-output.json> \
   --dry-run
 ```
