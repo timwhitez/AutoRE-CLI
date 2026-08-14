@@ -97,7 +97,7 @@
     "version": "0.1.0"
   },
   "source_repository": "auto-re_source",
-  "source_revision": "74a1f3e9430c9db73ad06dbd60b49175a13a5ed9",
+  "source_revision": "3c1ff60a8ce61413f554f92fc47151a9b0176b84",
   "third_party_dependency_count": 54,
   "toolchain": {
     "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
