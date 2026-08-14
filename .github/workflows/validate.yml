@@ -112,3 +112,40 @@ jobs:
           test ! -e "${AUTORE_INSTALL_DIR}/auto-re-cli"
           test ! -e "${TRAE_HOME}/skills/auto-re"
           test ! -e "${RUNNER_TEMP}/codex-legacy/skills/auto-re"
+
+  verify-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Verify distribution
+        shell: pwsh
+        run: py -3 scripts/autore_distribution.py verify
+
+      - name: Probe trusted Windows release binary
+        shell: pwsh
+        run: |
+          $actual = & "bin/windows-x86_64/auto-re-cli.exe" --version
+          if ($LASTEXITCODE -ne 0 -or $actual -ne "auto-re-cli 0.1.0") {
+            throw "unexpected windows-x86_64 version output: $actual"
+          }
+
+      - name: Install selected Windows binary
+        shell: pwsh
+        run: |
+          $install = Join-Path $env:RUNNER_TEMP "autore-bin"
+          py -3 scripts/autore_distribution.py install `
+            --cli-only `
+            --install-dir $install
+          $installed = Join-Path $install "auto-re-cli.exe"
+          $actual = & $installed --version
+          if ($LASTEXITCODE -ne 0 -or $actual -ne "auto-re-cli 0.1.0") {
+            throw "unexpected installed version output: $actual"
+          }
+          py -3 scripts/autore_distribution.py uninstall `
+            --cli-only `
+            --install-dir $install
+          if (Test-Path $installed) {
+            throw "managed Windows binary was not removed"
+          }

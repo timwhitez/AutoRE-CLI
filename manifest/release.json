@@ -28,15 +28,6 @@
       "target": "linux-x86_64"
     },
     {
-      "bytes": 21842256,
-      "file_identity": "ELF 32-bit LSB pie executable, Intel 80386, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux.so.2, for GNU/Linux 2.0.0, stripped",
-      "path": "bin/linux-x86/auto-re-cli",
-      "rust_target": "i686-unknown-linux-gnu",
-      "sha256": "0fcb1e5ad85ab7b5c600ad8179e1c15b40805d25cf9ee667315237b9081ad049",
-      "signing": "not_applicable",
-      "target": "linux-x86"
-    },
-    {
       "bytes": 16365320,
       "file_identity": "ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, for GNU/Linux 2.0.0, stripped",
       "path": "bin/linux-arm64/auto-re-cli",
@@ -44,6 +35,37 @@
       "sha256": "a88bfdcdf7fddbd2277139ef2f35b201e0a9ccb0c926cd11eb41d60123b5d9c9",
       "signing": "not_applicable",
       "target": "linux-arm64"
+    },
+    {
+      "bytes": 18184704,
+      "file_identity": "PE32+ executable (console) x86-64, for MS Windows",
+      "path": "bin/windows-x86_64/auto-re-cli.exe",
+      "pe": {
+        "architecture": "x86_64",
+        "imported_dlls": [
+          "api-ms-win-core-synch-l1-2-0.dll",
+          "api-ms-win-crt-convert-l1-1-0.dll",
+          "api-ms-win-crt-environment-l1-1-0.dll",
+          "api-ms-win-crt-filesystem-l1-1-0.dll",
+          "api-ms-win-crt-heap-l1-1-0.dll",
+          "api-ms-win-crt-locale-l1-1-0.dll",
+          "api-ms-win-crt-math-l1-1-0.dll",
+          "api-ms-win-crt-private-l1-1-0.dll",
+          "api-ms-win-crt-runtime-l1-1-0.dll",
+          "api-ms-win-crt-stdio-l1-1-0.dll",
+          "api-ms-win-crt-string-l1-1-0.dll",
+          "bcryptprimitives.dll",
+          "KERNEL32.dll",
+          "ntdll.dll"
+        ],
+        "llvm_mingw_runtime": "static",
+        "subsystem": "console",
+        "timestamp": 0
+      },
+      "rust_target": "x86_64-pc-windows-gnullvm",
+      "sha256": "bac486d25a081e7e492e26e189201737e9270e77c538819caa8239dc6a0f11e3",
+      "signing": "not_applicable",
+      "target": "windows-x86_64"
     }
   ],
   "kind": "autore_cli_binary_distribution",
@@ -75,7 +97,7 @@
     "version": "0.1.0"
   },
   "source_repository": "auto-re_source",
-  "source_revision": "11f13319f17abfbca869c77d63a7b185b2a997a3",
+  "source_revision": "74a1f3e9430c9db73ad06dbd60b49175a13a5ed9",
   "third_party_dependency_count": 54,
   "toolchain": {
     "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",

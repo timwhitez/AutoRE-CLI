@@ -1,5 +1,7 @@
 # AutoRE-CLI
 
+[English](README.md) | [简体中文](README_zh.md)
+
 [![Validate Distribution](https://github.com/timwhitez/AutoRE-CLI/actions/workflows/validate.yml/badge.svg)](https://github.com/timwhitez/AutoRE-CLI/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE-MIT)
 
@@ -37,7 +39,7 @@ specifications, samples, or analysis output.
 
 Requirements:
 
-- a supported macOS or Linux host;
+- a supported macOS, Linux, or Windows host;
 - Python 3.9 or newer;
 - no Rust toolchain and no source checkout.
 
@@ -48,9 +50,20 @@ cd AutoRE-CLI
 ./install.sh
 ```
 
+On Windows PowerShell, use the Python entrypoint (the `py -3` launcher or
+`python` both work):
+
+```powershell
+git clone https://github.com/timwhitez/AutoRE-CLI.git
+Set-Location AutoRE-CLI
+py -3 scripts/autore_distribution.py verify
+py -3 scripts/autore_distribution.py install
+```
+
 The default installation copies:
 
-- `auto-re-cli` to `${AUTORE_INSTALL_DIR:-$HOME/.local/bin}`;
+- `auto-re-cli` (or `auto-re-cli.exe` on Windows) to
+  `${AUTORE_INSTALL_DIR:-$HOME/.local/bin}`;
 - the Skill to `${TRAE_HOME:-$HOME/.trae}/skills/auto-re`;
 - the Skill to `$HOME/.agents/skills/auto-re`.
 
@@ -202,12 +215,11 @@ installed version.
 | macOS Apple Silicon | `macos-arm64` | Published; ad-hoc signed |
 | macOS Intel | `macos-x86_64` | Published; ad-hoc signed |
 | Linux x86-64 | `linux-x86_64` | Published |
-| Linux x86 | `linux-x86` | Published |
 | Linux AArch64 | `linux-arm64` | Published |
-| Windows | — | Not yet published |
+| Windows x86-64 | `windows-x86_64` | Published; unsigned |
 
-The macOS binaries are not Developer ID signed or notarized. Windows remains
-unsupported until a dedicated Rust Windows linker lane is validated.
+The macOS binaries are not Developer ID signed or notarized. The Windows
+binary supports Windows 10 or newer and is not Authenticode signed.
 
 ## Integrity And Provenance
 

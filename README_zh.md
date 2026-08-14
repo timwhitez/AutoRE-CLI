@@ -1,5 +1,7 @@
 # AutoRE-CLI
 
+[English](README.md) | [简体中文](README_zh.md)
+
 [![Validate Distribution](https://github.com/timwhitez/AutoRE-CLI/actions/workflows/validate.yml/badge.svg)](https://github.com/timwhitez/AutoRE-CLI/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE-MIT)
 
@@ -34,7 +36,7 @@ AI Agent 的 CLI-first 静态逆向工程引擎。
 
 要求：
 
-- 受支持的 macOS 或 Linux；
+- 受支持的 macOS、Linux 或 Windows；
 - Python 3.9 或更高版本；
 - 不需要 Rust toolchain，也不需要源码 checkout。
 
@@ -45,9 +47,19 @@ cd AutoRE-CLI
 ./install.sh
 ```
 
+Windows PowerShell 请使用 Python 入口（`py -3` launcher 或 `python` 均可）：
+
+```powershell
+git clone https://github.com/timwhitez/AutoRE-CLI.git
+Set-Location AutoRE-CLI
+py -3 scripts/autore_distribution.py verify
+py -3 scripts/autore_distribution.py install
+```
+
 默认安装位置：
 
-- CLI：`${AUTORE_INSTALL_DIR:-$HOME/.local/bin}/auto-re-cli`
+- CLI：`${AUTORE_INSTALL_DIR:-$HOME/.local/bin}/auto-re-cli`（Windows 为
+  `auto-re-cli.exe`）
 - Trae Skill：`${TRAE_HOME:-$HOME/.trae}/skills/auto-re`
 - Agent Skill：`$HOME/.agents/skills/auto-re`
 
@@ -192,12 +204,11 @@ raw architecture、base 和 entry 必须由调用者提供，不能从文件名�
 | macOS Apple Silicon | `macos-arm64` | 已发布；ad-hoc signed |
 | macOS Intel | `macos-x86_64` | 已发布；ad-hoc signed |
 | Linux x86-64 | `linux-x86_64` | 已发布 |
-| Linux x86 | `linux-x86` | 已发布 |
 | Linux AArch64 | `linux-arm64` | 已发布 |
-| Windows | — | 暂未发布 |
+| Windows x86-64 | `windows-x86_64` | 已发布；未签名 |
 
-macOS binary 没有 Developer ID 签名，也没有 notarization。Windows 需要独立且
-验证通过的 Rust Windows linker lane 后才会发布。
+macOS binary 没有 Developer ID 签名，也没有 notarization。Windows binary
+支持 Windows 10 或更高版本，且没有 Authenticode 签名。
 
 ## 完整性与来源
 

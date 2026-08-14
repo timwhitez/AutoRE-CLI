@@ -26,6 +26,7 @@ SKILL_NAME = "auto-re"
 CHECKSUM_FILE = "SHA256SUMS"
 MANIFEST_FILE = "manifest/release.json"
 BINARY_NAME = "auto-re-cli"
+WINDOWS_BINARY_NAME = "auto-re-cli.exe"
 BINARY_MARKER = ".auto-re-cli.autore-managed.json"
 SKILL_MARKER = ".autore-managed.json"
 FORBIDDEN_ROOT_NAMES = {
@@ -64,12 +65,32 @@ SUPPORTED_TARGETS = {
     ("Darwin", "amd64"): "macos-x86_64",
     ("Linux", "x86_64"): "linux-x86_64",
     ("Linux", "amd64"): "linux-x86_64",
-    ("Linux", "i386"): "linux-x86",
-    ("Linux", "i486"): "linux-x86",
-    ("Linux", "i586"): "linux-x86",
-    ("Linux", "i686"): "linux-x86",
     ("Linux", "aarch64"): "linux-arm64",
     ("Linux", "arm64"): "linux-arm64",
+    ("Windows", "amd64"): "windows-x86_64",
+    ("Windows", "x86_64"): "windows-x86_64",
+}
+RELEASE_TARGETS = {
+    "macos-arm64": (
+        "aarch64-apple-darwin",
+        "bin/macos-arm64/auto-re-cli",
+    ),
+    "macos-x86_64": (
+        "x86_64-apple-darwin",
+        "bin/macos-x86_64/auto-re-cli",
+    ),
+    "linux-x86_64": (
+        "x86_64-unknown-linux-gnu",
+        "bin/linux-x86_64/auto-re-cli",
+    ),
+    "linux-arm64": (
+        "aarch64-unknown-linux-gnu",
+        "bin/linux-arm64/auto-re-cli",
+    ),
+    "windows-x86_64": (
+        "x86_64-pc-windows-gnullvm",
+        "bin/windows-x86_64/auto-re-cli.exe",
+    ),
 }
 
 
@@ -212,6 +233,23 @@ def validate_public_allowlist(root: pathlib.Path, files: list[pathlib.Path]) -> 
                 )
 
 
+def validate_bilingual_documentation(root: pathlib.Path) -> None:
+    language_switch = "[English](README.md) | [简体中文](README_zh.md)"
+    for relative in ("README.md", "README_zh.md"):
+        path = root / relative
+        require_regular_file(path, "public README")
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as error:
+            raise DistributionError(f"cannot read public README {relative}: {error}") from error
+        if language_switch not in text:
+            raise DistributionError(f"missing bilingual README switch: {relative}")
+        if "windows-x86_64" not in text:
+            raise DistributionError(
+                f"published Windows target windows-x86_64 is missing from {relative}"
+            )
+
+
 def validate_manifest(
     root: pathlib.Path, manifest: dict[str, Any], checksums: dict[str, str]
 ) -> list[dict[str, Any]]:
@@ -256,11 +294,18 @@ def validate_manifest(
         if not isinstance(artifact, dict):
             raise DistributionError(f"artifacts[{index}] must be an object")
         target = artifact.get("target")
+        rust_target = artifact.get("rust_target")
         relative_text = artifact.get("path")
         signing = artifact.get("signing")
         if not isinstance(target, str) or target in targets:
             raise DistributionError(f"invalid or duplicate artifact target: {target!r}")
         targets.add(target)
+        contract = RELEASE_TARGETS.get(target)
+        if contract is None or (rust_target, relative_text) != contract:
+            raise DistributionError(
+                f"artifact target/path contract mismatch for {target}: "
+                f"rust_target={rust_target!r} path={relative_text!r}"
+            )
         expected_signing = "adhoc" if target.startswith("macos-") else "not_applicable"
         if signing != expected_signing:
             raise DistributionError(
@@ -284,6 +329,25 @@ def validate_manifest(
             raise DistributionError(f"artifact digest mismatch: {normalized}")
         if not os.access(binary, os.X_OK):
             raise DistributionError(f"release binary is not executable: {normalized}")
+        if target.startswith("windows-"):
+            pe = artifact.get("pe")
+            expected_arch = "x86_64" if target.endswith("x86_64") else "x86"
+            if (
+                not isinstance(pe, dict)
+                or pe.get("architecture") != expected_arch
+                or pe.get("subsystem") != "console"
+                or not isinstance(pe.get("imported_dlls"), list)
+                or not pe["imported_dlls"]
+                or pe.get("llvm_mingw_runtime") != "static"
+                or pe.get("timestamp") != 0
+            ):
+                raise DistributionError(f"invalid PE metadata for {target}")
+
+    if targets != set(RELEASE_TARGETS):
+        raise DistributionError(
+            "release artifact target set mismatch: "
+            f"expected={sorted(RELEASE_TARGETS)!r} actual={sorted(targets)!r}"
+        )
 
     skill = manifest.get("skill")
     if not isinstance(skill, dict) or skill.get("name") != SKILL_NAME:
@@ -324,6 +388,7 @@ def verify_distribution(root: pathlib.Path) -> dict[str, Any]:
     checksums = parse_checksums(root)
     files = list(iter_public_files(root))
     validate_public_allowlist(root, files)
+    validate_bilingual_documentation(root)
     actual_paths = {
         path.relative_to(root).as_posix()
         for path in files
@@ -367,6 +432,10 @@ def host_target() -> str:
         raise DistributionError(
             f"unsupported installation host: system={system!r} machine={machine!r}"
         ) from error
+
+
+def installed_binary_name() -> str:
+    return WINDOWS_BINARY_NAME if platform.system() == "Windows" else BINARY_NAME
 
 
 def parse_agents(value: str) -> list[str]:
@@ -716,7 +785,7 @@ def command_install(args: argparse.Namespace) -> dict[str, Any]:
             or os.environ.get("AUTORE_INSTALL_DIR")
             or pathlib.Path.home() / ".local" / "bin"
         ).expanduser()
-        destination = install_dir / BINARY_NAME
+        destination = install_dir / installed_binary_name()
         marker_path = install_dir / BINARY_MARKER
         marker = {
             "schema_version": SCHEMA_VERSION,
@@ -827,7 +896,7 @@ def command_uninstall(args: argparse.Namespace) -> dict[str, Any]:
             or os.environ.get("AUTORE_INSTALL_DIR")
             or pathlib.Path.home() / ".local" / "bin"
         ).expanduser()
-        destination = install_dir / BINARY_NAME
+        destination = install_dir / installed_binary_name()
         marker_path = install_dir / BINARY_MARKER
         marker = load_managed_marker(marker_path, "binary-install")
         if marker is not None:
