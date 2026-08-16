@@ -1,0 +1,53 @@
+name: Use case or integration
+description: Share a safe workflow, integration request, or adoption blocker
+title: "[Use case] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the workflow without uploading binaries, malware, recovered
+        payloads, secrets, private paths, or proprietary analysis output.
+  - type: dropdown
+    id: workflow
+    attributes:
+      label: Workflow
+      options:
+        - Human analyst CLI
+        - AI Agent Skill
+        - CI or automation
+        - Batch comparison
+        - Go or Rust analysis
+        - PE or malware triage
+        - Package manager or installation
+        - Documentation or teaching
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What are you trying to learn or automate?
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Current workflow
+      description: List sanitized tools, commands, and constraints.
+    validations:
+      required: true
+  - type: textarea
+    id: blocker
+    attributes:
+      label: Blocker or requested improvement
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: I removed samples, payloads, secrets, private paths, and proprietary output.
+          required: true

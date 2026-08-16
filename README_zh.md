@@ -3,68 +3,120 @@
 [English](README.md) | [简体中文](README_zh.md)
 
 [![Validate Distribution](https://github.com/timwhitez/AutoRE-CLI/actions/workflows/validate.yml/badge.svg)](https://github.com/timwhitez/AutoRE-CLI/actions/workflows/validate.yml)
+[![Release](https://img.shields.io/github/v/release/timwhitez/AutoRE-CLI?display_name=tag)](https://github.com/timwhitez/AutoRE-CLI/releases/latest)
+[![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-64748b)](#支持平台)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE-MIT)
 
-AutoRE-CLI 是 Auto-RE 的纯二进制发行仓库。Auto-RE 是面向人类分析师与
-AI Agent 的 CLI-first 静态逆向工程引擎。
+**面向人类分析师与 AI Agent 的有界纯静态逆向工程工具。**
 
-**由 [@timwhitez](https://github.com/timwhitez) 独立维护和发布。**
+AutoRE-CLI 把 ELF、PE/COFF、Mach-O、object file 和明确标识的 raw shellcode
+转换为可追溯 JSON、CFG/IL、可读 pseudo、语言证据与安全的下一步动作，全程不执行
+目标字节。
 
-本仓库只包含编译后二进制、`auto-re` Skill、离线安装器、SHA-256、发行来源、
-第三方许可和用户文档；不公开 Rust 源码仓、私有规格、样本或分析输出。
+![AutoRE-CLI 受控静态分析演示](assets/demo.png)
 
-[安装](#安装) · [Agent 快速开始](#agent-快速开始) ·
-[CLI 快速开始](#cli-快速开始) · [支持平台](#支持平台) ·
-[完整性](#完整性与来源) · [安全说明](SECURITY.md)
+[下载](https://github.com/timwhitez/AutoRE-CLI/releases/latest) ·
+[Agent 快速开始](#agent-快速开始) · [CLI 快速开始](#cli-快速开始) ·
+[为什么选择 AutoRE-CLI](#为什么选择-autore-cli) · [安全说明](SECURITY.md) ·
+[常见问题](FAQ_zh.md)
 
-## 核心特点
+## 为什么选择 AutoRE-CLI
 
-- **纯静态安全边界**：不得执行目标字节、恢复 shellcode、解包 payload、
-  embedded object 或任何目标派生产物。
-- **Agent 原生输出**：有界 JSON、显式预算、warnings、stop reason、
-  bundle/spill manifest 和可执行 `next_actions[].argv`。
-- **分层分析**：反汇编、CFG、LLIL、MLIL、HLIL、CUSTOM IL、可读 pseudo、
-  types、calls 与 data references。
-- **语言感知证据**：提供有边界的 Go/Rust inventory 与 proof state，不虚构
-  source-grade 语义。
-- **恶意样本静态检查**：PE resources/strings、static flow、packer/protection
-  evidence、batch archive、replay 和 semantic diff。
-- **可追溯发行**：每个二进制都绑定源码 revision、尺寸、target、签名状态和
-  SHA-256。
+- **证据强于自信**：结论明确区分 `validated`、`inferred`、`unresolved` 与
+  `not_claimed`。
+- **适合 Agent 的上下文**：有界 JSON、预算、warning、stop reason、经过验证的
+  bundle 和精确 `next_actions[].argv`，避免输出失控。
+- **纯静态安全边界**：不执行目标、恢复 payload、shellcode、embedded object
+  或任何目标派生产物。
+- **分层检查能力**：反汇编、CFG、LLIL、MLIL、HLIL、CUSTOM IL、pseudo、
+  types、calls、data references、PE inventory 与 Go/Rust 证据。
+- **可重复调查**：archive、replay、semantic diff 和 batch comparison 保留完整
+  证据路径。
+- **离线且可追溯**：安装过程不访问网络；每个发行 binary 都有明确 target、
+  byte count、源码 revision、签名状态和 SHA-256。
+
+### 与其他工具的关系
+
+| 工具 | 最适合的场景 | AutoRE-CLI 的差异 |
+| --- | --- | --- |
+| Ghidra、Rizin、angr | 可扩展交互式框架与定制分析 | AutoRE-CLI 是预构建、CLI-first、适合自动化和 Agent 的有界证据接口 |
+| Ghidra MCP 集成 | 用自然语言操作现有 Ghidra 环境 | AutoRE-CLI 不需要 GUI 或分析服务，并把纯静态边界写入输出契约 |
+| capa | 基于规则识别 binary capability | AutoRE-CLI 还提供函数、CFG/IL、pseudo、引用、语言证据与对比工作流 |
+| 通用 binary-analysis Skill | 在独立工具之上提供分析方法 | 本项目的 Skill 与 CLI 共用同一套已验证 action、artifact 和 evidence contract |
+
+AutoRE-CLI 不是 debugger、emulator 或 sandbox，也不声称完美恢复源码。如果需要
+插件生态、交互式 GUI、符号执行或动态观测，应使用相应的大型框架。
 
 ## 安装
 
-要求：
+要求是 Python 3.9 或更高版本以及受支持的主机；不需要 Rust toolchain 或源码
+checkout。
 
-- 受支持的 macOS、Linux 或 Windows；
-- Python 3.9 或更高版本；
-- 不需要 Rust toolchain，也不需要源码 checkout。
+### 单平台发行包
+
+从 [GitHub Releases](https://github.com/timwhitez/AutoRE-CLI/releases/latest)
+下载对应主机的压缩包，然后验证并安装：
 
 ```sh
-git clone https://github.com/timwhitez/AutoRE-CLI.git
+tar -xzf AutoRE-CLI-0.1.1-macos-arm64.tar.gz
+cd AutoRE-CLI-0.1.1-macos-arm64
+./verify.sh
+./install.sh
+auto-re-cli --version
+```
+
+可以把 `macos-arm64` 替换为 `macos-x86_64`、`linux-x86_64` 或
+`linux-arm64`。Windows 用户解压
+`AutoRE-CLI-0.1.1-windows-x86_64.zip` 后运行：
+
+```powershell
+py -3 scripts/autore_distribution.py verify
+py -3 scripts/autore_distribution.py install
+auto-re-cli --version
+```
+
+每个约 7–8 MB 的单平台包只包含一个 binary，以及 Agent Skill、离线安装器、
+provenance、checksums 与第三方 notice。也可以 clone 仓库获取完整平台矩阵：
+
+```sh
+git clone --depth 1 https://github.com/timwhitez/AutoRE-CLI.git
 cd AutoRE-CLI
 ./verify.sh
 ./install.sh
 ```
 
-Windows PowerShell 请使用 Python 入口（`py -3` launcher 或 `python` 均可）：
+### 包管理器
+
+包管理器只安装 CLI。Agent Skill 需要单独安装；如果希望获得完整且经过验证的发行
+内容，请使用上面的单平台压缩包。
+
+```sh
+# 为 Codex、Claude Code、Cursor 等客户端安装 Agent Skill
+npx skills add \
+  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.1/AutoRE-CLI-0.1.1-auto-re-skill.zip -g
+```
 
 ```powershell
-git clone https://github.com/timwhitez/AutoRE-CLI.git
-Set-Location AutoRE-CLI
-py -3 scripts/autore_distribution.py verify
-py -3 scripts/autore_distribution.py install
+# 在 Windows 上通过 Scoop 安装 CLI
+scoop install https://raw.githubusercontent.com/timwhitez/AutoRE-CLI/main/packaging/scoop/autore-cli.json
 ```
+
+仓库内包含版本化
+[Homebrew formula](https://github.com/timwhitez/AutoRE-CLI/blob/main/packaging/homebrew/autore-cli.rb)
+与
+[Scoop manifest](https://github.com/timwhitez/AutoRE-CLI/blob/main/packaging/scoop/autore-cli.json)。
+Homebrew formula 已为独立 Tap 准备好；在 Tap 发布前，请使用经过验证的 macOS
+或 Linux 单平台包。包管理器可用时间可能稍晚于 GitHub Release。
 
 默认安装位置：
 
-- CLI：`${AUTORE_INSTALL_DIR:-$HOME/.local/bin}/auto-re-cli`（Windows 为
-  `auto-re-cli.exe`）
-- Trae Skill：`${TRAE_HOME:-$HOME/.trae}/skills/auto-re`
-- Agent Skill：`$HOME/.agents/skills/auto-re`
+- CLI：`${AUTORE_INSTALL_DIR:-$HOME/.local/bin}/auto-re-cli`，Windows 为
+  `auto-re-cli.exe`；
+- Trae Skill：`${TRAE_HOME:-$HOME/.trae}/skills/auto-re`；
+- Agent Skill：`$HOME/.agents/skills/auto-re`。
 
-安装器不访问网络。它先验证完整发行内容，再探测选中的 binary；默认复制而非
-symlink，使用 managed marker，并拒绝覆盖 unmanaged destination，除非显式使用
+安装器会验证解压后的完整发行内容，只用 `--version` 探测已验证 binary，复制而非
+symlink，记录 managed marker，并拒绝覆盖 unmanaged destination，除非显式使用
 `--replace-unmanaged`。
 
 常用选项：
@@ -82,16 +134,10 @@ symlink，使用 managed marker，并拒绝覆盖 unmanaged destination，除非
 `--codex-home` 选择旧版 `<home>/skills` 兼容路径；当前默认路径是
 `$HOME/.agents/skills`。
 
-确保 binary 目录位于 `PATH`，然后运行：
-
-```sh
-auto-re-cli --version
-```
-
 ### 更新与卸载
 
-拉取或解压新发行后，重新运行 `./verify.sh` 和 `./install.sh`。managed drift、
-同版本 repack、降级和额外 Skill 文件都会 fail closed。
+解压新版本后重新运行 `./verify.sh` 和 `./install.sh`。managed drift、同版本
+binary repack、降级和额外 Skill 文件都会 fail closed。
 
 ```sh
 ./uninstall.sh
@@ -110,16 +156,11 @@ auto-re-cli --version
 ./analysis-results。不得执行样本或任何目标派生产物。
 ```
 
-Skill 会：
+Skill 会先验证 CLI；读取 bundle payload 前检查 ownership、size 和 SHA-256；
+分离不同证据强度；每次只跟随一个相关的静态 continuation；并在证据或预算边界处
+停止。
 
-1. 验证 `auto-re-cli`；
-2. 从有界 AI JSON context bundle 开始；
-3. 读取 bundle payload 前验证 ownership、size 和 SHA-256；
-4. 分开报告 validated、inferred、unresolved 与 not-claimed；
-5. 每次只跟随一个相关的静态 continuation；
-6. 在 stop condition、证据充分、预算耗尽或 unsupported 边界处停止。
-
-可用 helper 安全准备一个 emitted action，且不经过 shell interpolation：
+可用 helper 在不经过 shell interpolation 的情况下准备 emitted action：
 
 ```sh
 python3 skills/auto-re/scripts/run_next_action.py \
@@ -129,8 +170,8 @@ python3 skills/auto-re/scripts/run_next_action.py \
   --dry-run
 ```
 
-检查 argument vector 后再移除 `--dry-run`。已经拥有 bundle/spill sink 的 action
-会拒绝额外 `--output`。
+检查准确 argument vector 后再移除 `--dry-run`。已经拥有 bundle/spill sink 的
+action 会拒绝额外 `--output`。
 
 ## CLI 快速开始
 
@@ -150,6 +191,9 @@ python3 skills/auto-re/scripts/verify_bundle.py \
   ./analysis-results/sample.bundle/manifest.json
 ```
 
+Manifest 会记录 command-owned payload path、byte count、SHA-256、warning、
+budget、completion state、current finding 和有界 next action。
+
 ### 聚焦函数
 
 ```sh
@@ -164,6 +208,14 @@ auto-re-cli dump-il ./sample.exe \
   --format json \
   --output ./analysis-results/custom-il-401000.json
 ```
+
+### 复现安全 Demo
+
+[`examples/controlled/fixture.c`](examples/controlled/fixture.c) 是独立编写的无害
+fixture。把它构建为不可运行的 object，然后执行
+[`examples/controlled/README.md`](examples/controlled/README.md) 中的命令。
+实测 Demo 找到一个 AArch64 函数，在没有 truncation 或 warning 的情况下完成，并把
+缺失的类型证据保留为 `not_claimed`。
 
 ### 显式 Raw Shellcode
 
@@ -207,47 +259,62 @@ raw architecture、base 和 entry 必须由调用者提供，不能从文件名�
 | Linux AArch64 | `linux-arm64` | 已发布 |
 | Windows x86-64 | `windows-x86_64` | 已发布；未签名 |
 
-macOS binary 没有 Developer ID 签名，也没有 notarization。Windows binary
-支持 Windows 10 或更高版本，且没有 Authenticode 签名。
+macOS binary 没有 Developer ID 签名，也没有 notarization。Windows binary 支持
+Windows 10 或更高版本，且没有 Authenticode 签名。
 
 ## 完整性与来源
 
 安装前运行 `./verify.sh`。它验证：
 
-- `SHA256SUMS` 的每一行；
-- `manifest/release.json` 中所有 binary 的 target/path/size/hash；
+- 每一行 `SHA256SUMS` 和准确的公开文件集合；
+- `manifest/release.json` 中每个 binary 的 target/path/size/hash；
 - 精确的 managed Skill 文件集合；
 - MIT-only 项目许可证边界；
 - 个人 publisher 与 repository identity；
-- 不含源码根、Rust 源码、私有路径、样本、内部产物以及受管控的公司/内部账号标识。
+- 不含源码根、Rust 源码、私有路径、样本、内部产物以及受管控内部账号标识。
 
-`manifest/release.json` 记录 publisher、repository URL、版本、源码 revision、
-toolchain、target matrix 和 static-safety flags。第三方许可独立保存在
-`THIRD_PARTY_LICENSES.md` 与 `licenses/third-party/`。
+`manifest/release.json` 记录 publisher、repository URL、版本、distribution
+scope、源码 revision、toolchain、target matrix 和 static-safety flags。
+第三方许可独立保存在 `THIRD_PARTY_LICENSES.md` 与 `licenses/third-party/`。
+
+## 公开仓库边界
+
+本仓库是 Auto-RE 的 MIT 许可**公开二进制发行仓**，包含编译后二进制、开源 Agent
+Skill 与 helper、安装与校验脚本、Release 自动化、受控 Demo 源码、checksums、
+provenance、第三方 notice 和文档。
+
+引擎的 Rust 实现、私有规格、样本与分析输出没有在此公开。本仓库中的“开源”仅适用于
+公开脚本、Skill、example、自动化和文档，不代表 binary engine 的实现源码可用。
 
 ## 仓库结构
 
 ```text
-bin/                         多平台 binary
-skills/auto-re/              Agent Skill 与 deterministic helper
+assets/                       Demo 与社交传播素材
+bin/                          多平台 binary
+examples/controlled/          无害且可复现的 Demo 源码
+skills/auto-re/               Agent Skill 与 deterministic helper
 scripts/autore_distribution.py
-manifest/release.json        机器可读来源
-licenses/third-party/        第三方许可
-SHA256SUMS                   外层完整性清单
-install.sh / uninstall.sh    managed 本地安装
-verify.sh                    fail-closed 发行校验器
+scripts/build_release_assets.py
+manifest/release.json         机器可读来源
+licenses/third-party/         第三方许可
+SHA256SUMS                    外层完整性清单
+install.sh / uninstall.sh     managed 本地安装
+verify.sh                     fail-closed 发行校验器
 ```
 
 ## 支持
 
 - Bug 与文档：[Issues](https://github.com/timwhitez/AutoRE-CLI/issues)
+- 用例与集成需求：[公开讨论](https://github.com/timwhitez/AutoRE-CLI/discussions/1)
 - 安全问题：[私密漏洞报告](https://github.com/timwhitez/AutoRE-CLI/security/advisories/new)
 - 贡献边界：[CONTRIBUTING.md](CONTRIBUTING.md)
+- 发行记录：[CHANGELOG.md](CHANGELOG.md)
 - 维护者：[@timwhitez](https://github.com/timwhitez)
 
 不要上传恶意样本、恢复 payload、secret、私有路径或 proprietary analysis output。
 
 ## 许可证
 
-AutoRE-CLI 使用 [MIT License](LICENSE-MIT)。第三方依赖保留各自许可证，其中可能
-包含 Apache 许可依赖，详见 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)。
+AutoRE-CLI 公开发行内容使用 [MIT License](LICENSE-MIT)。第三方依赖保留各自
+许可证，其中可能包含 Apache 许可依赖，详见
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)。

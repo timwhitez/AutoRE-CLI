@@ -5,3 +5,4 @@ __pycache__/
 *.tmp
 *.bak
 analysis-results/
+release-assets/

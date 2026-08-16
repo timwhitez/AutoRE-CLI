@@ -29,6 +29,7 @@ BINARY_NAME = "auto-re-cli"
 WINDOWS_BINARY_NAME = "auto-re-cli.exe"
 BINARY_MARKER = ".auto-re-cli.autore-managed.json"
 SKILL_MARKER = ".autore-managed.json"
+IGNORED_WORKTREE_ROOTS = {"release-assets"}
 FORBIDDEN_ROOT_NAMES = {
     "benchmarks",
     "context",
@@ -143,9 +144,12 @@ def require_regular_file(path: pathlib.Path, label: str) -> os.stat_result:
 
 
 def iter_public_files(root: pathlib.Path) -> Iterable[pathlib.Path]:
+    repository_checkout = (root / ".git").exists()
     for path in sorted(root.rglob("*")):
         relative = path.relative_to(root)
         if ".git" in relative.parts:
+            continue
+        if repository_checkout and relative.parts[0] in IGNORED_WORKTREE_ROOTS:
             continue
         if path.is_symlink():
             raise DistributionError(f"public repository contains a symlink: {relative}")
@@ -262,6 +266,18 @@ def validate_manifest(
         or manifest.get("repository_url") != REPOSITORY_URL
     ):
         raise DistributionError("unexpected release publisher identity")
+    distribution_scope = manifest.get("distribution_scope")
+    package_target = manifest.get("package_target")
+    if distribution_scope == "repository":
+        if package_target is not None:
+            raise DistributionError("repository distribution must not set package_target")
+        expected_targets = set(RELEASE_TARGETS)
+    elif distribution_scope == "platform":
+        if package_target not in RELEASE_TARGETS:
+            raise DistributionError("platform distribution has an invalid package_target")
+        expected_targets = {package_target}
+    else:
+        raise DistributionError("unsupported distribution scope")
     version = manifest.get("version")
     source_revision = manifest.get("source_revision")
     if not isinstance(version, str) or not version:
@@ -343,10 +359,10 @@ def validate_manifest(
             ):
                 raise DistributionError(f"invalid PE metadata for {target}")
 
-    if targets != set(RELEASE_TARGETS):
+    if targets != expected_targets:
         raise DistributionError(
             "release artifact target set mismatch: "
-            f"expected={sorted(RELEASE_TARGETS)!r} actual={sorted(targets)!r}"
+            f"expected={sorted(expected_targets)!r} actual={sorted(targets)!r}"
         )
 
     skill = manifest.get("skill")
@@ -417,6 +433,8 @@ def verify_distribution(root: pathlib.Path) -> dict[str, Any]:
         "product": manifest["product"],
         "version": manifest["version"],
         "source_revision": manifest["source_revision"],
+        "distribution_scope": manifest["distribution_scope"],
+        "package_target": manifest.get("package_target"),
         "artifact_count": len(artifacts),
         "checksummed_file_count": len(checksums),
         "skill": manifest["skill"]["name"],

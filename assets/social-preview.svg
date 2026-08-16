@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title description">
+  <title id="title">AutoRE-CLI social preview</title>
+  <description id="description">Bounded static reverse engineering for analysts and AI agents.</description>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#070d19"/>
+      <stop offset="0.55" stop-color="#101827"/>
+      <stop offset="1" stop-color="#172033"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#a78bfa"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="640" fill="url(#background)"/>
+  <circle cx="1120" cy="90" r="260" fill="#22d3ee" opacity="0.08"/>
+  <circle cx="80" cy="610" r="280" fill="#8b5cf6" opacity="0.09"/>
+  <path d="M842 86h272l92 92v274l-92 92H842l-92-92V178z" fill="none" stroke="url(#accent)" stroke-width="4" opacity="0.72"/>
+  <path d="M816 200h324M816 260h232M816 320h286M816 380h190M816 440h250" stroke="#7dd3fc" stroke-width="14" stroke-linecap="round" opacity="0.8"/>
+  <circle cx="780" cy="200" r="10" fill="#34d399"/>
+  <circle cx="780" cy="260" r="10" fill="#fbbf24"/>
+  <circle cx="780" cy="320" r="10" fill="#94a3b8"/>
+  <circle cx="780" cy="380" r="10" fill="#a78bfa"/>
+  <circle cx="780" cy="440" r="10" fill="#22d3ee"/>
+
+  <text x="82" y="176" fill="#67e8f9" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="26" letter-spacing="4">STATIC · BOUNDED · EVIDENCE-BACKED</text>
+  <text x="78" y="284" fill="#f8fafc" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="88" font-weight="750">AutoRE-CLI</text>
+  <text x="82" y="358" fill="#cbd5e1" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="32">Reverse engineering for analysts and AI agents</text>
+  <rect x="82" y="414" width="526" height="68" rx="14" fill="#0b1220" stroke="#334155" stroke-width="2"/>
+  <text x="110" y="458" fill="#34d399" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="24">$ auto-re-cli report sample.o --json-profile ai</text>
+  <text x="84" y="552" fill="#94a3b8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="24">ELF · PE/COFF · Mach-O · Go · Rust · CFG · IL · Diff</text>
+</svg>

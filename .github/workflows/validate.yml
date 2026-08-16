@@ -114,6 +114,13 @@ jobs:
           test ! -e "${TRAE_HOME}/skills/auto-re"
           test ! -e "${RUNNER_TEMP}/codex-legacy/skills/auto-re"
 
+      - name: Build and verify platform release archives
+        run: |
+          set -euo pipefail
+          python3 scripts/build_release_assets.py \
+            --output "${RUNNER_TEMP}/autore-release-assets"
+          test "$(find "${RUNNER_TEMP}/autore-release-assets" -type f | wc -l)" -eq 7
+
   verify-windows:
     runs-on: windows-latest
     steps:
@@ -150,3 +157,35 @@ jobs:
           if (Test-Path $installed) {
             throw "managed Windows binary was not removed"
           }
+
+  publish-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - verify-linux-x86-64
+      - verify-windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Require tag and manifest version match
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(cat VERSION)"
+          test "${GITHUB_REF_NAME}" = "v${version}"
+
+      - name: Build independently verifiable assets
+        run: python3 scripts/build_release_assets.py
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            release-assets/* \
+            --title "AutoRE-CLI ${GITHUB_REF_NAME}" \
+            --notes-file "release-notes/${GITHUB_REF_NAME}.md" \
+            --verify-tag

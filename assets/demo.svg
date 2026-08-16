@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-labelledby="title description">
+  <title id="title">AutoRE-CLI controlled static analysis demo</title>
+  <description id="description">A terminal-style view of a bounded analysis result with validated, inferred, and not claimed evidence states.</description>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#08101f"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#000000" flood-opacity="0.38"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="680" rx="32" fill="url(#background)"/>
+  <circle cx="1060" cy="92" r="170" fill="#22d3ee" opacity="0.08"/>
+  <circle cx="114" cy="620" r="210" fill="#8b5cf6" opacity="0.08"/>
+  <g filter="url(#shadow)">
+    <rect x="58" y="48" width="1084" height="584" rx="20" fill="#0b1220" stroke="#273449" stroke-width="2"/>
+  </g>
+  <rect x="58" y="48" width="1084" height="58" rx="20" fill="#121c2e"/>
+  <rect x="58" y="84" width="1084" height="22" fill="#121c2e"/>
+  <circle cx="92" cy="77" r="7" fill="#fb7185"/>
+  <circle cx="116" cy="77" r="7" fill="#fbbf24"/>
+  <circle cx="140" cy="77" r="7" fill="#34d399"/>
+  <text x="600" y="83" text-anchor="middle" fill="#a7b4c8" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16">controlled fixture · static analysis only</text>
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="19">
+    <text x="92" y="148" fill="#67e8f9">$</text>
+    <text x="118" y="148" fill="#e5edf8">auto-re-cli report fixture.o --json-profile ai --limit 8</text>
+
+    <text x="92" y="194" fill="#34d399">✓ VERIFIED</text>
+    <text x="262" y="194" fill="#a7b4c8">owner=auto-re-cli · files=5 · SHA-256 checked</text>
+
+    <text x="92" y="236" fill="#34d399">✓ COMPLETE</text>
+    <text x="262" y="236" fill="#a7b4c8">complete=true · truncated=false · warnings=0</text>
+
+    <rect x="88" y="274" width="1016" height="2" fill="#25334a"/>
+
+    <text x="92" y="318" fill="#34d399">VALIDATED</text>
+    <text x="236" y="318" fill="#dbeafe">Mach-O · AArch64 · relocatable · one function</text>
+
+    <text x="92" y="358" fill="#fbbf24">INFERRED</text>
+    <text x="236" y="358" fill="#dbeafe">static flow root at 0x0 · return-oriented helper</text>
+
+    <text x="92" y="398" fill="#94a3b8">NOT CLAIMED</text>
+    <text x="260" y="398" fill="#dbeafe">no recovered type evidence in selected section</text>
+
+    <rect x="88" y="430" width="1016" height="2" fill="#25334a"/>
+
+    <text x="92" y="474" fill="#c4b5fd">PSEUDO</text>
+    <text x="210" y="474" fill="#94a3b8">evidence-backed, bounded output</text>
+    <text x="112" y="512" fill="#7dd3fc">w8</text>
+    <text x="146" y="512" fill="#dbeafe">= clamp(score, 0, 100);</text>
+    <text x="112" y="548" fill="#7dd3fc">w9</text>
+    <text x="146" y="548" fill="#dbeafe">= (record.flags &amp; 1) ? record.id : -record.id;</text>
+    <text x="112" y="584" fill="#f0abfc">return</text>
+    <text x="190" y="584" fill="#dbeafe">w8 + w9;</text>
+
+    <text x="1098" y="606" text-anchor="end" fill="#64748b" font-size="15">target bytes never executed</text>
+  </g>
+</svg>

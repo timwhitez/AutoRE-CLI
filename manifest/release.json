@@ -68,6 +68,7 @@
       "target": "windows-x86_64"
     }
   ],
+  "distribution_scope": "repository",
   "kind": "autore_cli_binary_distribution",
   "product": "AutoRE-CLI",
   "publisher": "timwhitez",
