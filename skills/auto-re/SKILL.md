@@ -62,7 +62,12 @@ Then:
      <result-dir>/bundle/manifest.json
    ```
 
-2. Read only files listed in the validator's `files[]`.
+2. Read only the private, read-only paths returned in the validator's
+   `files[].path`. The validator hashes and copies each payload from one stable
+   opened file object; `files[].source_path` is provenance only and must not be
+   reopened as validated evidence. Retain the returned `verified_root` until
+   the last consumer finishes, then remove it because
+   `cleanup_required=true`.
 3. Review `current_findings[]`, `warnings[]`, `budget`, `completion`, and
    `next_actions[]`.
 4. Select one action whose reason advances the user's question.
@@ -129,6 +134,7 @@ its recorded status.
 
 1. List created output paths.
 2. State warnings, truncation, unsupported states, and remaining questions.
-3. Remove task-owned temporary data after its final consumer.
+3. Remove every validator-owned `verified_root` and other task-owned temporary
+   data after its final consumer.
 4. Retain only user-requested reports or bundles.
 5. Confirm that no target or target-derived artifact executed.

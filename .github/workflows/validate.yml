@@ -134,8 +134,10 @@ jobs:
       - name: Probe trusted Windows release binary
         shell: pwsh
         run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          $expected = "auto-re-cli $version"
           $actual = & "bin/windows-x86_64/auto-re-cli.exe" --version
-          if ($LASTEXITCODE -ne 0 -or $actual -ne "auto-re-cli 0.1.1") {
+          if ($LASTEXITCODE -ne 0 -or $actual -ne $expected) {
             throw "unexpected windows-x86_64 version output: $actual"
           }
 
@@ -147,8 +149,10 @@ jobs:
             --cli-only `
             --install-dir $install
           $installed = Join-Path $install "auto-re-cli.exe"
+          $version = (Get-Content VERSION -Raw).Trim()
+          $expected = "auto-re-cli $version"
           $actual = & $installed --version
-          if ($LASTEXITCODE -ne 0 -or $actual -ne "auto-re-cli 0.1.1") {
+          if ($LASTEXITCODE -ne 0 -or $actual -ne $expected) {
             throw "unexpected installed version output: $actual"
           }
           py -3 scripts/autore_distribution.py uninstall `

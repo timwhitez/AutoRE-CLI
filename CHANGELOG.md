@@ -4,6 +4,28 @@ All notable changes to the public AutoRE-CLI distribution are recorded here.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-08-31
+
+### Added
+
+- Exact repository and one-platform distribution scopes for independently
+  verifiable release archives.
+- Static recovery for additional ELF PLT, PE import, DWARF, AArch64, x86, Go,
+  and Rust evidence families.
+
+### Changed
+
+- Rebuilt all five platform binaries from source revision
+  `35380fa076394ff4f63bb6ab0665bc58d18bcd04` with Rust 1.97.1.
+- Updated the Agent Skill, bounded continuation helpers, installer, verifier,
+  provenance manifest, and third-party dependency inventory.
+
+### Security
+
+- Hardened archive path identity, artifact transactions, split-output
+  ownership, bounded control-file reads, streaming hashes, XAR/CPIO integrity,
+  and trusted UPX helper launch handling.
+
 ## [0.1.1] - 2026-08-17
 
 ### Added
@@ -36,6 +58,7 @@ All notable changes to the public AutoRE-CLI distribution are recorded here.
 - Offline installer, uninstaller, fail-closed verifier, release provenance,
   third-party notices, and `auto-re` Agent Skill.
 
-[Unreleased]: https://github.com/timwhitez/AutoRE-CLI/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/timwhitez/AutoRE-CLI/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/timwhitez/AutoRE-CLI/releases/tag/v0.1.2
 [0.1.1]: https://github.com/timwhitez/AutoRE-CLI/releases/tag/v0.1.1
 [0.1.0]: https://github.com/timwhitez/AutoRE-CLI/releases/tag/v0.1.0
