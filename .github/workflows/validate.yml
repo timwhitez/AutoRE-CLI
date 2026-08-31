@@ -28,6 +28,9 @@ jobs:
           cat > "$work/result.json" <<'JSON'
           {
             "schema_version": "0.1.0",
+            "profile": "ai",
+            "binary": {},
+            "summary": {},
             "next_actions": [
               {
                 "stage": "function.selected",
