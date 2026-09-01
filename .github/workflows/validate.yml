@@ -54,6 +54,7 @@ jobs:
             "$work/result.json" \
             --action-stage function.selected \
             --output "$work/function.json" \
+            --receipt "$work/action-receipt.json" \
             --dry-run > "$work/prepared.json"
           python3 - "$work/prepared.json" <<'PY'
           import json
@@ -65,6 +66,63 @@ jobs:
           assert payload["action_stage"] == "function.selected"
           assert payload["argv"][0] == "auto-re-cli"
           assert payload["argv"][-2] == "--output"
+          assert payload["planned_receipt"].endswith("action-receipt.json")
+          assert payload["planned_log_dir"].endswith("action-receipt.json.logs")
+          PY
+
+      - name: Test bounded bundle verification receipt and cleanup
+        run: |
+          set -euo pipefail
+          work="${RUNNER_TEMP}/autore-verification"
+          mkdir -p "$work"
+          printf '{"schema_version":"0.1.0"}\n' > "$work/summary.json"
+          python3 - "$work" <<'PY'
+          import hashlib
+          import json
+          import pathlib
+          import sys
+
+          root = pathlib.Path(sys.argv[1])
+          payload = root / "summary.json"
+          data = payload.read_bytes()
+          manifest = {
+              "schema_version": "0.1.0",
+              "owner": "auto-re-cli",
+              "kind": "context_bundle",
+              "files": [{
+                  "ownership": "command",
+                  "path": payload.name,
+                  "section_id": "summary",
+                  "bytes": len(data),
+                  "sha256": hashlib.sha256(data).hexdigest(),
+              }],
+          }
+          (root / "manifest.json").write_text(
+              json.dumps(manifest), encoding="utf-8"
+          )
+          PY
+          python3 skills/auto-re/scripts/verify_bundle.py \
+            "$work/manifest.json" \
+            --receipt "$work/verification-receipt.json" \
+            > "$work/verification-summary.json"
+          python3 skills/auto-re/scripts/verify_bundle.py \
+            --cleanup-receipt "$work/verification-receipt.json" \
+            > "$work/cleanup-summary.json"
+          python3 - "$work" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          root = pathlib.Path(sys.argv[1])
+          verification = json.loads(
+              (root / "verification-summary.json").read_text(encoding="utf-8")
+          )
+          cleanup = json.loads(
+              (root / "cleanup-summary.json").read_text(encoding="utf-8")
+          )
+          assert verification["kind"] == "auto_re_bundle_verification_summary"
+          assert cleanup["removed"] is True
+          assert not pathlib.Path(cleanup["verified_root"]).exists()
           PY
 
       - name: Install in isolated homes
@@ -78,6 +136,9 @@ jobs:
           "${AUTORE_INSTALL_DIR}/auto-re-cli" --version
           test -f "${TRAE_HOME}/skills/auto-re/SKILL.md"
           test -f "${RUNNER_TEMP}/codex-legacy/skills/auto-re/SKILL.md"
+          python3 "${RUNNER_TEMP}/codex-legacy/skills/auto-re/scripts/skill_doctor.py" \
+            --skill-root "${RUNNER_TEMP}/codex-legacy/skills/auto-re" \
+            --cli "${AUTORE_INSTALL_DIR}/auto-re-cli"
 
       - name: Analyze a controlled object without execution
         env:
@@ -134,6 +195,10 @@ jobs:
         shell: pwsh
         run: py -3 scripts/autore_distribution.py verify
 
+      - name: Validate the Auto-RE Skill
+        shell: pwsh
+        run: py -3 scripts/quick_validate_skill.py skills/auto-re
+
       - name: Probe trusted Windows release binary
         shell: pwsh
         run: |
@@ -157,6 +222,12 @@ jobs:
           $actual = & $installed --version
           if ($LASTEXITCODE -ne 0 -or $actual -ne $expected) {
             throw "unexpected installed version output: $actual"
+          }
+          py -3 "skills/auto-re/scripts/skill_doctor.py" `
+            --skill-root "skills/auto-re" `
+            --cli $installed
+          if ($LASTEXITCODE -ne 0) {
+            throw "Auto-RE Skill doctor failed"
           }
           py -3 scripts/autore_distribution.py uninstall `
             --cli-only `

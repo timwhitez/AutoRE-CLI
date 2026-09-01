@@ -58,8 +58,8 @@ checkout。
 下载对应主机的压缩包，然后验证并安装：
 
 ```sh
-tar -xzf AutoRE-CLI-0.1.2-macos-arm64.tar.gz
-cd AutoRE-CLI-0.1.2-macos-arm64
+tar -xzf AutoRE-CLI-0.1.3-macos-arm64.tar.gz
+cd AutoRE-CLI-0.1.3-macos-arm64
 ./verify.sh
 ./install.sh
 auto-re-cli --version
@@ -67,7 +67,7 @@ auto-re-cli --version
 
 可以把 `macos-arm64` 替换为 `macos-x86_64`、`linux-x86_64` 或
 `linux-arm64`。Windows 用户解压
-`AutoRE-CLI-0.1.2-windows-x86_64.zip` 后运行：
+`AutoRE-CLI-0.1.3-windows-x86_64.zip` 后运行：
 
 ```powershell
 py -3 scripts/autore_distribution.py verify
@@ -93,7 +93,7 @@ cd AutoRE-CLI
 ```sh
 # 为 Codex、Claude Code、Cursor 等客户端安装 Agent Skill
 npx skills add \
-  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.2/AutoRE-CLI-0.1.2-auto-re-skill.zip -g
+  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.3/AutoRE-CLI-0.1.3-auto-re-skill.zip -g
 ```
 
 ```powershell
@@ -156,9 +156,15 @@ binary repack、降级和额外 Skill 文件都会 fail closed。
 ./analysis-results。不得执行样本或任何目标派生产物。
 ```
 
-Skill 会先验证 CLI；读取 bundle payload 前检查 ownership、size 和 SHA-256；
-分离不同证据强度；每次只跟随一个相关的静态 continuation；并在证据或预算边界处
-停止。
+Skill 会先诊断 CLI/Skill 版本一致性和重复注册；对明确的窄问题直接选择最小命令；
+把 bundle 校验为有界 receipt 后再读取；分离不同证据强度；每次只跟随一个相关的
+静态 continuation，并将操作日志限制在有界 tail 中；最后在证据或预算边界处停止。
+
+分析前可检查已安装的 CLI/Skill 组合：
+
+```sh
+python3 "$HOME/.agents/skills/auto-re/scripts/skill_doctor.py"
+```
 
 可用 helper 在不经过 shell interpolation 的情况下准备 emitted action：
 
@@ -167,6 +173,7 @@ python3 skills/auto-re/scripts/run_next_action.py \
   ./analysis-results/sample.bundle/manifest.json \
   --action-stage function.selected \
   --output ./analysis-results/function-selected.json \
+  --receipt ./analysis-results/receipts/function-selected.json \
   --dry-run
 ```
 
@@ -179,6 +186,7 @@ action 会拒绝额外 `--output`。
 
 ```sh
 mkdir -p ./analysis-results
+mkdir -p ./analysis-results/receipts
 auto-re-cli report ./sample.exe \
   --format json \
   --json-profile ai \
@@ -188,11 +196,18 @@ auto-re-cli report ./sample.exe \
   --output ./analysis-results/sample.bundle/manifest.json
 
 python3 skills/auto-re/scripts/verify_bundle.py \
-  ./analysis-results/sample.bundle/manifest.json
+  ./analysis-results/sample.bundle/manifest.json \
+  --receipt ./analysis-results/receipts/bundle-verification.json
 ```
 
-Manifest 会记录 command-owned payload path、byte count、SHA-256、warning、
-budget、completion state、current finding 和有界 next action。
+Receipt 会指向稳定的只读 payload 副本，并记录 byte count、SHA-256、warning、
+budget、completion state、current finding 和有界 next action。最后一个消费者结束后，
+只清理 validator 拥有的临时树：
+
+```sh
+python3 skills/auto-re/scripts/verify_bundle.py \
+  --cleanup-receipt ./analysis-results/receipts/bundle-verification.json
+```
 
 ### 聚焦函数
 

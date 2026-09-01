@@ -8,10 +8,12 @@ import hashlib
 import json
 import os
 import pathlib
+import secrets
 import shutil
 import stat
 import sys
 import tempfile
+from datetime import datetime, timezone
 from typing import Any, BinaryIO, NamedTuple
 
 
@@ -22,6 +24,11 @@ EXPECTED_OWNERSHIP = "command"
 FILE_ATTRIBUTE_REPARSE_POINT = 0x400
 COPY_CHUNK_BYTES = 1024 * 1024
 CONTROL_READ_CHUNK_BYTES = 64 * 1024
+MAX_BUNDLE_FILE_COUNT = 64
+MAX_TOTAL_PAYLOAD_BYTES = 64 * 1024 * 1024
+VERIFICATION_RECEIPT_MAX_BYTES = 1024 * 1024
+VERIFIED_ROOT_MARKER = ".auto-re-verified-root.json"
+VERIFIED_ROOT_PREFIX = "auto-re-verified-bundle."
 
 
 class ControlJsonPolicy(NamedTuple):
@@ -41,6 +48,32 @@ VERIFIED_BUNDLE_MANIFEST_POLICY = ControlJsonPolicy(
     100_000,
     1024 * 1024,
 )
+
+VERIFICATION_RECEIPT_POLICY = ControlJsonPolicy(
+    "bundle_verification_receipt",
+    VERIFICATION_RECEIPT_MAX_BYTES,
+    64,
+    4096,
+    1024,
+    1024 * 1024,
+)
+
+VERIFIED_ROOT_MARKER_POLICY = ControlJsonPolicy(
+    "verified_root_marker",
+    8192,
+    8,
+    64,
+    32,
+    4096,
+)
+
+
+class ManifestFileRow(NamedTuple):
+    relative: pathlib.PurePosixPath
+    relative_text: str
+    expected_bytes: int
+    expected_sha256: str
+    section_id: Any
 
 
 class ValidationError(Exception):
@@ -154,6 +187,73 @@ def safe_relative_path(value: Any) -> pathlib.PurePosixPath:
     if "\\" in value:
         raise ValidationError(f"backslash payload path is forbidden: {value}")
     return path
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _materialization_limit(dimension: str, limit: int, observed: int) -> ValidationError:
+    return ValidationError(
+        "bundle_materialization_limit: "
+        f"dimension={dimension} limit={limit} observed={observed}"
+    )
+
+
+def prepare_manifest_rows(files: Any) -> tuple[list[ManifestFileRow], int]:
+    if not isinstance(files, list) or not files:
+        raise ValidationError("manifest files[] must be a non-empty array")
+    if len(files) > MAX_BUNDLE_FILE_COUNT:
+        raise _materialization_limit(
+            "file_count", MAX_BUNDLE_FILE_COUNT, len(files)
+        )
+
+    rows: list[ManifestFileRow] = []
+    seen_paths: set[str] = set()
+    total_payload_bytes = 0
+    for index, row in enumerate(files):
+        if not isinstance(row, dict):
+            raise ValidationError(f"files[{index}] must be an object")
+        if row.get("ownership") != EXPECTED_OWNERSHIP:
+            raise ValidationError(f"files[{index}].ownership must be command")
+        relative = safe_relative_path(row.get("path"))
+        relative_text = relative.as_posix()
+        if relative_text in seen_paths:
+            raise ValidationError(f"duplicate payload path: {relative_text}")
+        seen_paths.add(relative_text)
+
+        expected_bytes = row.get("bytes")
+        if not isinstance(expected_bytes, int) or isinstance(expected_bytes, bool):
+            raise ValidationError(f"files[{index}].bytes must be an integer")
+        if expected_bytes < 0:
+            raise ValidationError(f"files[{index}].bytes must not be negative")
+        total_payload_bytes += expected_bytes
+        if total_payload_bytes > MAX_TOTAL_PAYLOAD_BYTES:
+            raise _materialization_limit(
+                "total_payload_bytes",
+                MAX_TOTAL_PAYLOAD_BYTES,
+                total_payload_bytes,
+            )
+
+        expected_sha256 = row.get("sha256")
+        if (
+            not isinstance(expected_sha256, str)
+            or len(expected_sha256) != 64
+            or any(character not in "0123456789abcdef" for character in expected_sha256)
+        ):
+            raise ValidationError(
+                f"files[{index}].sha256 must be lowercase hexadecimal SHA-256"
+            )
+        rows.append(
+            ManifestFileRow(
+                relative,
+                relative_text,
+                expected_bytes,
+                expected_sha256,
+                row.get("section_id", row.get("section")),
+            )
+        )
+    return rows, total_payload_bytes
 
 
 def path_is_indirection(path: pathlib.Path, metadata: os.stat_result) -> bool:
@@ -284,18 +384,27 @@ def copy_and_hash_opened_payload(
     expected_sha256: str,
     label: str,
 ) -> tuple[int, str]:
+    if opened.st_size != expected_bytes:
+        raise ValidationError(
+            f"payload size mismatch for {label}: "
+            f"expected {expected_bytes}, got {opened.st_size}"
+        )
     destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     digest = hashlib.sha256()
     observed_bytes = 0
     try:
         with destination.open("xb") as output:
-            while True:
-                chunk = handle.read(COPY_CHUNK_BYTES)
+            while observed_bytes < expected_bytes:
+                remaining = expected_bytes - observed_bytes
+                chunk = handle.read(min(COPY_CHUNK_BYTES, remaining))
                 if not chunk:
                     break
                 observed_bytes += len(chunk)
                 digest.update(chunk)
                 output.write(chunk)
+            trailing = handle.read(1)
+            if trailing:
+                observed_bytes += len(trailing)
             output.flush()
             os.fsync(output.fileno())
         after = os.fstat(handle.fileno())
@@ -338,6 +447,71 @@ def remove_verified_root(root: pathlib.Path) -> None:
     shutil.rmtree(root, onerror=_retry_remove_readonly)
 
 
+def resolve_new_output(path: pathlib.Path, label: str) -> pathlib.Path:
+    requested = path.expanduser().absolute()
+    try:
+        requested.lstat()
+    except FileNotFoundError:
+        pass
+    except OSError as error:
+        raise ValidationError(f"cannot inspect {label} output: {error}") from error
+    else:
+        raise ValidationError(f"{label} output already exists: {requested}")
+    try:
+        parent = requested.parent.resolve(strict=True)
+    except OSError as error:
+        raise ValidationError(f"{label} output parent is unavailable: {error}") from error
+    return parent / requested.name
+
+
+def write_json_exclusive(
+    path: pathlib.Path,
+    value: dict[str, Any],
+    *,
+    label: str,
+    max_encoded_bytes: int,
+) -> pathlib.Path:
+    target = resolve_new_output(path, label)
+    encoded = (json.dumps(value, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    if len(encoded) > max_encoded_bytes:
+        raise ValidationError(
+            f"{label} output exceeds limit: limit={max_encoded_bytes} "
+            f"observed={len(encoded)}"
+        )
+    try:
+        with target.open("xb") as output:
+            output.write(encoded)
+            output.flush()
+            os.fsync(output.fileno())
+        target.chmod(0o400)
+    except OSError as error:
+        target.unlink(missing_ok=True)
+        raise ValidationError(f"cannot write {label} output: {error}") from error
+    return target
+
+
+def write_verified_root_marker(
+    verified_root: pathlib.Path,
+    cleanup_token: str,
+) -> dict[str, Any]:
+    root_metadata = verified_root.lstat()
+    device, inode = stable_identity(root_metadata, "verified root")
+    marker = {
+        "schema_version": 1,
+        "owner": "auto-re-skill",
+        "kind": "auto_re_verified_root",
+        "cleanup_token": cleanup_token,
+        "root_identity": {"device": device, "inode": inode},
+    }
+    write_json_exclusive(
+        verified_root / VERIFIED_ROOT_MARKER,
+        marker,
+        label="verified-root marker",
+        max_encoded_bytes=VERIFIED_ROOT_MARKER_POLICY.max_encoded_bytes,
+    )
+    return marker
+
+
 def validate_manifest(path: pathlib.Path) -> dict[str, Any]:
     root = path.parent.resolve(strict=True)
     manifest_path = root / path.name
@@ -353,72 +527,45 @@ def validate_manifest(path: pathlib.Path) -> dict[str, Any]:
     if manifest.get("kind") not in SUPPORTED_KINDS:
         raise ValidationError(f"unsupported manifest kind: {manifest.get('kind')!r}")
 
-    files = manifest.get("files")
-    if not isinstance(files, list) or not files:
-        raise ValidationError("manifest files[] must be a non-empty array")
+    rows, total_payload_bytes = prepare_manifest_rows(manifest.get("files"))
 
     verified_root = pathlib.Path(
-        tempfile.mkdtemp(prefix="auto-re-verified-bundle.")
+        tempfile.mkdtemp(prefix=VERIFIED_ROOT_PREFIX)
     )
-    seen_paths: set[str] = set()
+    cleanup_token = secrets.token_hex(32)
     validated: list[dict[str, Any]] = []
     try:
         verified_root.chmod(0o700)
-        for index, row in enumerate(files):
-            if not isinstance(row, dict):
-                raise ValidationError(f"files[{index}] must be an object")
-            if row.get("ownership") != EXPECTED_OWNERSHIP:
-                raise ValidationError(f"files[{index}].ownership must be command")
-            relative = safe_relative_path(row.get("path"))
-            relative_text = relative.as_posix()
-            if relative_text in seen_paths:
-                raise ValidationError(f"duplicate payload path: {relative_text}")
-            seen_paths.add(relative_text)
-
-            expected_bytes = row.get("bytes")
-            if not isinstance(expected_bytes, int) or isinstance(expected_bytes, bool):
-                raise ValidationError(f"files[{index}].bytes must be an integer")
-            if expected_bytes < 0:
-                raise ValidationError(f"files[{index}].bytes must not be negative")
-
-            expected_sha256 = row.get("sha256")
-            if (
-                not isinstance(expected_sha256, str)
-                or len(expected_sha256) != 64
-                or any(character not in "0123456789abcdef" for character in expected_sha256)
-            ):
-                raise ValidationError(
-                    f"files[{index}].sha256 must be lowercase hexadecimal SHA-256"
-                )
-
-            payload = root.joinpath(*relative.parts)
+        write_verified_root_marker(verified_root, cleanup_token)
+        for row in rows:
+            payload = root.joinpath(*row.relative.parts)
             handle, opened = open_regular_file_stably(payload, root, "payload")
-            destination = verified_root.joinpath(*relative.parts)
+            destination = verified_root.joinpath(*row.relative.parts)
             try:
                 observed_bytes, actual_sha256 = copy_and_hash_opened_payload(
                     handle,
                     opened,
                     destination,
-                    expected_bytes,
-                    expected_sha256,
-                    relative_text,
+                    row.expected_bytes,
+                    row.expected_sha256,
+                    row.relative_text,
                 )
             finally:
                 handle.close()
 
-            device, inode = stable_identity(opened, relative_text)
+            device, inode = stable_identity(opened, row.relative_text)
             validated.append(
                 {
                     "path": str(destination),
                     "source_path": str(payload),
-                    "relative_path": relative_text,
+                    "relative_path": row.relative_text,
                     "bytes": observed_bytes,
                     "sha256": actual_sha256,
                     "stable_identity": {
                         "device": device,
                         "inode": inode,
                     },
-                    "section_id": row.get("section_id", row.get("section")),
+                    "section_id": row.section_id,
                 }
             )
     except BaseException as error:
@@ -439,8 +586,10 @@ def validate_manifest(path: pathlib.Path) -> dict[str, Any]:
         "manifest_path": str(manifest_path),
         "verified_root": str(verified_root),
         "cleanup_required": True,
+        "cleanup_token": cleanup_token,
         "consumption_contract": "read_materialized_verified_paths_only",
         "file_count": len(validated),
+        "total_payload_bytes": total_payload_bytes,
         "files": validated,
         "completion": manifest.get("completion"),
         "next_action_count": len(manifest.get("next_actions", []))
@@ -449,18 +598,183 @@ def validate_manifest(path: pathlib.Path) -> dict[str, Any]:
     }
 
 
+def build_verification_receipt(result: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "owner": "auto-re-skill",
+        "kind": "auto_re_bundle_verification_receipt",
+        "created_at": utc_now(),
+        "manifest": {
+            "path": result["manifest_path"],
+            "owner": result["owner"],
+            "kind": result["kind"],
+            "schema_version": result["schema_version"],
+        },
+        "verified_root": result["verified_root"],
+        "cleanup_required": result["cleanup_required"],
+        "cleanup_token": result["cleanup_token"],
+        "consumption_contract": result["consumption_contract"],
+        "limits": {
+            "max_file_count": MAX_BUNDLE_FILE_COUNT,
+            "max_total_payload_bytes": MAX_TOTAL_PAYLOAD_BYTES,
+        },
+        "file_count": result["file_count"],
+        "total_payload_bytes": result["total_payload_bytes"],
+        "files": result["files"],
+        "completion": result["completion"],
+        "next_action_count": result["next_action_count"],
+    }
+
+
+def validate_manifest_to_receipt(
+    manifest_path: pathlib.Path,
+    receipt_path: pathlib.Path,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    receipt_target = resolve_new_output(receipt_path, "receipt")
+    result = validate_manifest(manifest_path)
+    try:
+        receipt = build_verification_receipt(result)
+        written = write_json_exclusive(
+            receipt_target,
+            receipt,
+            label="receipt",
+            max_encoded_bytes=VERIFICATION_RECEIPT_MAX_BYTES,
+        )
+    except BaseException as error:
+        try:
+            remove_verified_root(pathlib.Path(result["verified_root"]))
+        except OSError as cleanup_error:
+            raise ValidationError(
+                "verification receipt failed and verified-copy cleanup failed: "
+                f"{cleanup_error}; retained recovery path: {result['verified_root']}"
+            ) from error
+        raise
+    summary = {
+        "ok": True,
+        "owner": "auto-re-skill",
+        "kind": "auto_re_bundle_verification_summary",
+        "receipt_path": str(written),
+        "verified_root": receipt["verified_root"],
+        "cleanup_required": True,
+        "file_count": receipt["file_count"],
+        "total_payload_bytes": receipt["total_payload_bytes"],
+    }
+    return receipt, summary
+
+
+def _read_verification_receipt(path: pathlib.Path) -> tuple[pathlib.Path, dict[str, Any]]:
+    requested = path.expanduser().absolute()
+    try:
+        root = requested.parent.resolve(strict=True)
+    except OSError as error:
+        raise ValidationError(f"cannot resolve receipt parent: {error}") from error
+    receipt_path = root / requested.name
+    receipt = read_json_object_stably(
+        receipt_path,
+        root,
+        "verification receipt",
+        policy=VERIFICATION_RECEIPT_POLICY,
+    )
+    if receipt.get("schema_version") != 1:
+        raise ValidationError("unsupported verification receipt schema_version")
+    if receipt.get("owner") != "auto-re-skill":
+        raise ValidationError("verification receipt owner must be auto-re-skill")
+    if receipt.get("kind") != "auto_re_bundle_verification_receipt":
+        raise ValidationError("unsupported verification receipt kind")
+    return receipt_path, receipt
+
+
+def cleanup_verified_receipt(path: pathlib.Path) -> dict[str, Any]:
+    receipt_path, receipt = _read_verification_receipt(path)
+    root_text = receipt.get("verified_root")
+    cleanup_token = receipt.get("cleanup_token")
+    if not isinstance(root_text, str) or not pathlib.PurePath(root_text).is_absolute():
+        raise ValidationError("verification receipt verified_root must be absolute")
+    if (
+        not isinstance(cleanup_token, str)
+        or len(cleanup_token) != 64
+        or any(character not in "0123456789abcdef" for character in cleanup_token)
+    ):
+        raise ValidationError("verification receipt cleanup_token is invalid")
+
+    temporary_root = pathlib.Path(tempfile.gettempdir()).resolve(strict=True)
+    verified_root = pathlib.Path(root_text)
+    if verified_root.name.startswith(VERIFIED_ROOT_PREFIX) is False:
+        raise ValidationError("verification receipt verified_root prefix is invalid")
+    try:
+        if verified_root.parent.resolve(strict=True) != temporary_root:
+            raise ValidationError("verification receipt verified_root is outside temp root")
+        root_metadata = verified_root.lstat()
+    except ValidationError:
+        raise
+    except OSError as error:
+        raise ValidationError(f"cannot inspect verified root: {error}") from error
+    if path_is_indirection(verified_root, root_metadata) or not stat.S_ISDIR(
+        root_metadata.st_mode
+    ):
+        raise ValidationError("verified root must be a direct directory")
+
+    marker_path = verified_root / VERIFIED_ROOT_MARKER
+    try:
+        marker = read_json_object_stably(
+            marker_path,
+            verified_root,
+            "verified-root marker",
+            policy=VERIFIED_ROOT_MARKER_POLICY,
+        )
+    except ValidationError as error:
+        raise ValidationError(f"verified-root marker is invalid: {error}") from error
+    if (
+        marker.get("schema_version") != 1
+        or marker.get("owner") != "auto-re-skill"
+        or marker.get("kind") != "auto_re_verified_root"
+        or marker.get("cleanup_token") != cleanup_token
+    ):
+        raise ValidationError("verified-root marker identity does not match receipt")
+    expected_identity = marker.get("root_identity")
+    actual_device, actual_inode = stable_identity(root_metadata, "verified root")
+    if expected_identity != {"device": actual_device, "inode": actual_inode}:
+        raise ValidationError("verified-root marker stable identity does not match")
+
+    remove_verified_root(verified_root)
+    return {
+        "ok": True,
+        "owner": "auto-re-skill",
+        "kind": "auto_re_bundle_cleanup_summary",
+        "receipt_path": str(receipt_path),
+        "verified_root": str(verified_root),
+        "removed": True,
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Validate an Auto-RE context bundle or direct spill manifest."
     )
-    parser.add_argument("manifest", type=pathlib.Path)
+    parser.add_argument("manifest", type=pathlib.Path, nargs="?")
+    parser.add_argument("--receipt", type=pathlib.Path)
+    parser.add_argument("--cleanup-receipt", type=pathlib.Path)
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     try:
-        result = validate_manifest(args.manifest)
+        if args.cleanup_receipt is not None:
+            if args.manifest is not None or args.receipt is not None:
+                raise ValidationError(
+                    "--cleanup-receipt cannot be combined with a manifest or --receipt"
+                )
+            result = cleanup_verified_receipt(args.cleanup_receipt)
+        else:
+            if args.manifest is None:
+                raise ValidationError("a manifest is required")
+            if args.receipt is not None:
+                _receipt, result = validate_manifest_to_receipt(
+                    args.manifest, args.receipt
+                )
+            else:
+                result = validate_manifest(args.manifest)
     except ValidationError as error:
         json.dump({"ok": False, "error": str(error)}, sys.stderr, sort_keys=True)
         sys.stderr.write("\n")

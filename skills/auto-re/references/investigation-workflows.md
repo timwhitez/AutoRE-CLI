@@ -3,6 +3,10 @@
 Load only the workflow that matches the request. Preserve the hard safety
 boundary and output/evidence contracts from the main skill.
 
+If the request already names one capability or exact selector, begin at that
+matching section. General triage is the fallback for open-ended questions, not
+a prerequisite for every narrow command.
+
 ## General Triage
 
 ```bash
@@ -153,6 +157,7 @@ Return:
 
 - inputs and exact commands;
 - created output paths;
+- bounded verification/execution receipt paths and any log truncation;
 - validated findings;
 - conservative inferences;
 - not-claimed/unresolved items;

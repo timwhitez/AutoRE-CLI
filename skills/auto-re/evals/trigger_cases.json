@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "kind": "auto_re_skill_trigger_cases",
+  "cases": [
+    {
+      "id": "open_ended_pe_triage",
+      "prompt": "Statically triage this unknown PE malware sample and give me bounded evidence.",
+      "should_trigger": true,
+      "expected_route": "report",
+      "reason": "Open-ended untrusted binary triage needs the context bundle."
+    },
+    {
+      "id": "known_function",
+      "prompt": "Inspect function 0x401000 in this ELF and show only the bounded function evidence.",
+      "should_trigger": true,
+      "expected_route": "function",
+      "reason": "An exact function selector should bypass general triage."
+    },
+    {
+      "id": "known_cfg",
+      "prompt": "Show the CFG for function 0x100003f20 in this Mach-O without running it.",
+      "should_trigger": true,
+      "expected_route": "dump-cfg",
+      "reason": "A concrete CFG request has a direct bounded command."
+    },
+    {
+      "id": "pe_strings",
+      "prompt": "List the first bounded page of PE strings and their static references.",
+      "should_trigger": true,
+      "expected_route": "pe-strings",
+      "reason": "The user requested one PE inventory surface."
+    },
+    {
+      "id": "go_evidence",
+      "prompt": "Inspect this stripped Go binary for bounded Go metadata and function evidence.",
+      "should_trigger": true,
+      "expected_route": "inspect-go",
+      "reason": "The language-specific static inspector is the narrow route."
+    },
+    {
+      "id": "archive_diff",
+      "prompt": "Semantically compare these two Auto-RE analysis archives.",
+      "should_trigger": true,
+      "expected_route": "diff",
+      "reason": "Archived analysis comparison is an Auto-RE static workflow."
+    },
+    {
+      "id": "explicit_raw_shellcode",
+      "prompt": "Statically inspect this confirmed x86_64 raw shellcode at base 0x1000; do not execute it.",
+      "should_trigger": true,
+      "expected_route": "report",
+      "reason": "Explicit raw identity, architecture, and base permit bounded static triage."
+    },
+    {
+      "id": "sandbox_execution",
+      "prompt": "Run this malware sample in a sandbox and record its network traffic.",
+      "should_trigger": false,
+      "expected_route": null,
+      "reason": "Dynamic execution and observation are outside the Skill."
+    },
+    {
+      "id": "debug_process",
+      "prompt": "Attach gdb to this process and trace every system call.",
+      "should_trigger": false,
+      "expected_route": null,
+      "reason": "Debugger and runtime tracing requests must not route here."
+    },
+    {
+      "id": "compile_rust_project",
+      "prompt": "Compile this Rust workspace for Linux and Windows.",
+      "should_trigger": false,
+      "expected_route": null,
+      "reason": "Ordinary source compilation is not reverse engineering."
+    },
+    {
+      "id": "source_review",
+      "prompt": "Review this Rust source pull request for API design issues.",
+      "should_trigger": false,
+      "expected_route": null,
+      "reason": "Source review does not require binary static analysis."
+    },
+    {
+      "id": "elf_concept",
+      "prompt": "Explain what an ELF program header is in general.",
+      "should_trigger": false,
+      "expected_route": null,
+      "reason": "A conceptual question has no target to inspect."
+    },
+    {
+      "id": "execute_extracted_script",
+      "prompt": "Extract the installer script from this package and execute it.",
+      "should_trigger": false,
+      "expected_route": null,
+      "reason": "Target-derived scripts must remain data."
+    }
+  ]
+}

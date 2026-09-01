@@ -34,8 +34,17 @@ payloads:
 6. Verify `bytes` and lowercase SHA-256.
 7. Read only the validated paths.
 
-Use `scripts/verify_bundle.py <manifest>` for this check. Its JSON result lists
-the validated files. Do not infer trust from the directory name.
+Use the receipt route for this check:
+
+```bash
+python3 scripts/verify_bundle.py <manifest> \
+  --receipt <receipts>/bundle-verification.json
+```
+
+Stdout is a bounded summary. Read the receipt for validated private file paths.
+The validator rejects more than 64 payload rows or 64 MiB of aggregate declared
+payload bytes before it creates a verified tree. Do not infer trust from a
+directory name or raise these limits; narrow the requested sections or page.
 
 `spill_summary.manifest_path` is only a pointer. Validate the referenced
 manifest before loading the complete payload.
@@ -61,6 +70,7 @@ Prefer the deterministic helper:
 python3 scripts/run_next_action.py <result-json> \
   --action-stage <stage> \
   --output <new-output.json> \
+  --receipt <receipts>/<stage>.json \
   --dry-run
 ```
 
@@ -69,6 +79,13 @@ Review the emitted `argv[]`, then remove `--dry-run` to launch the trusted
 program, `--execute`, inherited `--output`, parent-result overwrite, and a
 missing output parent. Actions that already include `--bundle-dir` or
 `--spill-dir` own their output sink and reject a caller-provided `--output`.
+
+With `--receipt`, execution keeps only the final 1 MiB of each stdout/stderr
+stream in separate read-only logs while hashing and counting the full streams.
+The receipt records the exact resolved program, version, SHA-256, argv, sink,
+times, exit code, byte counts, hashes, and truncation. These fields prove an
+operational invocation boundary only; they are not target-analysis evidence.
+Never mix stderr into an analysis JSON document.
 
 Do not follow an action when:
 
@@ -117,3 +134,18 @@ Keep findings reproducible. Cite:
 
 If evidence is absent from a bounded window, say "not present in the inspected
 window", not "absent from the binary".
+
+## Verified-Tree Cleanup
+
+After the final consumer, remove only the validator-owned tree named by its
+receipt:
+
+```bash
+python3 scripts/verify_bundle.py \
+  --cleanup-receipt <receipts>/bundle-verification.json
+```
+
+Cleanup checks the receipt, private ownership marker, random token, stable root
+identity, exact temporary-root containment, and validator prefix before deleting
+the tree. Keep the bounded verification and cleanup summaries as audit evidence
+when the user wants reproducibility.

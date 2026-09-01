@@ -83,6 +83,8 @@ state the boundary. Do not silently rerun with unbounded or extreme values.
 - Direct compact-AI spill: `--spill-dir <new-dir>`.
 - Report sections: `--bundle-dir <new-dir>`.
 - Large text only when explicitly needed: `--split-output`.
+- Helper execution audit: a new `--receipt <path>`; its sibling bounded log
+  directory is helper-owned and must also be new.
 
 Never reuse an input path as a sink. Never make a generated continuation
 overwrite its parent result.

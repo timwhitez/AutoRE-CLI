@@ -499,6 +499,8 @@ def validate_manifest(
     skill = manifest.get("skill")
     if not isinstance(skill, dict) or skill.get("name") != SKILL_NAME:
         raise DistributionError("manifest skill identity is invalid")
+    if skill.get("version") != version:
+        raise DistributionError("manifest Skill version must match release version")
     skill_path_text = skill.get("path")
     managed_files = skill.get("managed_files")
     if not isinstance(skill_path_text, str) or not isinstance(managed_files, list):
@@ -522,10 +524,26 @@ def validate_manifest(
     }
     if actual_skill_files != expected_skill_files:
         raise DistributionError("manifest managed skill file set does not match disk")
+    skill_version_path = root.joinpath(*skill_path.parts) / "VERSION"
+    skill_version_metadata = require_regular_file(skill_version_path, "Skill VERSION")
+    if skill_version_metadata.st_size > 128:
+        raise DistributionError("Skill VERSION is too large")
+    try:
+        skill_version = skill_version_path.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeDecodeError) as error:
+        raise DistributionError(f"cannot read Skill VERSION: {error}") from error
+    if skill_version != version:
+        raise DistributionError(
+            f"Skill VERSION mismatch: expected {version!r}, got {skill_version!r}"
+        )
     parse_skill_frontmatter(root.joinpath(*skill_path.parts) / "SKILL.md")
     openai_yaml = root.joinpath(*skill_path.parts) / "agents/openai.yaml"
     openai_text = openai_yaml.read_text(encoding="utf-8")
-    if "display_name:" not in openai_text or "$auto-re" not in openai_text:
+    if (
+        "display_name:" not in openai_text
+        or "$auto-re" not in openai_text
+        or "allow_implicit_invocation: true" not in openai_text
+    ):
         raise DistributionError("agents/openai.yaml is missing required interface metadata")
     return artifacts
 

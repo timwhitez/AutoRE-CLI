@@ -5,16 +5,16 @@
       "file_identity": "Mach-O 64-bit executable arm64",
       "path": "bin/macos-arm64/auto-re-cli",
       "rust_target": "aarch64-apple-darwin",
-      "sha256": "38b02c3fdbc2d4689b3328766aa014c45783c3d4da219341c086c8849714f4eb",
+      "sha256": "cedb28baf165999f7f7b34b34ab848f09e335d8613ff318c6f68655ca34245ea",
       "signing": "adhoc",
       "target": "macos-arm64"
     },
     {
-      "bytes": 19258624,
+      "bytes": 19258608,
       "file_identity": "Mach-O 64-bit executable x86_64",
       "path": "bin/macos-x86_64/auto-re-cli",
       "rust_target": "x86_64-apple-darwin",
-      "sha256": "422e82846212f2755f78ca0de6965f56fdfc2b9276783ed8d50814856a5e430e",
+      "sha256": "9584007d546ee766b366e8b6f9b5633ab80e214fbc7c9f7474fb72f6bc01ed11",
       "signing": "adhoc",
       "target": "macos-x86_64"
     },
@@ -23,16 +23,16 @@
       "file_identity": "ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 2.0.0, stripped",
       "path": "bin/linux-x86_64/auto-re-cli",
       "rust_target": "x86_64-unknown-linux-gnu",
-      "sha256": "971116d756cc9c12c352d91d72eb2017d976ea17268e474ef878e57a2510b2f8",
+      "sha256": "89612bbad0993c455df0409f5bd0473a5fd26485d47f630819e09969e5de89af",
       "signing": "not_applicable",
       "target": "linux-x86_64"
     },
     {
-      "bytes": 17029072,
+      "bytes": 17029624,
       "file_identity": "ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, for GNU/Linux 2.0.0, stripped",
       "path": "bin/linux-arm64/auto-re-cli",
       "rust_target": "aarch64-unknown-linux-gnu",
-      "sha256": "200f9c5577f30675d863613e68535c6db3b9c62704cbda2450c1f2059fe18401",
+      "sha256": "7810e9e1c8e6013b488c8414558263657ed2d9fa530f6876f497660f9c670ef2",
       "signing": "not_applicable",
       "target": "linux-arm64"
     },
@@ -63,7 +63,7 @@
         "timestamp": 0
       },
       "rust_target": "x86_64-pc-windows-gnullvm",
-      "sha256": "8ee8377cbf6de99ca4c2272c460c999a209b6c93268182e700462d6bca785ad1",
+      "sha256": "333f4c970b33f9adf750197779d105cf1b5f15ca7d2edc21565d2bba1a142c4b",
       "signing": "not_applicable",
       "target": "windows-x86_64"
     }
@@ -85,25 +85,29 @@
   "skill": {
     "managed_files": [
       "skills/auto-re/SKILL.md",
+      "skills/auto-re/VERSION",
       "skills/auto-re/agents/openai.yaml",
+      "skills/auto-re/evals/trigger_cases.json",
       "skills/auto-re/references/command-routing.md",
       "skills/auto-re/references/evidence-contract.md",
       "skills/auto-re/references/investigation-workflows.md",
+      "skills/auto-re/references/platform-invocation.md",
       "skills/auto-re/references/safety-and-claims.md",
       "skills/auto-re/scripts/run_next_action.py",
+      "skills/auto-re/scripts/skill_doctor.py",
       "skills/auto-re/scripts/verify_bundle.py"
     ],
     "name": "auto-re",
     "path": "skills/auto-re",
-    "version": "0.1.2"
+    "version": "0.1.3"
   },
   "source_repository": "auto-re_source",
-  "source_revision": "35380fa076394ff4f63bb6ab0665bc58d18bcd04",
+  "source_revision": "253dcdf0c6834bd04af63e4ecaa45e6f5cf96d76",
   "third_party_dependency_count": 69,
   "toolchain": {
     "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
     "pinned_channel": "1.97.1",
     "rust": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
   },
-  "version": "0.1.2"
+  "version": "0.1.3"
 }

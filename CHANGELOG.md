@@ -4,6 +4,34 @@ All notable changes to the public AutoRE-CLI distribution are recorded here.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-09-01
+
+### Added
+
+- Versioned Auto-RE Skill metadata, trigger-boundary evaluations, and a
+  read-only doctor for CLI/Skill version agreement, managed-content drift, and
+  duplicate registration.
+- Versioned bundle verification and action execution receipts with bounded
+  stdout/stderr tails, full-stream hashes, and explicit cleanup ownership.
+
+### Changed
+
+- Rebuilt all five platform binaries from source revision
+  `253dcdf0c6834bd04af63e4ecaa45e6f5cf96d76` with Rust 1.97.1.
+- Routes explicit function, CFG/IL, reference, PE, language, protection, replay,
+  and diff questions through the smallest matching static command before
+  open-ended report generation.
+- Updated the Skill prompt, platform invocation guidance, installers, verifier,
+  provenance manifest, and third-party dependency inventory.
+
+### Security
+
+- Rejects oversized bundle cardinality and aggregate payload declarations
+  before materialization, and rejects an opened payload size mismatch before
+  reading or creating its verified destination.
+- Binds verified-tree cleanup to a private marker, random token, stable root
+  identity, and the system temporary directory.
+
 ## [0.1.2] - 2026-08-31
 
 ### Added
@@ -58,7 +86,8 @@ All notable changes to the public AutoRE-CLI distribution are recorded here.
 - Offline installer, uninstaller, fail-closed verifier, release provenance,
   third-party notices, and `auto-re` Agent Skill.
 
-[Unreleased]: https://github.com/timwhitez/AutoRE-CLI/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/timwhitez/AutoRE-CLI/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/timwhitez/AutoRE-CLI/releases/tag/v0.1.3
 [0.1.2]: https://github.com/timwhitez/AutoRE-CLI/releases/tag/v0.1.2
 [0.1.1]: https://github.com/timwhitez/AutoRE-CLI/releases/tag/v0.1.1
 [0.1.0]: https://github.com/timwhitez/AutoRE-CLI/releases/tag/v0.1.0

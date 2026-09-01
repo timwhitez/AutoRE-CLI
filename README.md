@@ -60,15 +60,15 @@ Download the archive for your host from
 then verify and install it:
 
 ```sh
-tar -xzf AutoRE-CLI-0.1.2-macos-arm64.tar.gz
-cd AutoRE-CLI-0.1.2-macos-arm64
+tar -xzf AutoRE-CLI-0.1.3-macos-arm64.tar.gz
+cd AutoRE-CLI-0.1.3-macos-arm64
 ./verify.sh
 ./install.sh
 auto-re-cli --version
 ```
 
 Replace `macos-arm64` with `macos-x86_64`, `linux-x86_64`, or `linux-arm64`.
-Windows users should extract `AutoRE-CLI-0.1.2-windows-x86_64.zip` and run:
+Windows users should extract `AutoRE-CLI-0.1.3-windows-x86_64.zip` and run:
 
 ```powershell
 py -3 scripts/autore_distribution.py verify
@@ -95,7 +95,7 @@ use the platform archive above for the complete verified distribution.
 ```sh
 # Agent Skill for Codex, Claude Code, Cursor, and other supported clients
 npx skills add \
-  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.2/AutoRE-CLI-0.1.2-auto-re-skill.zip -g
+  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.3/AutoRE-CLI-0.1.3-auto-re-skill.zip -g
 ```
 
 ```powershell
@@ -163,9 +163,17 @@ evidence-backed findings under ./analysis-results. Never execute the sample or
 any target-derived artifact.
 ```
 
-The Skill verifies the CLI, validates bundle ownership/size/SHA-256 before
-reading payloads, separates evidence strength, follows one relevant static
-continuation at a time, and stops at explicit evidence or budget boundaries.
+The Skill diagnoses CLI/Skill version agreement and duplicate registrations,
+routes explicit narrow questions directly, validates bundles into bounded
+receipts, separates evidence strength, follows one relevant static continuation
+at a time with bounded operational logs, and stops at explicit evidence or
+budget boundaries.
+
+Check the installed pair before analysis:
+
+```sh
+python3 "$HOME/.agents/skills/auto-re/scripts/skill_doctor.py"
+```
 
 To prepare one emitted action without shell interpolation:
 
@@ -174,6 +182,7 @@ python3 skills/auto-re/scripts/run_next_action.py \
   ./analysis-results/sample.bundle/manifest.json \
   --action-stage function.selected \
   --output ./analysis-results/function-selected.json \
+  --receipt ./analysis-results/receipts/function-selected.json \
   --dry-run
 ```
 
@@ -186,6 +195,7 @@ already own a bundle/spill sink reject an additional `--output`.
 
 ```sh
 mkdir -p ./analysis-results
+mkdir -p ./analysis-results/receipts
 auto-re-cli report ./sample.exe \
   --format json \
   --json-profile ai \
@@ -195,11 +205,18 @@ auto-re-cli report ./sample.exe \
   --output ./analysis-results/sample.bundle/manifest.json
 
 python3 skills/auto-re/scripts/verify_bundle.py \
-  ./analysis-results/sample.bundle/manifest.json
+  ./analysis-results/sample.bundle/manifest.json \
+  --receipt ./analysis-results/receipts/bundle-verification.json
 ```
 
-The manifest records owned payload paths, byte counts, SHA-256, warnings,
-budgets, completion state, current findings, and bounded next actions.
+The receipt points to stable read-only payload copies and records byte counts,
+SHA-256, warnings, budgets, completion state, and bounded next actions. After
+the final consumer, remove only the validator-owned temporary tree:
+
+```sh
+python3 skills/auto-re/scripts/verify_bundle.py \
+  --cleanup-receipt ./analysis-results/receipts/bundle-verification.json
+```
 
 ### Focused Function
 
