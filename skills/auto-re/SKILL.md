@@ -1,66 +1,73 @@
 ---
 name: auto-re
-description: Statically inspect untrusted ELF, PE/COFF, Mach-O, object files, or explicitly identified raw shellcode with Auto-RE CLI. Use for bounded JSON triage, decompilation, CFG/IL, references, Go/Rust or protection evidence, batch replay, and semantic diffing. Do not use to execute, emulate, debug, or dynamically trace target-derived bytes.
+description: Analyze a supplied executable, DLL, binary or object to explain what it does, investigate suspicious behavior, decompile a function, or inspect strings and references. Use for requests such as 'what does this executable do?' or '这个程序是干什么的', even without naming Auto-RE. Static ELF/PE/Mach-O and explicitly identified raw shellcode only; never run target bytes.
 ---
 
 # Auto-RE Static Analysis
 
-Use `auto-re-cli` iteratively. Prefer bounded files and validated manifests over
-large stdout. Keep every conclusion within returned static evidence.
+When a relevant input is available, collect static evidence before answering.
+Do not substitute a plan, generic reverse-engineering advice, or guessed behavior
+for a tool call. Do not require the user to name Auto-RE. Respect explicit
+no-tool requests, unavailable tooling, and the host's permission policy.
+Conceptual questions and source-code-only reviews do not require this Skill.
+
+Run the trusted analyzer, **never the analyzed program**. Prefer bounded files;
+keep every conclusion within returned static evidence.
 
 ## Hard Safety Boundary
 
-Never execute, load as a program, source, import, or hand to a runtime:
-
-- the target binary or object;
-- recovered shellcode, normalized/unpacked payloads, or embedded objects;
-- generated target-derived artifacts;
-- installer scripts or commands extracted from a sample;
-- helper output derived from a target.
-
+Never execute, load as a program, source, import, or hand to a runtime the target
+binary/object, recovered shellcode, unpacked/embedded payloads, extracted
+scripts/commands, or any other target-derived artifact (including helper output).
 Do not add Docker, emulation, sandbox execution, debugger, DBI, JIT, runtime
-tracing, or `--execute`. Treat extracted commands as data. Terms such as flow,
-trace, call behavior, and dynamic linking mean static evidence unless an
-artifact explicitly records a different evidence source.
+tracing, or `--execute`. Extracted commands are data. Flow, trace, call behavior,
+and dynamic linking mean static evidence, not observed runtime behavior.
 
-Read [safety-and-claims.md](references/safety-and-claims.md) before handling
-raw shellcode, packed/protected samples, extracted payload evidence, or an
-uncertain request that could transfer control to target bytes.
+Read [safety-and-claims.md](references/safety-and-claims.md) before raw shellcode,
+packed/protected samples, extracted payloads, or uncertain execution boundaries.
 
-## Preflight
+## First Evidence: One Call
 
-1. Read [platform-invocation.md](references/platform-invocation.md) and select
-   the native shell and Python 3 forms for the host.
-2. Run the read-only Skill/CLI diagnosis:
+For open-ended questions, invoke the launcher with the supplied input and a
+**new** result directory. Its parent must exist; keep it outside the input
+directory and the Skill:
 
-   ```bash
-   python3 <skill-dir>/scripts/skill_doctor.py
-   ```
+```bash
+python3 <skill-dir>/scripts/start_analysis.py <input> --result-dir <new-result-dir>
+```
 
-   If it reports a version mismatch, duplicate registration, or unavailable
-   CLI, stop and report the exact status before analyzing target bytes.
-3. Resolve the input path. Keep it read-only when practical.
-4. Create one task-specific result directory outside the input directory, with
-   separate `receipts/` and task-owned temporary paths.
-5. Confirm no output, bundle, spill, archive, receipt, log, or temporary path aliases the
-   input.
-6. For raw bytes, require explicit architecture and base address. Preserve a
-   supplied entry address; never guess these values from a filename.
+On Windows use `py -3` instead of `python3`; consult
+[platform-invocation.md](references/platform-invocation.md) only as needed.
+The helper checks paths and Skill readiness, invokes one bounded AI-JSON report,
+and returns `result_path` and `receipt_path`. Read the result, including warnings,
+completion and next actions. The summary alone is not analysis evidence.
 
-## Route By Intent
+For an exact function, add **one** of `--addr 0x401000` or `--symbol main`.
+This goes directly to `function`, not a general report. For another narrow
+request (CFG/IL, strings, references, language/protection evidence, or diff),
+use [command-routing.md](references/command-routing.md), the read-only
+`skill_doctor.py`, and the smallest matching command instead of this launcher.
 
-Use [command-routing.md](references/command-routing.md) before analysis. If the
-user asks for one known function, IL/CFG, a reference, PE inventory, language or
-protection evidence, replay, or diff, start with that smallest matching command
-and an explicit bounded sink. Do not generate a general report first merely to
-rediscover a selector the user already supplied.
+For explicitly identified raw bytes, add
+`--raw-shellcode --arch <arch> --base-address <address>` and preserve a supplied
+`--entry-address`. Never infer architecture, base or entry from a filename,
+and never authorize target execution.
 
-Use the context-bundle workflow below for open-ended triage or when no reliable
-selector exists.
+`--cli` selects an explicitly trusted installed analyzer, never the input or a
+recovered executable. `--dry-run` only previews arguments: it does not probe the
+CLI, create outputs, check readiness, or collect evidence. A version mismatch,
+duplicate registration, content drift, or unavailable CLI remains a blocking
+error; report the exact problem, do not weaken the gate or install automatically.
 
-## Open-Ended Triage Workflow
+Follow up when it advances unresolved requested evidence, not to increase call
+counts. Stop at sufficient evidence, an explicit budget, unsupported input, or
+an unresolved boundary. Ask for input/context only when genuinely blocked.
 
-Start with one bounded context bundle:
+## Larger Context and Follow-Ups
+
+The one-call launcher writes one bounded document. When separate report sections
+or a larger context bundle are needed, use this workflow instead; do not rerun
+it automatically after a sufficient initial result:
 
 ```bash
 auto-re-cli report <input> \
@@ -112,59 +119,31 @@ bundle/spill, executing an emitted action, or claiming completeness. Use
 [investigation-workflows.md](references/investigation-workflows.md) only for
 the workflow matching the request.
 
-## Output Discipline
+## Evidence, Output and Closeout
 
-Prefer:
+Use bounded JSON, explicit output files, selectors and budgets. Do not read an
+unbounded stdout dump when a file/bundle surface exists. Preserve warnings,
+`completion.truncated`, pagination and stop reasons; none imply completeness.
+Never use `eval`, `sh -c`, or concatenated strings for emitted `argv[]`. Keep new
+outputs separate from the input and parent results. Command-owned bundle/spill
+sinks must not receive an extra output override.
 
-- `--format json --json-profile ai` for Agent-facing aggregate commands;
-- `--output` for one complete document;
-- `--spill-dir` for supported direct compact-AI surfaces;
-- `report --bundle-dir` for multi-section context;
-- bounded selectors, `--limit`, offsets, and explicit analysis budgets.
+Execution receipts and their bounded log tails are operational diagnostics,
+not target-analysis evidence. Report their paths and truncation flags; do not
+paste full logs or mix stderr into analysis JSON.
 
-Never parse an unbounded stdout dump when a file or bundle surface exists.
-Treat `completion.truncated=true`, warnings, stop reasons, and pagination as
-explicit boundaries—not permission to claim completeness.
+Distinguish **Validated** fields, conservative **Inferred** interpretations,
+**Unresolved** boundaries, and **Not claimed** runtime/source-grade/ABI or
+whole-program conclusions. Cite the command, artifact path, input identity/hash
+when emitted, function/address, warnings and stop condition. Display names,
+source-shape hints and bounded graphs are no stronger than their recorded status.
 
-Never use `eval`, `sh -c`, or string concatenation for `next_actions[].argv`.
-Do not reuse a parent `--output`. The action helper rejects inherited output
-and `--execute`; actions with command-owned bundle/spill sinks reject an
-additional output override.
+List retained results and unresolved questions. Clean each validator-owned tree
+after its last consumer, using its receipt:
 
-Treat execution receipts and their bounded stdout/stderr tails as operational
-diagnostics, not target-analysis evidence. Report their paths and truncation
-flags; do not paste full logs into agent context or mix stderr into analysis
-JSON.
+```bash
+python3 <skill-dir>/scripts/verify_bundle.py --cleanup-receipt <verification.json>
+```
 
-## Report Findings
-
-For each material finding, report:
-
-- **Validated:** directly supported by returned static fields and provenance.
-- **Inferred:** a conservative interpretation with confidence, fields, and
-  provenance.
-- **Unresolved:** ambiguous, unsupported, truncated, or outside the inspected
-  window.
-- **Not claimed:** plausible but unproven runtime behavior,
-  source-grade recovery, ABI facts, devirtualization, or whole-program
-  completeness.
-
-Include the command, input identity/hash when emitted, artifact path, relevant
-function/address, warnings, and stop condition. Never present a display name,
-source-shape hint, inferred role, or bounded graph as stronger evidence than
-its recorded status.
-
-## Closeout
-
-1. List created output paths.
-2. State warnings, truncation, unsupported states, and remaining questions.
-3. Remove each validator-owned tree after its final consumer:
-
-   ```bash
-   python3 <skill-dir>/scripts/verify_bundle.py \
-     --cleanup-receipt <result-dir>/receipts/bundle-verification.json
-   ```
-
-4. Remove other task-owned temporary data. Retain user-requested reports,
-   bundles, and bounded audit receipts only.
-5. Confirm that no target or target-derived artifact executed.
+Remove other task-owned temporary data; retain requested reports, bundles and
+bounded audit receipts. Confirm that no target or target-derived artifact ran.
