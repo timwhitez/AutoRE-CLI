@@ -58,8 +58,8 @@ checkout。
 下载对应主机的压缩包，然后验证并安装：
 
 ```sh
-tar -xzf AutoRE-CLI-0.1.3-macos-arm64.tar.gz
-cd AutoRE-CLI-0.1.3-macos-arm64
+tar -xzf AutoRE-CLI-0.1.4-macos-arm64.tar.gz
+cd AutoRE-CLI-0.1.4-macos-arm64
 ./verify.sh
 ./install.sh
 auto-re-cli --version
@@ -67,7 +67,7 @@ auto-re-cli --version
 
 可以把 `macos-arm64` 替换为 `macos-x86_64`、`linux-x86_64` 或
 `linux-arm64`。Windows 用户解压
-`AutoRE-CLI-0.1.3-windows-x86_64.zip` 后运行：
+`AutoRE-CLI-0.1.4-windows-x86_64.zip` 后运行：
 
 ```powershell
 py -3 scripts/autore_distribution.py verify
@@ -93,7 +93,7 @@ cd AutoRE-CLI
 ```sh
 # 为 Codex、Claude Code、Cursor 等客户端安装 Agent Skill
 npx skills add \
-  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.3/AutoRE-CLI-0.1.3-auto-re-skill.zip -g
+  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.4/AutoRE-CLI-0.1.4-auto-re-skill.zip -g
 ```
 
 ```powershell
