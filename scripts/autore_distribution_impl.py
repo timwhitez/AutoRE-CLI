@@ -249,7 +249,10 @@ def load_json_object(
             if opened_size > policy.max_encoded_bytes:
                 raise _control_file_too_large(policy, opened_size)
             data = _read_bounded_control_bytes(handle, policy)
-        value = json.loads(data.decode("utf-8"))
+        try:
+            value = json.loads(data.decode("utf-8"))
+        except ValueError as error:
+            raise DistributionError(f"cannot read {label} {path}: {str(error)[:512]}") from error
     except DistributionError:
         raise
     except (OSError, UnicodeDecodeError, json.JSONDecodeError, RecursionError) as error:
