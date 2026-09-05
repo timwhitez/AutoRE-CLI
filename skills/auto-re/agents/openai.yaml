@@ -1,6 +1,6 @@
 interface:
   display_name: "Auto-RE Static Analysis"
   short_description: "Bounded static reverse engineering with traceable evidence"
-  default_prompt: "Use $auto-re to answer the user's question about the selected binary with the smallest bounded static workflow, write artifacts to a task-specific directory, validate manifests, and return concise evidence paths, warnings, truncation, and unresolved items without executing target-derived bytes."
+  default_prompt: "Use $auto-re to collect static evidence for the supplied binary before answering, not merely describe a plan. Start with scripts/start_analysis.py for open-ended analysis or an exact function; use the direct narrow command for other specific requests. Read result JSON, pursue relevant unresolved evidence, and report artifact paths, warnings and boundaries. Run only the trusted analyzer, never target-derived bytes."
 policy:
   allow_implicit_invocation: true

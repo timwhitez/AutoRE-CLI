@@ -92,6 +92,55 @@
       "should_trigger": false,
       "expected_route": null,
       "reason": "Target-derived scripts must remain data."
+    },
+    {
+      "id": "plain_executable_question",
+      "prompt": "What does this executable do? The input is /samples/unknown.exe.",
+      "should_trigger": true,
+      "expected_route": "report",
+      "reason": "A concrete binary question needs evidence without requiring the tool name."
+    },
+    {
+      "id": "chinese_plain_binary",
+      "prompt": "这个程序是干什么的？文件在 /samples/unknown，没有扩展名。",
+      "should_trigger": true,
+      "expected_route": "report",
+      "reason": "Natural-language intent and a concrete input matter more than extensions or jargon."
+    },
+    {
+      "id": "chinese_suspicious_dll",
+      "prompt": "帮我看看 /samples/update.dll 是否有可疑行为，不要运行它。",
+      "should_trigger": true,
+      "expected_route": "report",
+      "reason": "Collect bounded static evidence before making behavioral claims."
+    },
+    {
+      "id": "chinese_known_function",
+      "prompt": "看看 /samples/app.exe 里 0x401230 这个函数的逻辑。",
+      "should_trigger": true,
+      "expected_route": "function",
+      "reason": "An explicit function address must not be replaced by generic triage."
+    },
+    {
+      "id": "no_tool_request",
+      "prompt": "Do not run any tools. Only explain which commands could inspect /samples/app.exe.",
+      "should_trigger": false,
+      "expected_route": null,
+      "reason": "Respect explicit no-tool instructions even when an input path is present."
+    },
+    {
+      "id": "chinese_concept",
+      "prompt": "解释一下反编译和反汇编的区别，不需要分析具体文件。",
+      "should_trigger": false,
+      "expected_route": null,
+      "reason": "Conceptual questions do not require binary inspection."
+    },
+    {
+      "id": "chinese_dynamic_trace",
+      "prompt": "运行 /samples/app.exe，抓取它实际发出的网络请求。",
+      "should_trigger": false,
+      "expected_route": null,
+      "reason": "A supplied binary does not bring dynamic execution into scope."
     }
   ]
 }
