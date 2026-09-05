@@ -59,6 +59,14 @@ CLI, create outputs, check readiness, or collect evidence. A version mismatch,
 duplicate registration, content drift, or unavailable CLI remains a blocking
 error; report the exact problem, do not weaken the gate or install automatically.
 
+Both launchers accept `--timeout-seconds` (default 900); increase it for a
+legitimate long analysis within the task budget. A timeout or cancellation is
+not evidence that the binary is benign or analysis is complete. Preserve the
+receipt and partial results: `execution_status`, `diagnostics` and stream
+`capture_complete` describe operational completion. Exit codes 124, 130 and
+125 indicate timeout, cancellation and operational failure respectively.
+Do not retry indefinitely or delete partial analyzer outputs.
+
 Follow up when it advances unresolved requested evidence, not to increase call
 counts. Stop at sufficient evidence, an explicit budget, unsupported input, or
 an unresolved boundary. Ask for input/context only when genuinely blocked.

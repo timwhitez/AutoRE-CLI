@@ -44,6 +44,9 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument("--base-address", type=address)
     parser.add_argument("--entry-address", type=address)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--timeout-seconds", type=actions.positive_seconds,
+                        default=actions.DEFAULT_TIMEOUT_SECONDS,
+                        help="analysis execution budget; increase for long static analyses (default: 900)")
     args = parser.parse_args(argv)
     if args.raw_shellcode and (args.arch is None or args.base_address is None):
         parser.error("raw shellcode requires explicit --arch and --base-address")
@@ -132,6 +135,7 @@ def run(args: argparse.Namespace) -> tuple[int, dict]:
     receipts.mkdir(mode=0o700)
     code, summary = actions.execute_prepared_with_receipt(
         prepared, executable, receipts / "initial.json", log_tail_bytes=LOG_TAIL_BYTES,
+        timeout_seconds=args.timeout_seconds,
     )
     result_path = output / "analysis.json"
     summary.update(readiness_checked=True, analysis_executed=True,

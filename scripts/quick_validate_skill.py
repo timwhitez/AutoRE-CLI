@@ -73,7 +73,9 @@ def validate_trigger_cases(skill_dir: pathlib.Path) -> tuple[int, int, int]:
         raise SkillValidationError("trigger cases exceed the 64 KiB limit")
     try:
         value = json.loads(data.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as error:
+    # ValueError also owns UnicodeDecodeError, JSONDecodeError, and the
+    # interpreter's integer string conversion limit raised by json.loads().
+    except (ValueError, RecursionError) as error:
         raise SkillValidationError(f"cannot parse trigger cases: {error}") from error
     if not isinstance(value, dict) or value.get("schema_version") != 1:
         raise SkillValidationError("trigger cases have an unsupported schema")
