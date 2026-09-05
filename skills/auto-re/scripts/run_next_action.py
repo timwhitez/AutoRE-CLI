@@ -192,7 +192,11 @@ def validate_result_contract(result: dict[str, Any]) -> str:
     owner = result.get("owner")
     kind = result.get("kind")
     if owner is not None or kind is not None:
-        if owner != "auto-re-cli" or kind not in SUPPORTED_MANIFEST_KINDS:
+        if (
+            owner != "auto-re-cli"
+            or not isinstance(kind, str)
+            or kind not in SUPPORTED_MANIFEST_KINDS
+        ):
             raise ActionError(
                 "unsupported Auto-RE manifest identity: "
                 f"owner={owner!r} kind={kind!r}"
@@ -315,15 +319,39 @@ def _capture_stream(
 
 
 def _write_private_bytes(path: pathlib.Path, data: bytes, label: str) -> None:
+    created: Optional[os.stat_result] = None
+
+    def private_opener(name: str, flags: int) -> int:
+        return os.open(name, flags, 0o600)
+
     try:
-        with path.open("xb") as output:
+        with open(path, "xb", opener=private_opener) as output:
+            created = os.fstat(output.fileno())
             output.write(data)
             output.flush()
             os.fsync(output.fileno())
-        path.chmod(0o400)
+            if hasattr(os, "fchmod"):
+                os.fchmod(output.fileno(), 0o400)
+        if not os.path.samestat(created, path.lstat()):
+            raise OSError("output object changed during write")
+        if not hasattr(os, "fchmod"):
+            path.chmod(0o400)
     except OSError as error:
-        path.unlink(missing_ok=True)
-        raise ActionError(f"cannot write {label}: {error}") from error
+        cleanup_error = None
+        # A failed exclusive open never grants ownership of the destination.
+        # Also preserve any replacement object observed after a later failure.
+        if created is not None:
+            try:
+                if os.path.samestat(created, path.lstat()):
+                    path.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError as failure:
+                cleanup_error = failure
+        detail = f"cannot write {label}: {error}"
+        if cleanup_error is not None:
+            detail += f"; cannot remove incomplete owned output: {cleanup_error}"
+        raise ActionError(detail) from error
 
 
 def _write_receipt(path: pathlib.Path, value: dict[str, Any]) -> None:
@@ -421,21 +449,37 @@ def validate_receipt_sink_separation(
     log_dir: pathlib.Path,
 ) -> None:
     argv = prepared["argv"]
-    if prepared["command_owned_sink"]:
-        for sink in _command_sink_values(argv):
+    sinks = (
+        _command_sink_values(argv)
+        if prepared["command_owned_sink"]
+        else [pathlib.Path(argv[-1])]
+    )
+    try:
+        diagnostics = [receipt.resolve(), log_dir.resolve()]
+        resolved_sinks = [sink.expanduser().resolve() for sink in sinks]
+    except (OSError, RuntimeError) as error:
+        raise ActionError(f"cannot resolve diagnostic or action sink: {error}") from error
+    for sink in resolved_sinks:
+        for diagnostic in diagnostics:
             if (
-                receipt == sink
-                or sink in receipt.parents
-                or log_dir == sink
-                or sink in log_dir.parents
+                sink == diagnostic
+                or sink in diagnostic.parents
+                or diagnostic in sink.parents
             ):
-                raise ActionError(
-                    "receipt or log path is inside a command-owned action sink"
-                )
-        return
-    output = pathlib.Path(argv[-1]).expanduser().absolute()
-    if receipt == output or log_dir == output:
-        raise ActionError("receipt or log path aliases action output")
+                if prepared["command_owned_sink"]:
+                    raise ActionError(
+                        "receipt or log path overlaps a command-owned action sink"
+                    )
+                raise ActionError("receipt or log path aliases action output")
+
+
+def prepare_action_receipt_paths(
+    prepared: dict[str, Any], receipt_path: pathlib.Path,
+) -> tuple[pathlib.Path, pathlib.Path]:
+    """Use the same non-mutating diagnostic preflight for dry-run and execution."""
+    receipt, logs = prepare_receipt_paths(receipt_path)
+    validate_receipt_sink_separation(prepared, receipt, logs)
+    return receipt, logs
 
 
 def execute_prepared_with_receipt(
@@ -448,9 +492,9 @@ def execute_prepared_with_receipt(
     if (
         not isinstance(log_tail_bytes, int)
         or isinstance(log_tail_bytes, bool)
-        or log_tail_bytes < 0
+        or not 0 <= log_tail_bytes <= LOG_TAIL_BYTES
     ):
-        raise ActionError("log tail byte limit must be a non-negative integer")
+        raise ActionError(f"log tail byte limit must be an integer from 0 to {LOG_TAIL_BYTES}")
     validate_prepared_argv(
         prepared.get("argv"),
         command_owned_sink=prepared.get("command_owned_sink") is True,
@@ -461,8 +505,7 @@ def execute_prepared_with_receipt(
         raise ActionError(f"cannot resolve trusted program: {error}") from error
     if not resolved_executable.is_file():
         raise ActionError("trusted program must be a regular file")
-    receipt, log_dir = prepare_receipt_paths(receipt_path)
-    validate_receipt_sink_separation(prepared, receipt, log_dir)
+    receipt, log_dir = prepare_action_receipt_paths(prepared, receipt_path)
     program_version = probe_program_version(resolved_executable)
     program_sha256 = sha256_file(resolved_executable)
 
@@ -702,7 +745,7 @@ def main() -> int:
         prepared = prepare_action(args.result, args.action_stage, args.output)
         if args.dry_run:
             if args.receipt is not None:
-                receipt, logs = prepare_receipt_paths(args.receipt)
+                receipt, logs = prepare_action_receipt_paths(prepared, args.receipt)
                 prepared["planned_receipt"] = str(receipt)
                 prepared["planned_log_dir"] = str(logs)
             json.dump(prepared, sys.stdout, indent=2, sort_keys=True)

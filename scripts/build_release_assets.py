@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import pathlib
+import re
 import shutil
 import stat
 import subprocess
@@ -36,6 +37,10 @@ PACKAGE_EXCLUDED_FILES = {
     "scripts/build_release_assets.py",
 }
 ARCHIVE_EPOCH = 946684800
+SUPPORTED_TARGETS = frozenset({
+    "macos-arm64", "macos-x86_64", "linux-arm64", "linux-x86_64", "windows-x86_64",
+})
+VERSION_PATTERN = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
 
 
 class ReleaseAssetError(ValueError):
@@ -67,8 +72,15 @@ def copy_file(source: pathlib.Path, destination: pathlib.Path) -> None:
     shutil.copy2(source, destination)
 
 
-def package_common_files() -> Iterable[pathlib.Path]:
+def package_common_files(
+    excluded: tuple[pathlib.Path, ...] = (),
+) -> Iterable[pathlib.Path]:
     for path in sorted(ROOT.rglob("*")):
+        if any(path == root or root in path.parents for root in excluded):
+            continue
+        relative = path.relative_to(ROOT)
+        if relative.parts[0] in PACKAGE_EXCLUDED_ROOTS or "__pycache__" in relative.parts:
+            continue
         if path.is_symlink():
             raise ReleaseAssetError(f"repository contains a symlink: {path}")
         if not path.is_file():
@@ -103,8 +115,10 @@ def prepare_package(
     package_root: pathlib.Path,
     manifest: dict[str, Any],
     artifact: dict[str, Any],
+    *,
+    excluded: tuple[pathlib.Path, ...] = (),
 ) -> None:
-    for source in package_common_files():
+    for source in package_common_files(excluded):
         copy_file(source, package_root / source.relative_to(ROOT))
 
     artifact_path = pathlib.PurePosixPath(artifact["path"])
@@ -204,9 +218,13 @@ def verify_package(package_root: pathlib.Path, target: str) -> None:
         raise ReleaseAssetError(
             f"package verification failed for {target}: {completed.stderr.strip()}"
         )
-    result = json.loads(completed.stdout)
+    try:
+        result = json.loads(completed.stdout)
+    except (UnicodeError, json.JSONDecodeError) as error:
+        raise ReleaseAssetError(f"invalid verification JSON for {target}: {error}") from error
     if (
-        result.get("ok") is not True
+        not isinstance(result, dict)
+        or result.get("ok") is not True
         or result.get("distribution_scope") != "platform"
         or result.get("package_target") != target
         or result.get("artifact_count") != 1
@@ -227,68 +245,128 @@ def build_skill_archive(
     return archive
 
 
-def build_assets(output: pathlib.Path) -> dict[str, Any]:
-    manifest = load_manifest()
+def reject_link_components(path: pathlib.Path) -> None:
+    for component in (*reversed(path.parents), path):
+        try:
+            info = component.lstat()
+        except FileNotFoundError:
+            continue
+        if stat.S_ISLNK(info.st_mode) or (
+            getattr(info, "st_file_attributes", 0)
+            & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+        ):
+            raise ReleaseAssetError(f"symlink/reparse path is not allowed: {component}")
+
+
+def validate_output_path(output: pathlib.Path) -> pathlib.Path:
+    requested = output.expanduser()
+    if ".." in requested.parts:
+        raise ReleaseAssetError("output path must not contain '..'")
+    requested = requested.absolute()
+    reject_link_components(requested)
+    repository = ROOT.resolve()
+    home = pathlib.Path.home().resolve()
+    if requested in (repository, home) or requested in repository.parents or requested in home.parents:
+        raise ReleaseAssetError("output must not be a repository, home, or ancestor directory")
+    default = repository / "release-assets"
+    if repository in requested.parents and requested != default and default not in requested.parents:
+        raise ReleaseAssetError("in-repository output must be under release-assets")
+    if requested.exists():
+        raise ReleaseAssetError("output already exists; choose a new directory (existing data is never cleared)")
+    if not requested.parent.is_dir():
+        raise ReleaseAssetError("output parent must already be an existing directory")
+    return requested
+
+
+def validate_asset_manifest(manifest: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
     version = manifest.get("version")
     artifacts = manifest.get("artifacts")
-    if not isinstance(version, str) or not isinstance(artifacts, list):
-        raise ReleaseAssetError("release manifest version or artifacts are invalid")
+    if not isinstance(version, str) or len(version) > 64 or VERSION_PATTERN.fullmatch(version) is None:
+        raise ReleaseAssetError("release manifest version must use x.y.z form")
+    if not isinstance(artifacts, list) or not artifacts:
+        raise ReleaseAssetError("release manifest must contain a non-empty artifacts list")
+    seen: set[str] = set()
+    for artifact in artifacts:
+        if not isinstance(artifact, dict):
+            raise ReleaseAssetError("release manifest contains an invalid artifact")
+        target = artifact.get("target")
+        if not isinstance(target, str) or target not in SUPPORTED_TARGETS or target in seen:
+            raise ReleaseAssetError("release manifest contains an unsupported or duplicate target")
+        seen.add(target)
+        filename = "auto-re-cli.exe" if target.startswith("windows-") else "auto-re-cli"
+        expected = f"bin/{target}/{filename}"
+        if artifact.get("path") != expected:
+            raise ReleaseAssetError(f"artifact path must be {expected}")
+        source = ROOT / expected
+        reject_link_components(source.absolute())
+        if not source.is_file():
+            raise ReleaseAssetError(f"artifact is not a regular file: {source}")
+    return version, artifacts
 
-    output.mkdir(parents=True, exist_ok=True)
-    for stale in output.iterdir():
-        if stale.is_dir():
-            shutil.rmtree(stale)
-        else:
-            stale.unlink()
 
-    archives: list[pathlib.Path] = []
-    with tempfile.TemporaryDirectory(prefix="autore-release-") as temporary_text:
+def build_assets(output: pathlib.Path) -> dict[str, Any]:
+    # Do not resolve away caller-supplied links before validating the path.
+    output = validate_output_path(output)
+    manifest = load_manifest()
+    version, artifacts = validate_asset_manifest(manifest)
+
+    # Stage on the destination filesystem and publish only a complete release.
+    # The parent must be trusted; this is not a hostile-directory locking API.
+    with tempfile.TemporaryDirectory(prefix=".autore-release-", dir=output.parent) as temporary_text:
         temporary = pathlib.Path(temporary_text)
+        staging = temporary / "assets"
+        staging.mkdir()
+        packages = temporary / "packages"
+        packages.mkdir()
+        archives: list[pathlib.Path] = []
         for artifact in artifacts:
-            if not isinstance(artifact, dict) or not isinstance(artifact.get("target"), str):
-                raise ReleaseAssetError("release manifest contains an invalid artifact")
             target = artifact["target"]
             package_name = f"AutoRE-CLI-{version}-{target}"
-            package_root = temporary / package_name
+            package_root = packages / package_name
             package_root.mkdir()
-            prepare_package(package_root, manifest, artifact)
+            prepare_package(package_root, manifest, artifact, excluded=(temporary, output))
             verify_package(package_root, target)
             if target.startswith("windows-"):
-                archive = output / f"{package_name}.zip"
+                archive = staging / f"{package_name}.zip"
                 write_zip(package_root, archive)
             else:
-                archive = output / f"{package_name}.tar.gz"
+                archive = staging / f"{package_name}.tar.gz"
                 write_tar_gz(package_root, archive)
             archives.append(archive)
-
-    archives.append(build_skill_archive(output, version))
-    write_release_checksums(output, archives)
-    return {
-        "ok": True,
-        "version": version,
-        "output": str(output),
-        "assets": [
-            {
-                "path": str(path),
-                "bytes": path.stat().st_size,
-                "sha256": sha256_file(path),
-            }
-            for path in sorted(archives)
-        ],
-        "checksum_file": str(output / "SHA256SUMS.release"),
-    }
+        archives.append(build_skill_archive(staging, version))
+        write_release_checksums(staging, archives)
+        result = {
+            "ok": True,
+            "version": version,
+            "output": str(output),
+            "assets": [
+                {
+                    "path": str(output / path.name),
+                    "bytes": path.stat().st_size,
+                    "sha256": sha256_file(path),
+                }
+                for path in sorted(archives)
+            ],
+            "checksum_file": str(output / "SHA256SUMS.release"),
+        }
+        validate_output_path(output)
+        staging.rename(output)
+    return result
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=pathlib.Path, default=DEFAULT_OUTPUT)
+    parser.add_argument(
+        "--output", type=pathlib.Path, default=DEFAULT_OUTPUT,
+        help="new output directory in an existing trusted parent; existing paths are never cleared",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     try:
-        result = build_assets(args.output.expanduser().resolve())
+        result = build_assets(args.output)
     except (ReleaseAssetError, OSError, subprocess.SubprocessError) as error:
         json.dump({"ok": False, "error": str(error)}, sys.stderr, sort_keys=True)
         sys.stderr.write("\n")
