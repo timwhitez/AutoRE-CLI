@@ -5,18 +5,29 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import pathlib
 import re
 import shutil
-import subprocess
+import subprocess  # retained test seam; lifecycle is owned by process_control
 import sys
-import threading
 import time
 from datetime import datetime, timezone
 from typing import Any, BinaryIO, NamedTuple, Optional
 
+
+# Import only the helper shipped beside this script, not a module from CWD/PATH.
+# Managed Skill inventories must not acquire import-time bytecode files.
+sys.dont_write_bytecode = True
+_PROCESS_SPEC = importlib.util.spec_from_file_location(
+    "auto_re_process_control", pathlib.Path(__file__).with_name("process_control.py")
+)
+assert _PROCESS_SPEC is not None and _PROCESS_SPEC.loader is not None
+process_control = importlib.util.module_from_spec(_PROCESS_SPEC)
+_PROCESS_SPEC.loader.exec_module(process_control)
+DEFAULT_TIMEOUT_SECONDS = process_control.DEFAULT_TIMEOUT_SECONDS
 
 TRUSTED_PROGRAM = "auto-re-cli"
 SUPPORTED_SCHEMA_VERSIONS = frozenset({"0.1.0"})
@@ -25,7 +36,6 @@ SUPPORTED_MANIFEST_KINDS = frozenset({"context_bundle", "agent_spill_manifest"})
 FORBIDDEN_FLAGS = {"--execute"}
 COMMAND_OWNED_SINK_FLAGS = {"--bundle-dir", "--spill-dir"}
 CONTROL_READ_CHUNK_BYTES = 64 * 1024
-LOG_READ_CHUNK_BYTES = 64 * 1024
 LOG_TAIL_BYTES = 1024 * 1024
 RECEIPT_MAX_BYTES = 256 * 1024
 PROGRAM_VERSION_MAX_BYTES = 4096
@@ -55,10 +65,7 @@ class ActionError(ValueError):
     pass
 
 
-class CapturedStream(NamedTuple):
-    tail: bytes
-    bytes_total: int
-    sha256: str
+CapturedStream = process_control.CapturedStream
 
 
 def _control_file_too_large(policy: ControlJsonPolicy, observed: int) -> ActionError:
@@ -166,7 +173,10 @@ def load_json_object(
             if opened_size > policy.max_encoded_bytes:
                 raise _control_file_too_large(policy, opened_size)
             data = _read_bounded_control_bytes(handle, policy)
-        value = json.loads(data.decode("utf-8"))
+        try:
+            value = json.loads(data.decode("utf-8"))
+        except ValueError as error:
+            raise ActionError(f"cannot read result JSON: {str(error)[:512]}") from error
     except ActionError:
         raise
     except (OSError, UnicodeDecodeError, json.JSONDecodeError, RecursionError) as error:
@@ -290,32 +300,6 @@ def prepare_receipt_paths(receipt_path: pathlib.Path) -> tuple[pathlib.Path, pat
     return receipt, logs
 
 
-def _capture_stream(
-    handle: BinaryIO,
-    tail_bytes: int,
-    results: dict[str, CapturedStream],
-    errors: list[BaseException],
-    key: str,
-) -> None:
-    digest = hashlib.sha256()
-    total = 0
-    tail = bytearray()
-    try:
-        while True:
-            chunk = handle.read(LOG_READ_CHUNK_BYTES)
-            if not chunk:
-                break
-            total += len(chunk)
-            digest.update(chunk)
-            if tail_bytes:
-                tail.extend(chunk)
-                if len(tail) > tail_bytes:
-                    del tail[: len(tail) - tail_bytes]
-        results[key] = CapturedStream(bytes(tail), total, digest.hexdigest())
-    except BaseException as error:
-        errors.append(error)
-    finally:
-        handle.close()
 
 
 def _write_private_bytes(path: pathlib.Path, data: bytes, label: str) -> None:
@@ -366,24 +350,9 @@ def _write_receipt(path: pathlib.Path, value: dict[str, Any]) -> None:
 
 def probe_program_version(executable: pathlib.Path) -> str:
     try:
-        completed = subprocess.run(
-            [str(executable), "--version"],
-            check=False,
-            capture_output=True,
-            timeout=10,
-        )
-    except (OSError, subprocess.SubprocessError) as error:
+        combined = process_control.probe_output(executable, max_bytes=PROGRAM_VERSION_MAX_BYTES)
+    except process_control.ProcessError as error:
         raise ActionError(f"cannot probe trusted program version: {error}") from error
-    combined = completed.stdout + completed.stderr
-    if len(combined) > PROGRAM_VERSION_MAX_BYTES:
-        raise ActionError(
-            "trusted program version output exceeds limit: "
-            f"limit={PROGRAM_VERSION_MAX_BYTES} observed={len(combined)}"
-        )
-    if completed.returncode != 0:
-        raise ActionError(
-            f"trusted program version probe failed with exit code {completed.returncode}"
-        )
     try:
         output = combined.decode("utf-8").strip()
     except UnicodeDecodeError as error:
@@ -409,6 +378,8 @@ def _stream_receipt(
         "sha256": captured.sha256,
         "retained_sha256": hashlib.sha256(captured.tail).hexdigest(),
         "truncated": captured.bytes_total > len(captured.tail),
+        "capture_complete": captured.complete,
+        "digest_scope": "complete_stream" if captured.complete else "observed_prefix",
     }
 
 
@@ -498,6 +469,7 @@ def execute_prepared_with_receipt(
     receipt_path: pathlib.Path,
     *,
     log_tail_bytes: int = LOG_TAIL_BYTES,
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
 ) -> tuple[int, dict[str, Any]]:
     if (
         not isinstance(log_tail_bytes, int)
@@ -507,6 +479,10 @@ def execute_prepared_with_receipt(
         raise ActionError(
             f"log tail byte limit must be an integer between 0 and {LOG_TAIL_BYTES}"
         )
+    try:
+        process_control.validate_seconds(timeout_seconds)
+    except process_control.ProcessError as error:
+        raise ActionError(str(error)) from error
     receipt, log_dir = prepare_action_receipt_paths(prepared, receipt_path)
     try:
         resolved_executable = executable.expanduser().resolve(strict=True)
@@ -527,41 +503,16 @@ def execute_prepared_with_receipt(
     started_at = utc_now()
     started_monotonic = time.monotonic()
     try:
-        process = subprocess.Popen(
-            argv,
-            shell=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+        captured = process_control.run_process(
+            argv, timeout_seconds=timeout_seconds, tail_bytes=log_tail_bytes,
         )
-    except OSError as error:
+    except process_control.ProcessError as error:
         shutil.rmtree(log_dir, ignore_errors=True)
-        raise ActionError(f"cannot launch trusted program: {error}") from error
-    assert process.stdout is not None and process.stderr is not None
-    results: dict[str, CapturedStream] = {}
-    errors: list[BaseException] = []
-    threads = [
-        threading.Thread(
-            target=_capture_stream,
-            args=(process.stdout, log_tail_bytes, results, errors, "stdout"),
-            daemon=True,
-        ),
-        threading.Thread(
-            target=_capture_stream,
-            args=(process.stderr, log_tail_bytes, results, errors, "stderr"),
-            daemon=True,
-        ),
-    ]
-    for thread in threads:
-        thread.start()
-    exit_code = process.wait()
-    for thread in threads:
-        thread.join()
+        raise ActionError(str(error)) from error
+    results = {"stdout": captured.stdout, "stderr": captured.stderr}
+    exit_code = execution_exit_code(captured)
     ended_at = utc_now()
     duration_ms = round((time.monotonic() - started_monotonic) * 1000)
-    if errors:
-        raise ActionError(f"cannot capture trusted program output: {errors[0]}")
-    if set(results) != {"stdout", "stderr"}:
-        raise ActionError("trusted program output capture did not complete")
 
     try:
         _write_private_bytes(stdout_path, results["stdout"].tail, "stdout tail log")
@@ -585,6 +536,11 @@ def execute_prepared_with_receipt(
             "ended_at": ended_at,
             "duration_ms": duration_ms,
             "exit_code": exit_code,
+            "process_exit_code": captured.returncode,
+            "execution_status": captured.status,
+            "timeout_seconds": timeout_seconds,
+            "leader_reaped": captured.leader_reaped,
+            "diagnostics": list(captured.diagnostics),
             "stdout": _stream_receipt(
                 stdout_path, results["stdout"], log_tail_bytes
             ),
@@ -604,6 +560,9 @@ def execute_prepared_with_receipt(
         "kind": "auto_re_action_execution_summary",
         "receipt_path": str(receipt),
         "exit_code": exit_code,
+        "process_exit_code": captured.returncode,
+        "execution_status": captured.status,
+        "diagnostics": list(captured.diagnostics),
         "stdout_truncated": receipt_value["stdout"]["truncated"],
         "stderr_truncated": receipt_value["stderr"]["truncated"],
     }
@@ -680,6 +639,10 @@ def validate_prepared_argv(value: Any, *, command_owned_sink: bool) -> list[str]
     if command_owned_sink:
         if not has_command_sink or output_positions:
             raise ActionError("prepared command-owned action has an invalid sink")
+        try:
+            _command_sink_values(argv)
+        except (OSError, RuntimeError) as error:
+            raise ActionError(f"cannot resolve action output directories: {error}") from error
     elif (
         has_command_sink
         or len(output_positions) != 1
@@ -723,6 +686,7 @@ def prepare_action(
             )
         argv.extend(["--output", str(output)])
 
+    validate_prepared_argv(argv, command_owned_sink=command_owned_sink)
     return {
         "ok": True,
         "schema_version": result["schema_version"],
@@ -736,6 +700,23 @@ def prepare_action(
     }
 
 
+def execution_exit_code(result) -> int:
+    if result.status == "timed_out":
+        return 124
+    if result.status == "cancelled":
+        return 130
+    if result.status != "completed" or result.returncode is None:
+        return 125
+    return result.returncode if result.returncode >= 0 else 128 - result.returncode
+
+
+def positive_seconds(text: str) -> float:
+    try:
+        return process_control.validate_seconds(float(text))
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(str(error)) from error
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Validate and run one exact static next_actions[] command."
@@ -744,6 +725,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--action-stage", required=True)
     parser.add_argument("--output", type=pathlib.Path)
     parser.add_argument("--receipt", type=pathlib.Path)
+    parser.add_argument("--timeout-seconds", type=positive_seconds, default=DEFAULT_TIMEOUT_SECONDS,
+                        help="analysis execution budget; increase for long static analyses (default: 900)")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
@@ -769,13 +752,23 @@ def main() -> int:
                 prepared,
                 pathlib.Path(executable),
                 args.receipt,
+                timeout_seconds=args.timeout_seconds,
             )
             json.dump(summary, sys.stdout, indent=2, sort_keys=True)
             sys.stdout.write("\n")
             return exit_code
         argv = [executable, *prepared["argv"][1:]]
-        completed = subprocess.run(argv, shell=False, check=False)
-        return completed.returncode
+        try:
+            completed = process_control.run_process(
+                argv, timeout_seconds=args.timeout_seconds, capture=False,
+            )
+        except process_control.ProcessError as error:
+            raise ActionError(str(error)) from error
+        if completed.status != "completed":
+            json.dump({"ok": False, "error": completed.status,
+                       "diagnostics": list(completed.diagnostics)}, sys.stderr, sort_keys=True)
+            sys.stderr.write("\n")
+        return execution_exit_code(completed)
     except (ActionError, OSError) as error:
         json.dump({"ok": False, "error": str(error)}, sys.stderr, sort_keys=True)
         sys.stderr.write("\n")

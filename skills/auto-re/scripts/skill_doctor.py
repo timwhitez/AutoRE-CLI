@@ -5,16 +5,27 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import pathlib
 import re
 import shutil
 import stat
-import subprocess
+import subprocess  # retained test seam; lifecycle is owned by process_control
 import sys
 from typing import Any, Optional
 
+
+# Import only the helper shipped beside this script, not a module from CWD/PATH.
+# Managed Skill inventories must not acquire import-time bytecode files.
+sys.dont_write_bytecode = True
+_PROCESS_SPEC = importlib.util.spec_from_file_location(
+    "auto_re_process_control", pathlib.Path(__file__).with_name("process_control.py")
+)
+assert _PROCESS_SPEC is not None and _PROCESS_SPEC.loader is not None
+process_control = importlib.util.module_from_spec(_PROCESS_SPEC)
+_PROCESS_SPEC.loader.exec_module(process_control)
 
 SKILL_NAME = "auto-re"
 TRUSTED_PROGRAM = "auto-re-cli"
@@ -97,8 +108,8 @@ def read_managed_marker(skill_root: pathlib.Path) -> Optional[dict[str, Any]]:
     )
     try:
         value = json.loads(data.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as error:
-        raise DoctorError(f"cannot parse managed marker: {error}") from error
+    except (UnicodeDecodeError, ValueError, RecursionError) as error:
+        raise DoctorError(f"cannot parse managed marker: {str(error)[:512]}") from error
     if not isinstance(value, dict):
         raise DoctorError("managed marker root must be an object")
     if (
@@ -158,22 +169,9 @@ def installed_skill_digest(skill_root: pathlib.Path, files: list[str]) -> str:
 
 def probe_cli_version(executable: pathlib.Path) -> tuple[str, str]:
     try:
-        completed = subprocess.run(
-            [str(executable), "--version"],
-            check=False,
-            capture_output=True,
-            timeout=10,
-        )
-    except (OSError, subprocess.SubprocessError) as error:
+        output_bytes = process_control.probe_output(executable, max_bytes=PROBE_OUTPUT_MAX_BYTES)
+    except process_control.ProcessError as error:
         raise DoctorError(f"cannot probe CLI version: {error}") from error
-    output_bytes = completed.stdout + completed.stderr
-    if len(output_bytes) > PROBE_OUTPUT_MAX_BYTES:
-        raise DoctorError(
-            "CLI version output is too large: "
-            f"limit={PROBE_OUTPUT_MAX_BYTES} observed={len(output_bytes)}"
-        )
-    if completed.returncode != 0:
-        raise DoctorError(f"CLI version probe failed with exit code {completed.returncode}")
     try:
         output = output_bytes.decode("utf-8").strip()
     except UnicodeDecodeError as error:

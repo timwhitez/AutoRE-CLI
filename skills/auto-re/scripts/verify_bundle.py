@@ -368,8 +368,9 @@ def read_json_object_stably(
         handle.close()
     try:
         value = json.loads(data.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as error:
-        raise ValidationError(f"cannot read JSON {label}: {error}") from error
+    except (ValueError, RecursionError) as error:
+        # Includes UTF-8/JSON syntax and the interpreter integer conversion limit.
+        raise ValidationError(f"cannot read JSON {label}: {str(error)[:512]}") from error
     _validate_json_shape(value, policy)
     if not isinstance(value, dict):
         raise ValidationError(f"{label} root must be an object")
@@ -464,6 +465,42 @@ def resolve_new_output(path: pathlib.Path, label: str) -> pathlib.Path:
     return parent / requested.name
 
 
+def _write_private_bytes(path: pathlib.Path, data: bytes, label: str) -> None:
+    created: os.stat_result | None = None
+
+    def private_opener(name: str, flags: int) -> int:
+        return os.open(name, flags, 0o600)
+
+    try:
+        with open(path, "xb", opener=private_opener) as output:
+            created = os.fstat(output.fileno())
+            output.write(data)
+            output.flush()
+            os.fsync(output.fileno())
+            if hasattr(os, "fchmod"):
+                os.fchmod(output.fileno(), 0o400)
+        if not os.path.samestat(created, path.lstat()):
+            raise OSError("output object changed during write")
+        if not hasattr(os, "fchmod"):
+            path.chmod(0o400)
+    except OSError as error:
+        cleanup_error = None
+        # A failed exclusive open never grants ownership of the destination.
+        # Also preserve any replacement object observed after a later failure.
+        if created is not None:
+            try:
+                if os.path.samestat(created, path.lstat()):
+                    path.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError as failure:
+                cleanup_error = failure
+        detail = f"cannot write {label}: {error}"
+        if cleanup_error is not None:
+            detail += f"; cannot remove incomplete owned output: {cleanup_error}"
+        raise ValidationError(detail) from error
+
+
 def write_json_exclusive(
     path: pathlib.Path,
     value: dict[str, Any],
@@ -478,15 +515,7 @@ def write_json_exclusive(
             f"{label} output exceeds limit: limit={max_encoded_bytes} "
             f"observed={len(encoded)}"
         )
-    try:
-        with target.open("xb") as output:
-            output.write(encoded)
-            output.flush()
-            os.fsync(output.fileno())
-        target.chmod(0o400)
-    except OSError as error:
-        target.unlink(missing_ok=True)
-        raise ValidationError(f"cannot write {label} output: {error}") from error
+    _write_private_bytes(target, encoded, f"{label} output")
     return target
 
 
@@ -524,7 +553,8 @@ def validate_manifest(path: pathlib.Path) -> dict[str, Any]:
         )
     if manifest.get("owner") != EXPECTED_OWNER:
         raise ValidationError("manifest owner must be auto-re-cli")
-    if manifest.get("kind") not in SUPPORTED_KINDS:
+    kind = manifest.get("kind")
+    if not isinstance(kind, str) or kind not in SUPPORTED_KINDS:
         raise ValidationError(f"unsupported manifest kind: {manifest.get('kind')!r}")
 
     rows, total_payload_bytes = prepare_manifest_rows(manifest.get("files"))
@@ -775,7 +805,7 @@ def main() -> int:
                 )
             else:
                 result = validate_manifest(args.manifest)
-    except ValidationError as error:
+    except (ValidationError, OSError) as error:
         json.dump({"ok": False, "error": str(error)}, sys.stderr, sort_keys=True)
         sys.stderr.write("\n")
         return 1
