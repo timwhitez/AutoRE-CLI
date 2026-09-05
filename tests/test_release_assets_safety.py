@@ -18,6 +18,16 @@ builder = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(builder)
 
 
+RELEASE_CONTRACT = {
+    "macos-arm64": ("aarch64-apple-darwin", "bin/macos-arm64/auto-re-cli", "adhoc"),
+    "macos-x86_64": ("x86_64-apple-darwin", "bin/macos-x86_64/auto-re-cli", "adhoc"),
+    "linux-arm64": ("aarch64-unknown-linux-gnu", "bin/linux-arm64/auto-re-cli", "not_applicable"),
+    "linux-x86_64": ("x86_64-unknown-linux-gnu", "bin/linux-x86_64/auto-re-cli", "not_applicable"),
+    "windows-x86_64": ("x86_64-pc-windows-gnullvm", "bin/windows-x86_64/auto-re-cli.exe", "not_applicable"),
+}
+SKILL_FILES = ("SKILL.md", "VERSION", "agents/openai.yaml", "scripts/run_next_action.py")
+
+
 class ReleaseAssetsSafetyTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
@@ -28,29 +38,7 @@ class ReleaseAssetsSafetyTests(unittest.TestCase):
         self.output = self.work / "output"
         self.home = self.work / "home"
         self.home.mkdir()
-        self.manifest = {"distribution_scope": "repository", "version": "0.1.3", "artifacts": [
-            {"target": "linux-x86_64", "path": "bin/linux-x86_64/auto-re-cli"},
-            {"target": "windows-x86_64", "path": "bin/windows-x86_64/auto-re-cli.exe"},
-        ]}
-        for artifact in self.manifest["artifacts"]:
-            path = self.root / artifact["path"]
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(b"inert packaging fixture; do not execute")
-        skill = self.root / "skills/auto-re/SKILL.md"
-        skill.parent.mkdir(parents=True)
-        skill.write_text("fixture skill\n", encoding="utf-8")
         self.manifest_path = self.root / "manifest/release.json"
-        self.manifest_path.parent.mkdir()
-        self.save_manifest()
-        verifier = self.root / "scripts/autore_distribution.py"
-        verifier.parent.mkdir()
-        verifier.write_text(
-            "import json,pathlib\n"
-            "m=json.loads(pathlib.Path('manifest/release.json').read_text())\n"
-            "print(json.dumps({'ok':True,'distribution_scope':m['distribution_scope'],"
-            "'package_target':m['package_target'],'artifact_count':len(m['artifacts'])}))\n",
-            encoding="utf-8",
-        )
         for name, value in (("ROOT", self.root), ("MANIFEST_PATH", self.manifest_path),
                             ("DEFAULT_OUTPUT", self.root / "release-assets")):
             patcher = mock.patch.object(builder, name, value)
@@ -59,6 +47,110 @@ class ReleaseAssetsSafetyTests(unittest.TestCase):
         patcher = mock.patch.object(Path, "home", return_value=self.home)
         patcher.start()
         self.addCleanup(patcher.stop)
+        self.build_repository(sorted(RELEASE_CONTRACT))
+        self.manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
+
+    def build_repository(self, targets: list[str]) -> None:
+        """Create a fixture repository that passes the full input gate."""
+        (self.root / "LICENSE-MIT").write_text("fixture license\n", encoding="utf-8")
+        switch = "[English](README.md) | [简体中文](README_zh.md)\n"
+        for name in ("README.md", "README_zh.md"):
+            (self.root / name).write_text(
+                switch + "five platforms including windows-x86_64\n", encoding="utf-8"
+            )
+        for relative in SKILL_FILES:
+            path = self.root / "skills/auto-re" / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if relative == "VERSION":
+                path.write_text("0.1.3\n", encoding="utf-8")
+            elif relative == "SKILL.md":
+                path.write_text(
+                    "---\nname: auto-re\ndescription: fixture skill\n---\n"
+                    "fixture skill payload\n",
+                    encoding="utf-8",
+                )
+            elif relative == "agents/openai.yaml":
+                path.write_text(
+                    "display_name: Auto-RE\n"
+                    "$auto-re static analysis\n"
+                    "allow_implicit_invocation: true\n",
+                    encoding="utf-8",
+                )
+            else:
+                path.write_text("fixture skill payload\n", encoding="utf-8")
+        verifier = self.root / "scripts/autore_distribution.py"
+        verifier.parent.mkdir(parents=True, exist_ok=True)
+        verifier.write_text(
+            "import json,pathlib\n"
+            "m=json.loads(pathlib.Path('manifest/release.json').read_text())\n"
+            "print(json.dumps({'ok':True,'distribution_scope':m['distribution_scope'],"
+            "'package_target':m['package_target'],'artifact_count':len(m['artifacts'])}))\n",
+            encoding="utf-8",
+        )
+        artifacts = []
+        for target in targets:
+            rust_target, path_text, signing = RELEASE_CONTRACT[target]
+            binary = self.root / path_text
+            binary.parent.mkdir(parents=True, exist_ok=True)
+            binary.write_bytes(f"inert packaging fixture {target}; do not execute".encode())
+            binary.chmod(0o755)
+            artifact = {
+                "target": target,
+                "rust_target": rust_target,
+                "path": path_text,
+                "signing": signing,
+                "bytes": binary.stat().st_size,
+                "sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
+            }
+            if target.startswith("windows-"):
+                artifact["pe"] = {
+                    "architecture": "x86_64",
+                    "subsystem": "console",
+                    "imported_dlls": ["KERNEL32.dll"],
+                    "llvm_mingw_runtime": "static",
+                    "timestamp": 0,
+                }
+            artifacts.append(artifact)
+        manifest = {
+            "schema_version": 1,
+            "kind": "autore_cli_binary_distribution",
+            "product": "AutoRE-CLI",
+            "publisher": "timwhitez",
+            "repository": "AutoRE-CLI",
+            "repository_url": "https://github.com/timwhitez/AutoRE-CLI",
+            "distribution_scope": "repository",
+            "version": "0.1.3",
+            "source_revision": "a" * 40,
+            "safety": {
+                "target_execution": False,
+                "shellcode_execution": False,
+                "generated_artifact_execution": False,
+                "dynamic_analysis": False,
+                "dynamic_evidence": False,
+            },
+            "artifacts": artifacts,
+            "skill": {
+                "name": "auto-re",
+                "path": "skills/auto-re",
+                "version": "0.1.3",
+                "managed_files": sorted(
+                    f"skills/auto-re/{relative}" for relative in SKILL_FILES
+                ),
+            },
+        }
+        self.manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        self.manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        self.rebuild_checksums()
+
+    def rebuild_checksums(self) -> None:
+        rows = []
+        for path in sorted(self.root.rglob("*")):
+            if not path.is_file() or path.name == "SHA256SUMS":
+                continue
+            rows.append(
+                f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.relative_to(self.root).as_posix()}\n"
+            )
+        (self.root / "SHA256SUMS").write_text("".join(rows), encoding="utf-8")
 
     def save_manifest(self) -> None:
         self.manifest_path.write_text(json.dumps(self.manifest), encoding="utf-8")
@@ -191,12 +283,12 @@ class ReleaseAssetsSafetyTests(unittest.TestCase):
         first = builder.build_assets(self.output)
         second = builder.build_assets(self.work / "second-output")
         self.assertTrue(first["ok"])
-        self.assertEqual(len(first["assets"]), 3)
+        self.assertEqual(len(first["assets"]), 6)
         self.assertEqual([a["sha256"] for a in first["assets"]], [a["sha256"] for a in second["assets"]])
         for line in (self.output / "SHA256SUMS.release").read_text().splitlines():
             digest, name = line.split("  ", 1)
             self.assertEqual(hashlib.sha256((self.output / name).read_bytes()).hexdigest(), digest)
-        archive = next(self.output.glob("*.tar.gz"))
+        archive = next(self.output.glob("*linux-x86_64.tar.gz"))
         with tarfile.open(archive) as handle:
             members = {m.name: handle.extractfile(m).read() for m in handle.getmembers() if m.isfile()}
         prefix = "AutoRE-CLI-0.1.3-linux-x86_64/"
@@ -206,6 +298,103 @@ class ReleaseAssetsSafetyTests(unittest.TestCase):
         self.assertFalse(any("windows-x86_64" in name for name in members))
         with zipfile.ZipFile(self.output / "AutoRE-CLI-0.1.3-auto-re-skill.zip") as handle:
             self.assertIn("SKILL.md", handle.namelist())
+
+    def test_incomplete_platform_matrix_is_rejected(self) -> None:
+        # A four-target manifest that is internally self-consistent (checksums
+        # regenerated) must still be rejected: standard releases are complete.
+        # The full input gate fires before the builder's own preflight.
+        targets = [t for t in sorted(RELEASE_CONTRACT) if t != "linux-arm64"]
+        self.build_repository(targets)
+        with self.assertRaisesRegex(
+            builder.ReleaseAssetError, "release artifact target set mismatch"
+        ):
+            builder.build_assets(self.output)
+        self.assertFalse(self.output.exists())
+
+    def test_manifest_preflight_alone_requires_every_platform(self) -> None:
+        targets = [t for t in sorted(RELEASE_CONTRACT) if t != "macos-arm64"]
+        self.build_repository(targets)
+        manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
+        with self.assertRaisesRegex(
+            builder.ReleaseAssetError, "missing targets: \\['macos-arm64'\\]"
+        ):
+            builder.validate_asset_manifest(manifest)
+
+    def test_missing_platform_in_stale_checksum_state_is_rejected(self) -> None:
+        # Even without regenerating checksums, removing a platform from the
+        # manifest must never produce a publishable release.
+        self.manifest["artifacts"] = [
+            artifact
+            for artifact in self.manifest["artifacts"]
+            if artifact["target"] != "macos-x86_64"
+        ]
+        self.save_manifest()
+        with self.assertRaises(builder.ReleaseAssetError):
+            builder.build_assets(self.output)
+        self.assertFalse(self.output.exists())
+
+    def test_unregistered_local_file_is_rejected_before_packaging(self) -> None:
+        sentinel = self.root / ".env"
+        sentinel.write_text("SECRET=fixture\n", encoding="utf-8")
+        with self.assertRaisesRegex(
+            builder.ReleaseAssetError, "failed verification before packaging"
+        ):
+            builder.build_assets(self.output)
+        self.assertFalse(self.output.exists())
+        self.assertTrue(sentinel.exists(), "builder must not delete working-tree files")
+
+    def test_unregistered_plain_file_is_rejected(self) -> None:
+        (self.root / "local-notes.txt").write_text("scratch\n", encoding="utf-8")
+        with self.assertRaises(builder.ReleaseAssetError):
+            builder.build_assets(self.output)
+        self.assertFalse(self.output.exists())
+
+    def test_pycache_residue_is_rejected_rather_than_packaged(self) -> None:
+        cache = self.root / "tests/__pycache__"
+        cache.mkdir(parents=True)
+        (cache / "test.cpython-312.pyc").write_bytes(b"\x00pyc")
+        with self.assertRaises(builder.ReleaseAssetError):
+            builder.build_assets(self.output)
+        self.assertFalse(self.output.exists())
+
+    def test_modified_registered_file_is_rejected(self) -> None:
+        skill = self.root / "skills/auto-re/SKILL.md"
+        skill.write_text("tampered after checksums\n", encoding="utf-8")
+        with self.assertRaisesRegex(
+            builder.ReleaseAssetError, "failed verification before packaging"
+        ):
+            builder.build_assets(self.output)
+        self.assertFalse(self.output.exists())
+
+    def test_skill_zip_members_match_platform_packages_exactly(self) -> None:
+        result = builder.build_assets(self.output)
+        skill_zip = self.output / "AutoRE-CLI-0.1.3-auto-re-skill.zip"
+        with zipfile.ZipFile(skill_zip) as handle:
+            names = sorted(handle.namelist())
+            digests = {
+                name: hashlib.sha256(handle.read(name)).hexdigest() for name in names
+            }
+        expected = sorted(SKILL_FILES)
+        self.assertEqual(names, expected)
+        self.assertFalse(any("__pycache__" in name or name.endswith(".pyc") for name in names))
+        # Cross-channel: every member is byte-identical inside a platform
+        # package archive.
+        archive = next(self.output.glob("*linux-x86_64.tar.gz"))
+        with tarfile.open(archive) as handle:
+            members = {
+                m.name.removeprefix("AutoRE-CLI-0.1.3-linux-x86_64/"): handle.extractfile(m).read()
+                for m in handle.getmembers()
+                if m.isfile()
+            }
+        for name in names:
+            packaged = f"skills/auto-re/{name}"
+            self.assertEqual(
+                hashlib.sha256(members[packaged]).hexdigest(), digests[name], name
+            )
+        # The success result lists every archive with its digest.
+        self.assertEqual(len(result["assets"]), 6)
+        listed = {Path(a["path"]).name: a["sha256"] for a in result["assets"]}
+        self.assertEqual(listed[skill_zip.name], hashlib.sha256(skill_zip.read_bytes()).hexdigest())
 
     def test_default_output_does_not_package_its_staging_tree(self) -> None:
         output = self.root / "release-assets"
