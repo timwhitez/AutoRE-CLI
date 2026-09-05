@@ -434,12 +434,20 @@ def _command_sink_values(argv: list[str]) -> list[pathlib.Path]:
     sinks: list[pathlib.Path] = []
     for index, argument in enumerate(argv):
         for flag in COMMAND_OWNED_SINK_FLAGS:
-            if argument == flag and index + 1 < len(argv):
-                sinks.append(pathlib.Path(argv[index + 1]).expanduser().absolute())
+            if argument == flag:
+                if index + 1 >= len(argv) or argv[index + 1].startswith("--"):
+                    raise ActionError(f"{flag} requires an output directory")
+                value = argv[index + 1]
             elif argument.startswith(f"{flag}="):
-                sinks.append(
-                    pathlib.Path(argument.split("=", 1)[1]).expanduser().absolute()
-                )
+                value = argument.split("=", 1)[1]
+            else:
+                continue
+            if not value:
+                raise ActionError(f"{flag} requires an output directory")
+            # argv is passed with shell=False: a literal ~ is not expanded.
+            sinks.append(pathlib.Path(value).resolve())
+    if not sinks:
+        raise ActionError("command-owned action is missing an output directory")
     return sinks
 
 
@@ -448,35 +456,37 @@ def validate_receipt_sink_separation(
     receipt: pathlib.Path,
     log_dir: pathlib.Path,
 ) -> None:
-    argv = prepared["argv"]
-    sinks = (
-        _command_sink_values(argv)
-        if prepared["command_owned_sink"]
-        else [pathlib.Path(argv[-1])]
-    )
+    def overlaps(left: pathlib.Path, right: pathlib.Path) -> bool:
+        return left == right or left in right.parents or right in left.parents
+
     try:
-        diagnostics = [receipt.resolve(), log_dir.resolve()]
-        resolved_sinks = [sink.expanduser().resolve() for sink in sinks]
-    except (OSError, RuntimeError) as error:
-        raise ActionError(f"cannot resolve diagnostic or action sink: {error}") from error
-    for sink in resolved_sinks:
-        for diagnostic in diagnostics:
-            if (
-                sink == diagnostic
-                or sink in diagnostic.parents
-                or diagnostic in sink.parents
-            ):
-                if prepared["command_owned_sink"]:
+        receipt = receipt.expanduser().resolve()
+        log_dir = log_dir.expanduser().resolve()
+        argv = prepared["argv"]
+        if prepared["command_owned_sink"]:
+            for sink in _command_sink_values(argv):
+                if overlaps(receipt, sink) or overlaps(log_dir, sink):
                     raise ActionError(
                         "receipt or log path overlaps a command-owned action sink"
                     )
-                raise ActionError("receipt or log path aliases action output")
+            return
+        output = pathlib.Path(argv[-1]).resolve()
+        if overlaps(receipt, output) or overlaps(log_dir, output):
+            raise ActionError("receipt or log path aliases action output")
+    except ActionError:
+        raise
+    except (OSError, RuntimeError, ValueError) as error:
+        raise ActionError(f"cannot resolve receipt/action sink paths: {error}") from error
 
 
 def prepare_action_receipt_paths(
-    prepared: dict[str, Any], receipt_path: pathlib.Path,
+    prepared: dict[str, Any], receipt_path: pathlib.Path
 ) -> tuple[pathlib.Path, pathlib.Path]:
-    """Use the same non-mutating diagnostic preflight for dry-run and execution."""
+    """Apply the same side-effect-free receipt preflight to preview and execution."""
+    validate_prepared_argv(
+        prepared.get("argv"),
+        command_owned_sink=prepared.get("command_owned_sink") is True,
+    )
     receipt, logs = prepare_receipt_paths(receipt_path)
     validate_receipt_sink_separation(prepared, receipt, logs)
     return receipt, logs
@@ -494,18 +504,16 @@ def execute_prepared_with_receipt(
         or isinstance(log_tail_bytes, bool)
         or not 0 <= log_tail_bytes <= LOG_TAIL_BYTES
     ):
-        raise ActionError(f"log tail byte limit must be an integer from 0 to {LOG_TAIL_BYTES}")
-    validate_prepared_argv(
-        prepared.get("argv"),
-        command_owned_sink=prepared.get("command_owned_sink") is True,
-    )
+        raise ActionError(
+            f"log tail byte limit must be an integer between 0 and {LOG_TAIL_BYTES}"
+        )
+    receipt, log_dir = prepare_action_receipt_paths(prepared, receipt_path)
     try:
         resolved_executable = executable.expanduser().resolve(strict=True)
     except OSError as error:
         raise ActionError(f"cannot resolve trusted program: {error}") from error
     if not resolved_executable.is_file():
         raise ActionError("trusted program must be a regular file")
-    receipt, log_dir = prepare_action_receipt_paths(prepared, receipt_path)
     program_version = probe_program_version(resolved_executable)
     program_sha256 = sha256_file(resolved_executable)
 
@@ -673,7 +681,8 @@ def validate_prepared_argv(value: Any, *, command_owned_sink: bool) -> list[str]
         if not has_command_sink or output_positions:
             raise ActionError("prepared command-owned action has an invalid sink")
     elif (
-        len(output_positions) != 1
+        has_command_sink
+        or len(output_positions) != 1
         or output_positions[0] != len(argv) - 2
         or argv[output_positions[0]] != "--output"
     ):
