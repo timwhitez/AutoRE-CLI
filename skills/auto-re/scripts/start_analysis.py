@@ -19,6 +19,11 @@ import skill_doctor as doctor
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 LOG_TAIL_BYTES = 16 * 1024
+# Each entry has a known JSON contract; this is not arbitrary CLI passthrough.
+FIRST_COMMANDS = (
+    "report", "function", "inspect-go", "inspect-rust", "inspect-die",
+    "inspect-upx", "inspect-vmp", "pe-strings", "pe-resources",
+)
 
 
 def address(text: str) -> str:
@@ -36,6 +41,8 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument("input", type=Path)
     parser.add_argument("--result-dir", type=Path, required=True)
     parser.add_argument("--cli", type=Path, help="trusted installed analyzer, never the input")
+    parser.add_argument("--command", choices=FIRST_COMMANDS,
+                        help="one static query; default: function with a selector, otherwise report")
     selector = parser.add_mutually_exclusive_group()
     selector.add_argument("--addr", type=address)
     selector.add_argument("--symbol")
@@ -48,6 +55,17 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
                         default=actions.DEFAULT_TIMEOUT_SECONDS,
                         help="analysis execution budget; increase for long static analyses (default: 900)")
     args = parser.parse_args(argv)
+    selected = args.addr is not None or args.symbol is not None
+    args.command = args.command or ("function" if selected else "report")
+    if args.command == "function" and not selected:
+        parser.error("--command function requires --addr or --symbol")
+    if args.command != "function" and selected:
+        parser.error("--addr and --symbol are only supported by --command function")
+    if args.command == "pe-resources" and (
+        args.arch is not None or args.raw_shellcode
+        or args.base_address is not None or args.entry_address is not None
+    ):
+        parser.error("pe-resources does not accept architecture or raw-input arguments")
     if args.raw_shellcode and (args.arch is None or args.base_address is None):
         parser.error("raw shellcode requires explicit --arch and --base-address")
     if not args.raw_shellcode and (args.base_address is not None or args.entry_address is not None):
@@ -78,16 +96,17 @@ def preflight_paths(args: argparse.Namespace) -> tuple[Path, Path]:
 
 
 def prepare(args: argparse.Namespace, target: Path, output: Path) -> dict:
-    command = "function" if args.addr is not None or args.symbol is not None else "report"
+    command = args.command
     argv = [actions.TRUSTED_PROGRAM, command, str(target)]
     if args.addr is not None:
         argv += ["--addr", args.addr]
     if args.symbol is not None:
         argv += ["--symbol", args.symbol]
     argv += ["--format", "json"]
+    if command != "function":
+        argv += ["--json-profile", "ai"]
     if command == "report":
-        argv += ["--json-profile", "ai", "--sections",
-                 "binary,summary,inspections,flow,functions,types", "--limit", "8"]
+        argv += ["--sections", "binary,summary,inspections,flow,functions,types", "--limit", "8"]
     if args.raw_shellcode:
         argv.append("--raw-shellcode")
     for flag, value in (("--arch", args.arch), ("--base-address", args.base_address),
@@ -123,7 +142,8 @@ def run(args: argparse.Namespace) -> tuple[int, dict]:
     actions.validate_prepared_argv(prepared["argv"], command_owned_sink=False)
     if args.dry_run:
         return 0, dict(prepared, readiness_checked=False, analysis_executed=False,
-                       investigation_complete=False, result_dir=str(output))
+                       investigation_complete=False, result_dir=str(output),
+                       result_validation="not_attempted")
 
     executable = trusted_cli(args, target)
     readiness = doctor.diagnose(SKILL_ROOT, executable=executable)
@@ -140,21 +160,45 @@ def run(args: argparse.Namespace) -> tuple[int, dict]:
     result_path = output / "analysis.json"
     summary.update(readiness_checked=True, analysis_executed=True,
                    investigation_complete=False, result_path=str(result_path),
+                   result_validation="not_attempted",
                    warnings=readiness["warnings"],
                    next_step="Read result JSON; inspect warnings, completion and next_actions before choosing one relevant follow-up.")
-    if code == 0:
+    if code != 0:
+        summary.update(
+            failure_phase="execution",
+            next_step="Inspect the execution receipt and bounded logs before changing the query or budget; partial results are not validated evidence.",
+        )
+        return code, summary
+
+    try:
         if not stat.S_ISREG(result_path.lstat().st_mode):
             raise actions.ActionError("analysis JSON must be a direct regular file")
         result = actions.load_json_object(result_path)
-        summary["result_wrapper"] = actions.validate_result_contract(result)
+        wrapper = actions.validate_result_contract(result)
+        expected = "wrapper:function" if args.command == "function" else "profile:ai"
+        if wrapper != expected:
+            raise actions.ActionError(f"{args.command} expected {expected}, received {wrapper}")
+    except (actions.ActionError, OSError, RuntimeError, ValueError) as error:
+        # The receipt describes the process; this failure belongs to the launcher.
+        # Keep its paths/status rather than losing them in main's preflight error.
+        summary.update(
+            ok=False, exit_code=1, result_validation="failed",
+            failure_phase="result_validation",
+            error="result JSON validation failed: " + str(error)[:512],
+            next_step="Inspect the retained receipt, bounded logs and result path; correct the output/contract problem before retrying into a new result directory. Do not treat the invalid result as evidence.",
+        )
+        return 1, summary
+    summary.update(result_wrapper=wrapper, result_validation="passed")
     return code, summary
 
 
 def main() -> int:
     try:
         code, result = run(parse_args())
-        json.dump(result, sys.stdout, sort_keys=True)
-        sys.stdout.write("\n")
+        # Keep post-execution validation errors on stderr for existing callers.
+        stream = sys.stderr if result.get("failure_phase") == "result_validation" else sys.stdout
+        json.dump(result, stream, sort_keys=True)
+        stream.write("\n")
         # Preserve normal error codes; map POSIX signal termination to shell form.
         return code if code >= 0 else 128 - code
     except (actions.ActionError, doctor.DoctorError, OSError, RuntimeError, ValueError) as error:
