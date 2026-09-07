@@ -90,3 +90,7 @@ Never reuse an input path as a sink. Never make a generated continuation
 overwrite its parent result.
 
 For an explicitly derived byte-pair arithmetic plan, use `fold-pair-bytes <plan.json> --output <result.json>`. Read the bounded static byte workflow before treating its candidate as evidence.
+
+For selected-function stack/file bytes, use `recover-bytes <input> --addr <address>
+--max-instructions-per-function 256 --output <result.json>`. Inspect input hash,
+read ranges, unknown bytes, `pair_loops`, unresolved reasons and truncation.
