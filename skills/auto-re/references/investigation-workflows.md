@@ -189,8 +189,8 @@ Return:
 raw `bytes` (null means unknown), strict `encoding`, source instruction addresses,
 callsite and symbolic stack origin. Scanned counts and `truncated` delimit the
 window. These are reaching-store candidates; a call argument, runtime value or
-complete string decoder is not thereby proved. Opaque effects, calls and block
-boundaries invalidate dependent bytes.
+complete string decoder is not thereby proved. Opaque effects and calls invalidate dependent bytes. Cross-block memory is
+conservative; proven pair loops carry a separate bounded summary.
 
 When static IL has identified a pair-permutation formula and its exact arrays,
 `fold-pair-bytes` checks the arithmetic without a target instruction simulator.
@@ -207,10 +207,45 @@ auto-re-cli fold-pair-bytes <plan.json> --output <results>/byte-candidate.json
 The result is `[8,22]`, marked `candidate` and `transform_proven=false`, with
 plan/input/key hashes and all transform parameters. The fixed formula reads both
 indexed bytes before writing either: `mask = (key1 XOR/SUB key2) + byte_index`,
-then applies the selected XOR/ADD/SUB with the mask and with the constant, using
-byte arithmetic. Key bounds are independent of output length. Unknown indices,
+then applies optional `mask_constant_operation` / `mask_constant` (default XOR
+zero), followed by the value and output-constant operations using byte arithmetic. Key bounds are independent of output length. Unknown indices,
 odd bounds and out-of-bounds accesses stop with unresolved status and no partial
 plaintext. Never select or validate a formula merely because its output looks
 readable. Keep CFG/loop-bound and parameter provenance beside the plan; unsupported
 closure or jump-table relations remain unresolved. This command accepts only
 bounded numeric data and fixed arithmetic choices, never scripts or instructions.
+
+For bytes loaded from the executable, use one immutable input snapshot:
+
+```bash
+auto-re-cli recover-bytes <input> --addr <address> --max-instructions-per-function 256 --output <results>/bytes.json
+```
+
+This bounded JSON command retains the input hash, file/virtual read ranges and
+load/store provenance. It rejects ambiguous mappings, writable memory, BSS,
+relocations affecting the read, and instruction/snapshot mismatches. Stack
+loads, aliases and partial MOVK writes retain unknown bytes rather than zero.
+
+`pair_loops` records an automatically proved def-use relation when the bounded
+CFG has a unique cycle path, zero initial counter, increment two, checked even
+key bound, disjoint key/cipher storage and both byte loads before both stores.
+The proof is independent of register names and text readability; it retains
+setup and loop instruction addresses. Unmatched loops remain unresolved. A
+proved transform is still a static candidate and does not prove runtime
+reachability, caller arguments, source identity or network use.
+
+For container slices, `selected_slice` records the selected architecture/range;
+`input_sha256` covers the complete input and `file_offset` remains relative to
+the original file. `memory_basis=read_only_after_fixups` records Mach-O's explicit
+`SG_READ_ONLY` condition. The segment name alone never authorizes recovery.
+
+`object_slot_links` records scalar loads, stores and register-mediated copies
+using symbolic base origins, offsets and widths. Copies distinguish truncation
+and zero extension, retain the source load address, and stop across unknown
+calls or redefinitions. These links do not require Go build-version metadata;
+they do not establish allocation ownership, capture names or initializer order.
+
+`state_chains` folds byte stores only when a guarded table has a unique initial
+state, constant transitions and a proved acyclic path to return. It retains
+state order, a stable symbolic memory base and instruction addresses. Calls,
+unknown stores, repeated states or unproved termination prevent a candidate.
