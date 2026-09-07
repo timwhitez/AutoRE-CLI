@@ -62,15 +62,15 @@ Download the archive for your host from
 then verify and install it:
 
 ```sh
-tar -xzf AutoRE-CLI-0.1.4-macos-arm64.tar.gz
-cd AutoRE-CLI-0.1.4-macos-arm64
+tar -xzf AutoRE-CLI-0.1.5-macos-arm64.tar.gz
+cd AutoRE-CLI-0.1.5-macos-arm64
 ./verify.sh
 ./install.sh
 auto-re-cli --version
 ```
 
 Replace `macos-arm64` with `macos-x86_64`, `linux-x86_64`, or `linux-arm64`.
-Windows users should extract `AutoRE-CLI-0.1.4-windows-x86_64.zip` and run:
+Windows users should extract `AutoRE-CLI-0.1.5-windows-x86_64.zip` and run:
 
 ```powershell
 py -3 scripts/autore_distribution.py verify
@@ -97,7 +97,7 @@ use the platform archive above for the complete verified distribution.
 ```sh
 # Agent Skill for Codex, Claude Code, Cursor, and other supported clients
 npx skills add \
-  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.4/AutoRE-CLI-0.1.4-auto-re-skill.zip -g
+  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.5/AutoRE-CLI-0.1.5-auto-re-skill.zip -g
 ```
 
 ```powershell

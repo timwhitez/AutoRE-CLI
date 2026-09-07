@@ -118,3 +118,15 @@ installed copy and legacy registration can differ. Follow the managed install
 workflow after selecting the intended version; do not disable the check or
 silently delete another registration. Release documentation describes that
 release, not necessarily the analyzer currently selected by PATH.
+
+For an explicit unmanaged checkout, run
+`python3 skills/auto-re/scripts/skill_doctor.py --checkout --cli <checkout-cli>`.
+This distinguishes one installed alternative from duplicate registrations; use
+normal diagnosis for the installed Skill. Keep the checkout's Skill and CLI
+versions aligned.
+
+Call-graph next actions now include stable stages and can be replayed with the
+same `run_next_action.py` workflow. When continuing an investigation, supply
+`--prior-receipt <previous.json> --receipt <new.json>` to reject a request with
+identical input, CLI, selector and budget. A different output filename is not
+analysis progress.

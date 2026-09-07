@@ -72,6 +72,12 @@ CLI, create outputs, check readiness, or collect evidence. A version mismatch,
 duplicate registration, content drift, or unavailable CLI remains a blocking
 error; report the exact problem, do not weaken the gate or install automatically.
 
+For explicit unmanaged checkout testing, first run
+`python3 <checkout-skill>/scripts/skill_doctor.py --checkout --cli <trusted-checkout-cli>`.
+It reports one installed alternative separately and still rejects two installed
+registrations. After it passes, invoke that CLI directly with a bounded output
+sink. The normal launcher's readiness check is for installed registrations.
+
 Both launchers accept `--timeout-seconds` (default 900); increase it for a
 legitimate long analysis within the task budget. A timeout or cancellation is
 not evidence that the binary is benign or analysis is complete. Preserve the
@@ -88,6 +94,10 @@ failure, not usable evidence. Its stderr JSON retains the result/receipt paths,
 Read that failure before selecting a different query. Do not repeat an identical
 failed call without a changed input, selector, supported option or justified
 budget. A passed wrapper check still does not prove the analysis is complete.
+
+When using `run_next_action.py`, keep `--receipt` and pass `--prior-receipt`
+for a continuation of the same request. Identical input/CLI/selector/budget stops
+before analysis; changing only the output name does not establish progress.
 
 Name the unanswered question and the evidence needed before choosing a follow-up.
 Prefer an exact returned address or a progressing page over widening all budgets.

@@ -98,3 +98,12 @@ UTF-8 应严格校验，不能悄悄替换非法字节。不要执行样本专�
 记录实际解析到的 CLI 路径、版本及所有 Skill 根目录。源码/发行仓副本、已安装副本
 和旧注册位置可能不同。确定目标版本后按受管安装流程更新，不能关闭检查或静默删除
 其他注册。发行文档描述的是该发行版本，不一定是 PATH 当前选择的分析器。
+
+显式检查未安装的 checkout 时，运行
+`python3 skills/auto-re/scripts/skill_doctor.py --checkout --cli <checkout-cli>`。
+这会将另一个已安装 Skill 与客户端重复注册区分开；已安装 Skill 仍使用常规诊断。
+checkout 的 Skill 与 CLI 版本必须一致。
+
+调用图的 next actions 带有稳定 stage，可通过 `run_next_action.py` 重放。
+续查时传入 `--prior-receipt <previous.json> --receipt <new.json>`，
+可以在输入、CLI、选择器与预算相同时阻止重复运行；更换输出文件名不算分析进展。

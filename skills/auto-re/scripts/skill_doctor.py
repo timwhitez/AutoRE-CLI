@@ -234,6 +234,7 @@ def diagnose(
     *,
     executable: Optional[pathlib.Path] = None,
     candidate_roots: Optional[list[pathlib.Path]] = None,
+    checkout: bool = False,
 ) -> dict[str, Any]:
     try:
         active_root = skill_root.expanduser().resolve(strict=True)
@@ -243,6 +244,8 @@ def diagnose(
         raise DoctorError("active Skill root is not an auto-re Skill")
     skill_version = read_skill_version(active_root)
     marker = read_managed_marker(active_root)
+    if checkout and (marker is not None or executable is None):
+        raise DoctorError("checkout diagnosis requires an unmanaged Skill and an explicit CLI")
 
     if executable is None:
         resolved_program = shutil.which(TRUSTED_PROGRAM)
@@ -263,7 +266,8 @@ def diagnose(
         else default_candidate_roots(active_root)
     )
     roots = existing_skill_roots(candidates)
-    duplicates = [path for path in roots if path != active_root]
+    alternatives = [path for path in roots if path != active_root]
+    duplicates = alternatives[1:] if checkout else alternatives
     marker_version = marker.get("version") if marker is not None else None
     version_match = cli_version == skill_version and (
         marker_version is None or marker_version == skill_version
@@ -303,6 +307,8 @@ def diagnose(
         },
         "version_match": version_match,
         "managed_content_match": managed_content_match,
+        "diagnosis_scope": "checkout" if checkout else "installation",
+        "alternative_skill_roots": [str(path) for path in alternatives] if checkout else [],
         "duplicate_count": len(duplicates),
         "duplicate_skill_roots": [str(path) for path in duplicates],
         "discovery_roots_checked": [str(path) for path in roots],
@@ -315,13 +321,14 @@ def parse_args() -> argparse.Namespace:
     default_root = pathlib.Path(__file__).resolve().parents[1]
     parser.add_argument("--skill-root", type=pathlib.Path, default=default_root)
     parser.add_argument("--cli", type=pathlib.Path)
+    parser.add_argument("--checkout", action="store_true", help="diagnose an unmanaged checkout separately from installed registrations; requires --cli")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     try:
-        result = diagnose(args.skill_root, executable=args.cli)
+        result = diagnose(args.skill_root, executable=args.cli, checkout=args.checkout)
         encoded = (json.dumps(result, indent=2, sort_keys=True) + "\n").encode("utf-8")
         if len(encoded) > DOCTOR_OUTPUT_MAX_BYTES:
             raise DoctorError(

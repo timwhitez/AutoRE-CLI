@@ -181,3 +181,36 @@ Return:
 - not-claimed/unresolved items;
 - warnings, budgets, truncation, and stop conditions;
 - confirmation that no target or target-derived artifact executed.
+
+## Bounded Static Byte Evidence
+
+`function <input> --addr <address> --format json` includes
+`static_byte_evidence` for AArch64 little-endian functions. Read each window's
+raw `bytes` (null means unknown), strict `encoding`, source instruction addresses,
+callsite and symbolic stack origin. Scanned counts and `truncated` delimit the
+window. These are reaching-store candidates; a call argument, runtime value or
+complete string decoder is not thereby proved. Opaque effects, calls and block
+boundaries invalidate dependent bytes.
+
+When static IL has identified a pair-permutation formula and its exact arrays,
+`fold-pair-bytes` checks the arithmetic without a target instruction simulator.
+For this controlled two-byte example, save a JSON plan:
+
+```json
+{"schema_version":1,"input_bytes":[10,20],"key_bytes":[0,1,0,1],"transform":{"mask":"xor","value_operation":"xor","constant_operation":"xor","constant":0,"key_bytes_used":4}}
+```
+
+```bash
+auto-re-cli fold-pair-bytes <plan.json> --output <results>/byte-candidate.json
+```
+
+The result is `[8,22]`, marked `candidate` and `transform_proven=false`, with
+plan/input/key hashes and all transform parameters. The fixed formula reads both
+indexed bytes before writing either: `mask = (key1 XOR/SUB key2) + byte_index`,
+then applies the selected XOR/ADD/SUB with the mask and with the constant, using
+byte arithmetic. Key bounds are independent of output length. Unknown indices,
+odd bounds and out-of-bounds accesses stop with unresolved status and no partial
+plaintext. Never select or validate a formula merely because its output looks
+readable. Keep CFG/loop-bound and parameter provenance beside the plan; unsupported
+closure or jump-table relations remain unresolved. This command accepts only
+bounded numeric data and fixed arithmetic choices, never scripts or instructions.

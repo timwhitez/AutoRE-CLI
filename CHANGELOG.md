@@ -4,6 +4,19 @@ All notable changes to the public AutoRE-CLI distribution are recorded here.
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-09-07
+
+- Rebuilt all five platform binaries locally from `158ca044a1908e9ae2b39105d68ccbd4b333bc51`.
+- Added bounded Go inventory fallback, formed-address indirect call discovery,
+  explicit AArch64 memory effects and static byte candidates.
+- Updated checkout diagnosis, no-progress receipts and investigation guidance.
+- See [release notes](release-notes/v0.1.5.md) for validation and capability limits.
+
+## [0.1.4] - 2026-09-05
+
+- See the [0.1.4 release notes](release-notes/v0.1.4.md) for the locally rebuilt
+  matrix and parser, LLVM, lifecycle and packaging changes.
+
 ## [0.1.3] - 2026-09-01
 
 ### Added
