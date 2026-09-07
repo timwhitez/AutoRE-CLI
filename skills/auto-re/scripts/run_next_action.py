@@ -11,6 +11,7 @@ import os
 import pathlib
 import re
 import shutil
+import stat
 import subprocess  # retained test seam; lifecycle is owned by process_control
 import sys
 import time
@@ -175,6 +176,8 @@ def load_json_object(
             data = _read_bounded_control_bytes(handle, policy)
         try:
             value = json.loads(data.decode("utf-8"))
+        except RecursionError as error:
+            raise _control_file_structure_limit(policy, "depth", policy.max_depth, policy.max_depth + 1) from error
         except ValueError as error:
             raise ActionError(f"cannot read result JSON: {str(error)[:512]}") from error
     except ActionError:
@@ -201,6 +204,10 @@ def validate_result_contract(result: dict[str, Any]) -> str:
 
     owner = result.get("owner")
     kind = result.get("kind")
+    if kind == "call_graph" and owner is None:
+        if result.get("profile") not in {"ai", "full"} or not _matches_shape(result, {"root": dict, "budget": dict, "summary": dict, "nodes": list, "edges": list}):
+            raise ActionError("invalid call_graph wrapper")
+        return "wrapper:call_graph"
     if owner is not None or kind is not None:
         if (
             owner != "auto-re-cli"
@@ -270,6 +277,48 @@ def sha256_file(path: pathlib.Path) -> str:
     except OSError as error:
         raise ActionError(f"cannot hash trusted program: {error}") from error
     return digest.hexdigest()
+
+
+def request_identity(argv: list[str], program_sha256: str) -> dict[str, Any] | None:
+    """Identify a single-input request, excluding only output destinations."""
+    commands = {"analyze", "report", "function", "decompile", "slice-function", "cfg",
+                "il", "xrefs", "call-graph", "inspect-go", "inspect-rust", "inspect-types",
+                "inspect-aarch64-refs", "inspect-pe", "inspect-die", "inspect-upx", "inspect-vmprotect"}
+    if len(argv) < 3 or argv[1] not in commands or argv[2].startswith("-"):
+        return None
+    try:
+        fd = os.open(argv[2], os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOFOLLOW", 0))
+        with os.fdopen(fd, "rb") as handle:
+            before = os.fstat(handle.fileno())
+            if not stat.S_ISREG(before.st_mode) or before.st_size > 512 * 1024 * 1024:
+                return None
+            digest = hashlib.sha256()
+            observed = 0
+            for chunk in iter(lambda: handle.read(CONTROL_READ_CHUNK_BYTES), b""):
+                observed += len(chunk)
+                if observed > before.st_size:
+                    return None
+                digest.update(chunk)
+            after = os.fstat(handle.fileno())
+            if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (after.st_size, after.st_mtime_ns, after.st_ctime_ns):
+                return None
+    except OSError:
+        return None
+    arguments = [argv[1], "<input-sha256>=" + digest.hexdigest()]
+    index = 3
+    sink_flags = COMMAND_OWNED_SINK_FLAGS | {"--output"}
+    while index < len(argv):
+        argument = argv[index]
+        if argument in sink_flags:
+            index += 2
+            continue
+        if not any(argument.startswith(flag + "=") for flag in sink_flags):
+            arguments.append(argument)
+        index += 1
+    identity = {"input_sha256": digest.hexdigest(), "input_bytes": before.st_size,
+                "program_sha256": program_sha256, "analysis_argv": arguments}
+    identity["sha256"] = hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return identity
 
 
 def receipt_log_dir(receipt_path: pathlib.Path) -> pathlib.Path:
@@ -470,6 +519,7 @@ def execute_prepared_with_receipt(
     *,
     log_tail_bytes: int = LOG_TAIL_BYTES,
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+    prior_receipt: pathlib.Path | None = None,
 ) -> tuple[int, dict[str, Any]]:
     if (
         not isinstance(log_tail_bytes, int)
@@ -492,6 +542,11 @@ def execute_prepared_with_receipt(
         raise ActionError("trusted program must be a regular file")
     program_version = probe_program_version(resolved_executable)
     program_sha256 = sha256_file(resolved_executable)
+    identity = request_identity(prepared["argv"], program_sha256)
+    if prior_receipt is not None:
+        prior = load_json_object(prior_receipt, policy=ControlJsonPolicy("prior_receipt", RECEIPT_MAX_BYTES, 16, 10000, 1000, 65536))
+        if identity is not None and prior.get("request_identity") == identity:
+            raise ActionError("no_progress: identical input, tool, selector and budget; inspect the prior result instead of renaming and repeating it")
 
     try:
         log_dir.mkdir(mode=0o700)
@@ -531,6 +586,7 @@ def execute_prepared_with_receipt(
                 "sha256": program_sha256,
             },
             "argv": argv,
+            "request_identity": identity if request_identity(prepared["argv"], program_sha256) == identity else None,
             "sink": _sink_record(prepared),
             "started_at": started_at,
             "ended_at": ended_at,
@@ -725,6 +781,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--action-stage", required=True)
     parser.add_argument("--output", type=pathlib.Path)
     parser.add_argument("--receipt", type=pathlib.Path)
+    parser.add_argument("--prior-receipt", type=pathlib.Path, help="stop before repeating an identical recorded request")
     parser.add_argument("--timeout-seconds", type=positive_seconds, default=DEFAULT_TIMEOUT_SECONDS,
                         help="analysis execution budget; increase for long static analyses (default: 900)")
     parser.add_argument("--dry-run", action="store_true")
@@ -734,6 +791,8 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     try:
+        if args.prior_receipt is not None and args.receipt is None:
+            raise ActionError("--prior-receipt requires --receipt")
         prepared = prepare_action(args.result, args.action_stage, args.output)
         if args.dry_run:
             if args.receipt is not None:
@@ -753,6 +812,7 @@ def main() -> int:
                 pathlib.Path(executable),
                 args.receipt,
                 timeout_seconds=args.timeout_seconds,
+                prior_receipt=args.prior_receipt,
             )
             json.dump(summary, sys.stdout, indent=2, sort_keys=True)
             sys.stdout.write("\n")

@@ -149,3 +149,37 @@ Cleanup checks the receipt, private ownership marker, random token, stable root
 identity, exact temporary-root containment, and validator prefix before deleting
 the tree. Keep the bounded verification and cleanup summaries as audit evidence
 when the user wants reproducibility.
+
+## Retrospective And Conflicting Evidence
+
+Keep historical reports separate from current analyzer output. Record each
+artifact's input identity and tool version when available; missing commands,
+versions, hashes or receipts remain missing. A filename such as `all_functions`
+or a report heading such as "fully recovered" does not establish completeness.
+
+Distinguish discovered functions, recovered names, analyzed bodies and emitted
+rows. Read unresolved-edge counts and truncation alongside warnings. Empty
+warnings and zero known callers do not establish complete or unreachable code.
+
+When decoder versions disagree, retain the alternatives and the exact source
+artifact/function/callsite. Require byte lengths, encoding and static transform
+provenance before promoting a candidate. Strings alone do not prove endpoint
+use, protocol behavior, maliciousness or attribution. User-supplied deployment
+metadata must be labeled separately from binary-derived evidence.
+
+## Request Identity And No Progress
+
+For a new action, keep its execution receipt. Supported single-file requests add
+`request_identity`: input bytes/hash, CLI hash and exact analysis arguments,
+excluding output destinations. Identity is unavailable for unsupported command
+shapes, nonregular/unstable files and inputs over 512 MiB; absence never means
+identical. The receipt remains operational evidence, not a transform proof.
+
+Pass `--prior-receipt <previous.json>` together with `--receipt <new.json>` to
+`run_next_action.py` when continuing the same investigation. An identical
+identity stops before analysis with `no_progress`, even if the output filename
+changed. Compare the prior result's warnings and missing evidence before changing
+a selector or budget. Changed inputs, CLI builds or budgets produce a new identity.
+For durable output commitments and replay, use the existing `archive`/`replay`
+commands and validated bundles; a request identity alone does not authenticate
+old output bytes. Do not invent missing identities for historical scripts.

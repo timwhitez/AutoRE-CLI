@@ -36,3 +36,11 @@ Engine changes are reviewed in the private source repository by the maintainer.
 - Add or update a public regression when behavior changes.
 - Run `./verify.sh` and the relevant installer or Skill checks.
 - Do not commit generated analysis results or untrusted samples.
+
+## Documentation Changes
+
+Start with [AGENTS.md](AGENTS.md). Keep README/FAQ translations aligned and
+shared documentation synchronized with the source distribution template. Keep
+commands compatible with the stated release and test changed executable policy.
+Refresh only intended checksum rows, then run `./verify.sh` and `git diff --check`.
+Do not copy private investigation artifacts into examples or public issues.

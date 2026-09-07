@@ -88,3 +88,5 @@ state the boundary. Do not silently rerun with unbounded or extreme values.
 
 Never reuse an input path as a sink. Never make a generated continuation
 overwrite its parent result.
+
+For an explicitly derived byte-pair arithmetic plan, use `fold-pair-bytes <plan.json> --output <result.json>`. Read the bounded static byte workflow before treating its candidate as evidence.

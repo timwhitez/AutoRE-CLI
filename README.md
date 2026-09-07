@@ -2,6 +2,8 @@
 
 [English](README.md) | [简体中文](README_zh.md)
 
+Maintenance: [AGENTS.md](AGENTS.md) · Troubleshooting: [FAQ](FAQ.md) · [Static investigation workflows](skills/auto-re/references/investigation-workflows.md)
+
 [![Validate Distribution](https://github.com/timwhitez/AutoRE-CLI/actions/workflows/validate.yml/badge.svg)](https://github.com/timwhitez/AutoRE-CLI/actions/workflows/validate.yml)
 [![Release](https://img.shields.io/github/v/release/timwhitez/AutoRE-CLI?display_name=tag)](https://github.com/timwhitez/AutoRE-CLI/releases/latest)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-64748b)](#platforms)
@@ -60,15 +62,15 @@ Download the archive for your host from
 then verify and install it:
 
 ```sh
-tar -xzf AutoRE-CLI-0.1.4-macos-arm64.tar.gz
-cd AutoRE-CLI-0.1.4-macos-arm64
+tar -xzf AutoRE-CLI-0.1.5-macos-arm64.tar.gz
+cd AutoRE-CLI-0.1.5-macos-arm64
 ./verify.sh
 ./install.sh
 auto-re-cli --version
 ```
 
 Replace `macos-arm64` with `macos-x86_64`, `linux-x86_64`, or `linux-arm64`.
-Windows users should extract `AutoRE-CLI-0.1.4-windows-x86_64.zip` and run:
+Windows users should extract `AutoRE-CLI-0.1.5-windows-x86_64.zip` and run:
 
 ```powershell
 py -3 scripts/autore_distribution.py verify
@@ -95,7 +97,7 @@ use the platform archive above for the complete verified distribution.
 ```sh
 # Agent Skill for Codex, Claude Code, Cursor, and other supported clients
 npx skills add \
-  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.4/AutoRE-CLI-0.1.4-auto-re-skill.zip -g
+  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.5/AutoRE-CLI-0.1.5-auto-re-skill.zip -g
 ```
 
 ```powershell
@@ -154,6 +156,17 @@ It never authorizes removal of unrelated parent directories or extra user
 files.
 
 ## Agent Quick Start
+
+For an open-ended investigation, use the current Skill launcher. Create the parent first and choose a new result directory:
+
+```sh
+mkdir -p ./analysis-results
+python3 skills/auto-re/scripts/start_analysis.py ./sample.exe \
+  --result-dir ./analysis-results/first-pass
+```
+
+Read the returned `result_path`, not just the launcher summary. Add `--addr` for a known function; use the CLI/Skill routes below for paging and references.
+
 
 Restart or refresh your agent after installation, then invoke:
 

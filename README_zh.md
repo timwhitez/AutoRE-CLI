@@ -2,6 +2,8 @@
 
 [English](README.md) | [简体中文](README_zh.md)
 
+维护指南：[AGENTS.md](AGENTS.md) · 排障：[FAQ_zh.md](FAQ_zh.md) · 静态调查流程：[Skill 工作流](skills/auto-re/references/investigation-workflows.md)
+
 [![Validate Distribution](https://github.com/timwhitez/AutoRE-CLI/actions/workflows/validate.yml/badge.svg)](https://github.com/timwhitez/AutoRE-CLI/actions/workflows/validate.yml)
 [![Release](https://img.shields.io/github/v/release/timwhitez/AutoRE-CLI?display_name=tag)](https://github.com/timwhitez/AutoRE-CLI/releases/latest)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-64748b)](#支持平台)
@@ -58,8 +60,8 @@ checkout。
 下载对应主机的压缩包，然后验证并安装：
 
 ```sh
-tar -xzf AutoRE-CLI-0.1.4-macos-arm64.tar.gz
-cd AutoRE-CLI-0.1.4-macos-arm64
+tar -xzf AutoRE-CLI-0.1.5-macos-arm64.tar.gz
+cd AutoRE-CLI-0.1.5-macos-arm64
 ./verify.sh
 ./install.sh
 auto-re-cli --version
@@ -67,7 +69,7 @@ auto-re-cli --version
 
 可以把 `macos-arm64` 替换为 `macos-x86_64`、`linux-x86_64` 或
 `linux-arm64`。Windows 用户解压
-`AutoRE-CLI-0.1.4-windows-x86_64.zip` 后运行：
+`AutoRE-CLI-0.1.5-windows-x86_64.zip` 后运行：
 
 ```powershell
 py -3 scripts/autore_distribution.py verify
@@ -93,7 +95,7 @@ cd AutoRE-CLI
 ```sh
 # 为 Codex、Claude Code、Cursor 等客户端安装 Agent Skill
 npx skills add \
-  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.4/AutoRE-CLI-0.1.4-auto-re-skill.zip -g
+  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.5/AutoRE-CLI-0.1.5-auto-re-skill.zip -g
 ```
 
 ```powershell
@@ -148,6 +150,17 @@ binary repack、降级和额外 Skill 文件都会 fail closed。
 额外用户文件。
 
 ## Agent 快速开始
+
+对于开放式分析，优先使用当前 Skill 的单次入口。`./analysis-results` 父目录必须已存在，结果子目录必须是新的：
+
+```sh
+mkdir -p ./analysis-results
+python3 skills/auto-re/scripts/start_analysis.py ./sample.exe \
+  --result-dir ./analysis-results/first-pass
+```
+
+阅读返回的 `result_path`，不要仅凭摘要判断行为。已知函数可添加 `--addr`；分页和引用查询按下方 CLI/Skill 流程继续。
+
 
 安装后重启或刷新 Agent，然后调用：
 

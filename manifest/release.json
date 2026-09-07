@@ -1,49 +1,48 @@
 {
   "artifacts": [
     {
-      "bytes": 17117568,
-      "file_identity": "ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, BuildID[sha1]=5429de2329bbd811d1be0a11dff0bb80a9aa5178, for GNU/Linux 3.7.0, stripped",
-      "path": "bin/linux-arm64/auto-re-cli",
-      "rust_target": "aarch64-unknown-linux-gnu",
-      "sha256": "0a047d3284f100eab220e7db16dd017eae96ec85068bce82fcb003219c9a1bfc",
-      "signing": "not_applicable",
-      "target": "linux-arm64"
-    },
-    {
-      "bytes": 20273160,
-      "file_identity": "ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, BuildID[sha1]=1666e8428475bf4ef397d9e67f8b3f157788ea94, stripped",
-      "path": "bin/linux-x86_64/auto-re-cli",
-      "rust_target": "x86_64-unknown-linux-gnu",
-      "sha256": "a79d9c2aa404a0b39cb91db90c86d08c7386b04c04b54657254e9269508251d7",
-      "signing": "not_applicable",
-      "target": "linux-x86_64"
-    },
-    {
-      "bytes": 16911936,
-      "file_identity": "Mach-O 64-bit arm64 executable, flags:<NOUNDEFS|DYLDLINK|TWOLEVEL|NO_REEXPORTED_DYLIBS|PIE|HAS_TLV_DESCRIPTORS>",
+      "bytes": 17368800,
+      "file_identity": "Mach-O 64-bit executable arm64",
       "path": "bin/macos-arm64/auto-re-cli",
       "rust_target": "aarch64-apple-darwin",
-      "sha256": "00903cb4e61d706e1b0c902ad2eca9313b24712093ff37d6a40ac0ded5f6b75b",
+      "sha256": "b0254a458c2c53b17eeb982e2c498f0f335711d76426d27cf84a7937e4698038",
       "signing": "adhoc",
       "target": "macos-arm64"
     },
     {
-      "bytes": 19080736,
-      "file_identity": "Mach-O 64-bit x86_64 executable, flags:<NOUNDEFS|DYLDLINK|TWOLEVEL|NO_REEXPORTED_DYLIBS|PIE|HAS_TLV_DESCRIPTORS>",
+      "bytes": 19607568,
+      "file_identity": "Mach-O 64-bit executable x86_64",
       "path": "bin/macos-x86_64/auto-re-cli",
       "rust_target": "x86_64-apple-darwin",
-      "sha256": "d5a101650161c3775379843f06e944b9bf4a2dd16f8ffd07093cc3a504968aa2",
+      "sha256": "2acbec7b4f9c7f32782878ac06f298a45d60e9579d089030e75637350f679047",
       "signing": "adhoc",
       "target": "macos-x86_64"
     },
     {
-      "bytes": 18964480,
-      "file_identity": "PE32+ executable (console) x86-64, for MS Windows, 6 sections",
+      "bytes": 20505584,
+      "file_identity": "ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 2.0.0, stripped",
+      "path": "bin/linux-x86_64/auto-re-cli",
+      "rust_target": "x86_64-unknown-linux-gnu",
+      "sha256": "434e97f93529fa71dcdd0de2dc332859ebf54aa1df3ab9dc28f4114320b46eb1",
+      "signing": "not_applicable",
+      "target": "linux-x86_64"
+    },
+    {
+      "bytes": 17390952,
+      "file_identity": "ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, for GNU/Linux 2.0.0, stripped",
+      "path": "bin/linux-arm64/auto-re-cli",
+      "rust_target": "aarch64-unknown-linux-gnu",
+      "sha256": "d369ea3c93bec1a8557205d5735a59d5bacc458189e311436b611c4c6cf4d3e0",
+      "signing": "not_applicable",
+      "target": "linux-arm64"
+    },
+    {
+      "bytes": 19155968,
+      "file_identity": "PE32+ executable (console) x86-64, for MS Windows",
       "path": "bin/windows-x86_64/auto-re-cli.exe",
       "pe": {
         "architecture": "x86_64",
         "imported_dlls": [
-          "KERNEL32.dll",
           "api-ms-win-core-synch-l1-2-0.dll",
           "api-ms-win-crt-convert-l1-1-0.dll",
           "api-ms-win-crt-environment-l1-1-0.dll",
@@ -56,6 +55,7 @@
           "api-ms-win-crt-stdio-l1-1-0.dll",
           "api-ms-win-crt-string-l1-1-0.dll",
           "bcryptprimitives.dll",
+          "KERNEL32.dll",
           "ntdll.dll"
         ],
         "llvm_mingw_runtime": "static",
@@ -63,7 +63,7 @@
         "timestamp": 0
       },
       "rust_target": "x86_64-pc-windows-gnullvm",
-      "sha256": "249c0bc97a37f47315569105a8c79b68e6ab46edbc8d1757270022bf14d7417e",
+      "sha256": "79f3e035abdd60ff5b0eb7e14d0d53d730abdd10db1711de635b9f842dbe0b4c",
       "signing": "not_applicable",
       "target": "windows-x86_64"
     }
@@ -101,15 +101,15 @@
     ],
     "name": "auto-re",
     "path": "skills/auto-re",
-    "version": "0.1.4"
+    "version": "0.1.5"
   },
   "source_repository": "auto-re_source",
-  "source_revision": "de89c02c8cab17c9d6fd253413806b45ef482d45",
+  "source_revision": "158ca044a1908e9ae2b39105d68ccbd4b333bc51",
   "third_party_dependency_count": 69,
   "toolchain": {
     "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
     "pinned_channel": "1.97.1",
     "rust": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
   },
-  "version": "0.1.4"
+  "version": "0.1.5"
 }
