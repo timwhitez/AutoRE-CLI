@@ -77,3 +77,44 @@ Use GitHub Issues for reproducible CLI, installer, verifier, Skill, or
 documentation problems. Use private vulnerability reporting for exploitable
 security defects. Never attach malware, recovered payloads, secrets, private
 paths, or proprietary analysis output.
+
+## Why are there only a few functions in a large Go binary?
+
+Language detection, recovered names, discovered functions, analyzed bodies and
+emitted rows are different counts. A finished page or `warnings: []` does not
+prove discovery is complete. Check `inspect-go` metadata, the selected window,
+noise filtering and discovery budgets. A present Go section with no parsed
+`pclntab` names is unresolved metadata, not proof that no Go functions exist.
+Changing `--limit` only changes an output window; it cannot repair discovery.
+
+## Why does a call graph stop at an indirect call?
+
+Read `unresolved_edge_count`, truncation and stop reasons, not only warnings.
+Inspect the callsite with `function`, `dump-il`, `data-xrefs` or `aarch64-refs`.
+An address reference may provide a candidate, but is not by itself a validated
+call edge. Zero known callers does not mean unreachable. Widen depth only when
+it addresses the missing evidence; a larger graph can remain incomplete.
+
+## How do I handle repeated actions or large output?
+
+Compare the input identity, command, selector, page and budgets. Stop an
+identical action that yields no new evidence. Prefer a selected function slice,
+progressing page or supported spill/bundle over dumping every IL layer. Keep
+stderr and operation receipts separate from analysis JSON. Record unresolved
+questions rather than treating retry exhaustion as a successful investigation.
+
+## Are readable decoded strings confirmed behavior?
+
+No. Printable text and keyword scores rank candidates; they do not prove a
+transform, call linkage, endpoint use or malicious intent. Preserve raw bytes,
+encoding, length, source addresses, transform evidence and conflicting results.
+Use strict UTF-8 validation where relevant; do not silently replace invalid
+bytes. Do not run sample-specific simulators or recovered scripts to fill gaps.
+
+## Why does Skill diagnosis report a duplicate or old version?
+
+Record the resolved CLI path/version and all discovered Skill roots. A checkout,
+installed copy and legacy registration can differ. Follow the managed install
+workflow after selecting the intended version; do not disable the check or
+silently delete another registration. Release documentation describes that
+release, not necessarily the analyzer currently selected by PATH.

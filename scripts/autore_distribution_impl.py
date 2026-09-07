@@ -348,12 +348,16 @@ def validate_public_allowlist(root: pathlib.Path, files: list[pathlib.Path]) -> 
         relative = path.relative_to(root)
         if relative.parts[0] in FORBIDDEN_ROOT_NAMES:
             raise DistributionError(f"forbidden private-source root: {relative}")
-        if path.name in FORBIDDEN_FILE_NAMES or path.suffix.lower() in FORBIDDEN_SUFFIXES:
+        if (path.name in FORBIDDEN_FILE_NAMES and relative.as_posix() != "AGENTS.md") or path.suffix.lower() in FORBIDDEN_SUFFIXES:
             raise DistributionError(f"forbidden private-source file: {relative}")
         try:
             content = path.read_bytes()
         except OSError as error:
             raise DistributionError(f"cannot scan {relative}: {error}") from error
+        if relative.as_posix() == "AGENTS.md" and not content.startswith(
+            b"# Public Distribution Instructions\n"
+        ):
+            raise DistributionError("root AGENTS.md must be the public distribution guide")
         normalized = content.lower()
         for pattern in FORBIDDEN_PUBLIC_IDENTITY_PATTERNS:
             if pattern in normalized:

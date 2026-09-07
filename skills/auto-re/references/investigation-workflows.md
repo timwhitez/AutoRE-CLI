@@ -72,6 +72,24 @@ states separate. Do not claim scheduler/runtime behavior, source package init
 order, concrete arguments, receivers, or complete source recovery unless an
 explicit proof field validates the specific fact.
 
+## Obfuscated Or Stripped Go
+
+1. Separate language detection from parsed metadata. Record build version,
+   `pclntab` status and recovered-name count; zero names is not zero functions.
+2. If inventory output repeats, compare selectors and discovery coverage before
+   increasing `--limit`. Keep synthetic raw identities; do not invent Go names.
+3. At an unresolved indirect call, inspect the exact callsite and its formed
+   addresses/data references. A candidate target is not an accepted call edge.
+4. For a large initializer or string helper, use the emitted `slice-function`
+   action and retain the slice bounds. Prefer shared static IL evidence over
+   copying an investigation's instruction simulator into a runnable helper.
+5. Preserve conflicting string candidates, raw byte lengths and UTF-8 status.
+   Printable output is not a proof. Keep init stores, globals and consumers as
+   separate links until static evidence joins them.
+6. Stop a repeated action with identical input/selector/budget and no new
+   evidence. Report unresolved metadata, CFG or data-flow boundaries; do not
+   turn missing static evidence into permission for runtime execution.
+
 ## Rust
 
 ```bash

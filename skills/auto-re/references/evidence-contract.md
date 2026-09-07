@@ -149,3 +149,20 @@ Cleanup checks the receipt, private ownership marker, random token, stable root
 identity, exact temporary-root containment, and validator prefix before deleting
 the tree. Keep the bounded verification and cleanup summaries as audit evidence
 when the user wants reproducibility.
+
+## Retrospective And Conflicting Evidence
+
+Keep historical reports separate from current analyzer output. Record each
+artifact's input identity and tool version when available; missing commands,
+versions, hashes or receipts remain missing. A filename such as `all_functions`
+or a report heading such as "fully recovered" does not establish completeness.
+
+Distinguish discovered functions, recovered names, analyzed bodies and emitted
+rows. Read unresolved-edge counts and truncation alongside warnings. Empty
+warnings and zero known callers do not establish complete or unreachable code.
+
+When decoder versions disagree, retain the alternatives and the exact source
+artifact/function/callsite. Require byte lengths, encoding and static transform
+provenance before promoting a candidate. Strings alone do not prove endpoint
+use, protocol behavior, maliciousness or attribution. User-supplied deployment
+metadata must be labeled separately from binary-derived evidence.
