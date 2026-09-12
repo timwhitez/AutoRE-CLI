@@ -10,6 +10,7 @@ Load this reference when choosing a command instead of following an emitted
 | Initial bounded investigation | `report` | `--format json --json-profile ai --bundle-dir <dir>` |
 | Fast binary metadata and discovery | `analyze` | `--format json --output <file>` |
 | Compact pseudo and triage | `decompile` | `--format json --json-profile ai --limit <n>` |
+| PE x64 metadata bounds | `function-bounds` (when listed by installed help) | `--addr <VA>`, inspect status and exclusive end |
 | One known function | `function` | `--addr <pc> --format json` or `--symbol <name>` |
 | Local region of a large function | `slice-function` | one of `--slice-index`, `--slice-start`, `--contains-call`, or `--contains-string` |
 | LLIL/MLIL/HLIL/CUSTOM IL | `dump-il` | `--level <level> --addr <pc> --format json` |
@@ -30,6 +31,7 @@ Load this reference when choosing a command instead of following an emitted
 | Experimental LLVM-oriented view | `dump-llvm` | selected function; never authoritative |
 | Multiple samples | `batch` | explicit `--output-dir`, JSON, optional archives |
 | Preserve/replay one result | `archive` / `replay` | JSON |
+| Compare selected functions in two binaries | `compare-functions` (when listed by installed help) | independent left/right VA or symbol selectors, JSON |
 | Compare archived results | `diff` | JSON plus optional `--semantic-summary` |
 | Replay/compare a batch | `batch-replay` / `batch-diff` | JSON |
 | Measure the analyzer | `bench` | only for an explicit performance task |
@@ -40,6 +42,12 @@ Run `auto-re-cli <command> --help` before inventing an option. Do not pass
 ## Selectors
 
 - Use either `--addr` or `--symbol`, never both.
+- `--addr` and reference `--address` values are virtual addresses, not file
+  offsets or PE RVAs. For PE, calculate `VA = image_base + RVA` from verified
+  headers; there is no automatic RVA-to-VA conversion. Existing selection may
+  canonicalize a VA to an enclosing function start; preserve requested/resolved
+  values and image base in your analysis notes. A failed selector or empty retained inventory
+  is not proof that code or references are absent.
 - Prefer an exact address emitted by Auto-RE over a guessed symbol spelling.
 - Preserve the raw `name`; treat `display_name` as presentation only.
 - For `slice-function`, choose exactly one local selector.
@@ -66,6 +74,14 @@ entry from a filename. Preserve these flags in every generated follow-up.
 ## Budgets
 
 Use the smallest budget that answers the question:
+
+When installed command help lists `--max-input-bytes`, explicitly increasing it
+allows input snapshots larger than the default 256 MiB. Analyze the original PE
+with an exact function selector to retain its sections, imports and strings;
+do not cut raw bytes merely to evade the input limit. This still loads a full
+snapshot and can increase memory use; independent scan and flow limits remain.
+Preserve the explicit input budget in follow-ups. The first-evidence launcher
+does not forward this advanced option; use the trusted CLI directly.
 
 - `--max-functions`
 - `--max-instructions-per-function`

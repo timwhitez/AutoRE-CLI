@@ -19,6 +19,44 @@ Exit code `0` means the command completed. Exit code `1` is an analysis or
 parsing failure. Exit code `2` is invalid CLI usage. A successful bounded
 result can still be incomplete; use its completion and budget fields.
 
+Raw-shellcode root functions warn that string-reference coverage is incomplete
+without the original containing image. An empty `string_references` array is not
+proof of no references, including when computed targets lie outside the supplied
+slice. Keep recovered string facts separate from unresolved addresses; a numeric
+target is not itself a string. Embedded object functions retain their own evidence.
+
+## Decoded References Versus Byte Matches
+
+A matching displacement or numeric operand is not sufficient reference evidence.
+For x86, retained string use sites come from supported decoded operands; indexed
+or segment-relative addresses may remain unresolved. An eight-byte pointer slot
+requires a full-width pointer load, not a narrow load of part of its bytes.
+Padding and bytes inside an instruction do not establish independent use sites.
+External raw-byte scanners must keep candidates separate from decoded references;
+zero retained rows still do not establish whole-program absence.
+
+## Compiler Metadata Is Not An Ordinary Reference
+
+PE exception-directory records and C++ exception metadata contain RVAs; their
+presence does not establish a decoded callsite or ordinary data reference.
+`data-xrefs` consumes retained typed AArch64 references and legacy string evidence,
+not a blind four-byte RVA scan. Function-boundary metadata is not a caller edge.
+Nearby `0x19930520`, `0x19930521` or `0x19930522` constants can be an investigation
+clue, not proof that every nearby slot is EH metadata. Do not discard a real
+decoded reference solely because it is near such a constant. External RVA-slot
+scanners must identify their metadata/candidate evidence separately; those
+session-specific scanners are not shipped by Auto-RE.
+
+## String Ownership And Labels
+
+A callee string belongs to the callee and its recorded instruction use site,
+not to every caller that can reach that node. Do not flatten a callee walk into
+caller strings or use it to assign a confident subsystem label; generic cleanup
+and forwarding helpers can expose unrelated constants. Even a local string is
+not proof of function purpose. Preserve raw identity beside `display_name` and
+keep `inferred_role` confidence and evidence. Analyst labels based on a call
+neighborhood remain heuristic and need independent checks against known controls.
+
 ## Bundles And Spills
 
 A report bundle or direct spill is a command-owned artifact set. Before reading
@@ -48,6 +86,32 @@ directory name or raise these limits; narrow the requested sections or page.
 
 `spill_summary.manifest_path` is only a pointer. Validate the referenced
 manifest before loading the complete payload.
+
+### Stable Workspace Across Tool Calls
+
+Primary results use explicit `--result-dir`, `--output` or `--bundle-dir`; choose
+a persistent workspace outside the input directory and installed Skill. Verified
+copies use Python's temporary root. If the harness discards system temporary
+files between calls, create a trusted workspace directory and set the same temp
+root for every verifier and cleanup invocation. POSIX example:
+
+```sh
+mkdir -p ./analysis-results/verified-copies
+TMPDIR="$PWD/analysis-results/verified-copies" python3 scripts/verify_bundle.py \
+  <manifest> --receipt <receipts>/bundle-verification.json
+TMPDIR="$PWD/analysis-results/verified-copies" python3 scripts/verify_bundle.py \
+  --cleanup-receipt <receipts>/bundle-verification.json
+```
+
+Read the receipt's absolute verified payload paths between those two commands;
+cleanup runs only after the final consumer. On Windows, set `TMPDIR`, `TEMP` and
+`TMP` to the same existing absolute workspace directory before each `py -3`
+invocation. Set environment variables before starting Python, not after its
+temp-root cache is initialized. A mismatched cleanup root is rejected, not
+silently searched or deleted. If the verified copy has vanished, reverify into
+a new receipt; the old receipt alone does not validate a replacement or authorize
+reading the original source payload. Workspace persistence remains a harness
+property and must be checked; these settings cannot prevent external deletion.
 
 ## Next Actions
 

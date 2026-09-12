@@ -39,7 +39,9 @@ def address(text: str) -> str:
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument("input", type=Path)
-    parser.add_argument("--result-dir", type=Path, required=True)
+    parser.add_argument("--result-dir", type=Path, required=True,
+                        help="new result directory with an existing parent, outside the input file parent directory "
+                             "(including its descendants) and the installed Skill")
     parser.add_argument("--cli", type=Path, help="trusted installed analyzer, never the input")
     parser.add_argument("--command", choices=FIRST_COMMANDS,
                         help="one static query; default: function with a selector, otherwise report")
@@ -47,7 +49,8 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     selector.add_argument("--addr", type=address)
     selector.add_argument("--symbol")
     parser.add_argument("--raw-shellcode", action="store_true")
-    parser.add_argument("--arch", choices=("x86", "x86_64", "aarch64"))
+    parser.add_argument("--arch", choices=("x86", "x86-64", "x86_64", "aarch64"),
+                        help="target architecture; x86-64 and x86_64 are equivalent")
     parser.add_argument("--base-address", type=address)
     parser.add_argument("--entry-address", type=address)
     parser.add_argument("--dry-run", action="store_true")
@@ -89,7 +92,11 @@ def preflight_paths(args: argparse.Namespace) -> tuple[Path, Path]:
     output = requested.parent.resolve(strict=True) / requested.name
     actions._require_absent(output, "result directory")
     if within(output, target.parent):
-        raise actions.ActionError("result directory must be outside the input directory")
+        raise actions.ActionError(
+            "result directory must be outside the input file parent directory "
+            "to keep analysis output separate from samples: "
+            f"result_dir={output}; input_dir={target.parent}"
+        )
     if within(output, SKILL_ROOT):
         raise actions.ActionError("result directory must be outside the installed Skill")
     return target, output

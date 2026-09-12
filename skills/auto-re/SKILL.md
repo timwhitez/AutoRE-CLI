@@ -30,7 +30,9 @@ packed/protected samples, extracted payloads, or uncertain execution boundaries.
 
 For open-ended questions, invoke the launcher with the supplied input and a
 **new** result directory. Its parent must exist; keep it outside the input
-directory and the Skill:
+file's resolved parent directory and all its descendants, and outside the Skill,
+so analysis output stays separate from samples. For example, use `samples/input`
+and a separate `results/run-1`, not `samples/results`:
 
 ```bash
 python3 <skill-dir>/scripts/start_analysis.py <input> --result-dir <new-result-dir>
