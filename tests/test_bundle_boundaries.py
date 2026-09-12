@@ -151,6 +151,50 @@ class BundleBoundaryTests(unittest.TestCase):
         self.assertEqual(payload.read_bytes(), content)
         self.assertTrue(self.output.exists())
 
+    def test_workspace_temp_root_survives_processes_and_restricts_cleanup(self):
+        workspace = self.root / "workspace"
+        workspace.mkdir()
+        temp_root = workspace / "verified-copies"
+        temp_root.mkdir()
+        other_root = workspace / "other-temp"
+        other_root.mkdir()
+        sentinel = temp_root / "keep"
+        sentinel.write_bytes(b"unrelated")
+        payload = self.root / "payload.json"
+        content = b'{"static_fixture":true}'
+        payload.write_bytes(content)
+        manifest = self.root / "manifest.json"
+        manifest.write_text(json.dumps({
+            "schema_version": "0.1.0", "owner": "auto-re-cli", "kind": "context_bundle",
+            "files": [{"path": payload.name, "ownership": "command", "bytes": len(content),
+                       "sha256": hashlib.sha256(content).hexdigest()}], "next_actions": []}))
+        env = dict(os.environ, TMPDIR=str(temp_root), TEMP=str(temp_root), TMP=str(temp_root))
+        verified = subprocess.run(
+            [sys.executable, "-B", str(MODULE), str(manifest), "--receipt", str(self.output)],
+            env=env, capture_output=True, text=True, timeout=15)
+        self.assertEqual(verified.returncode, 0, verified.stderr)
+        receipt = json.loads(self.output.read_text())
+        verified_root = Path(receipt["verified_root"])
+        self.addCleanup(lambda: bundle.remove_verified_root(verified_root) if verified_root.exists() else None)
+        self.assertEqual(verified_root.parent, temp_root)
+        later_read = subprocess.run(
+            [sys.executable, "-B", "-c", "import pathlib,sys; sys.stdout.buffer.write(pathlib.Path(sys.argv[1]).read_bytes())",
+             receipt["files"][0]["path"]], env=env, capture_output=True, timeout=15)
+        self.assertEqual(later_read.returncode, 0, later_read.stderr)
+        self.assertEqual(later_read.stdout, content)
+        cleanup = [sys.executable, "-B", str(MODULE), "--cleanup-receipt", str(self.output)]
+        mismatch = subprocess.run(cleanup, env=dict(env, TMPDIR=str(other_root), TEMP=str(other_root), TMP=str(other_root)),
+                                  capture_output=True, text=True, timeout=15)
+        self.assertNotEqual(mismatch.returncode, 0)
+        self.assertIn("outside temp root", json.loads(mismatch.stderr)["error"])
+        self.assertTrue(verified_root.exists())
+        matched = subprocess.run(cleanup, env=env, capture_output=True, text=True, timeout=15)
+        self.assertEqual(matched.returncode, 0, matched.stderr)
+        self.assertTrue(json.loads(matched.stdout)["removed"])
+        self.assertFalse(verified_root.exists())
+        self.assertEqual(payload.read_bytes(), content)
+        self.assertEqual(sentinel.read_bytes(), b"unrelated")
+
     def test_cli_errors_are_json_not_tracebacks(self):
         missing = self.root / "missing" / "manifest.json"
         huge = self.root / "huge.json"

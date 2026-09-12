@@ -162,6 +162,44 @@ class StartAnalysisTests(unittest.TestCase):
             self.assertEqual(args[args.index(flag) + 1], value)
         self.assertIn("--raw-shellcode", args)
 
+    def test_architecture_spellings_reach_selected_raw_function(self):
+        for arch in ("x86", "x86_64", "x86-64", "aarch64"):
+            with self.subTest(arch=arch):
+                before = len(self.analysis_calls())
+                completed = self.invoke(
+                    "--raw-shellcode", "--arch", arch,
+                    "--base-address", "0x1000", "--entry-address", "0x1010",
+                    "--addr", "0x1010", output=self.root / ("results-" + arch),
+                )
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                calls = self.analysis_calls()
+                self.assertEqual(len(calls), before + 1)
+                self.assertEqual(calls[-1][0], "function")
+                for flag, value in (("--arch", arch), ("--base-address", "0x1000"),
+                                    ("--entry-address", "0x1010"), ("--addr", "0x1010")):
+                    self.assertEqual(calls[-1][calls[-1].index(flag) + 1], value)
+                self.assertIn("--raw-shellcode", calls[-1])
+
+    def test_hyphenated_architecture_dry_run_has_no_side_effects(self):
+        completed = self.invoke(
+            "--dry-run", "--raw-shellcode", "--arch", "x86-64",
+            "--base-address", "0x1000", "--addr", "0x1000",
+            cli=self.root / "not-installed",
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        result = json.loads(completed.stdout)
+        self.assertEqual(result["argv"][result["argv"].index("--arch") + 1], "x86-64")
+        self.assertFalse(result["analysis_executed"])
+        self.assertFalse(result["readiness_checked"])
+        self.assertEqual(self.recorded(), [])
+        self.assertFalse(self.output.exists())
+
+    def test_unknown_architecture_is_rejected_before_cli_probe(self):
+        self.assert_blocked(self.invoke(
+            "--raw-shellcode", "--arch", "x86--64", "--base-address", "0x1000",
+        ))
+        self.assertEqual(self.recorded(), [])
+
     def test_non_raw_base_is_rejected(self):
         self.assert_blocked(self.invoke("--base-address", "0"))
 
@@ -204,8 +242,56 @@ class StartAnalysisTests(unittest.TestCase):
 
     def test_output_inside_input_directory_is_rejected(self):
         path = self.samples / "results"
-        self.assert_blocked(self.invoke(output=path))
+        completed = self.invoke(output=path)
+        self.assert_blocked(completed)
+        error = json.loads(completed.stderr)["error"]
+        self.assertIn("input file parent directory", error)
+        self.assertIn("separate from samples", error)
+        self.assertIn(f"result_dir={path.resolve()}", error)
+        self.assertIn(f"input_dir={self.samples.resolve()}", error)
+        self.assertEqual(self.recorded(), [])
         self.assertFalse(path.exists())
+
+    def test_input_alias_diagnostic_uses_resolved_sample_directory(self):
+        alias = self.root / "input-alias"
+        alias.symlink_to(self.target)
+        path = self.samples / "results"
+        completed = self.invoke(target=alias, output=path)
+        self.assert_blocked(completed)
+        error = json.loads(completed.stderr)["error"]
+        self.assertIn(f"result_dir={path.resolve()}", error)
+        self.assertIn(f"input_dir={self.samples.resolve()}", error)
+        self.assertEqual(self.recorded(), [])
+        self.assertFalse(path.exists())
+
+    def test_output_parent_alias_diagnostic_uses_resolved_directory(self):
+        alias = self.root / "output-parent-alias"
+        alias.symlink_to(self.samples, target_is_directory=True)
+        path = alias / "results"
+        completed = self.invoke(output=path)
+        self.assert_blocked(completed)
+        error = json.loads(completed.stderr)["error"]
+        self.assertIn(f"result_dir={path.resolve()}", error)
+        self.assertIn(f"input_dir={self.samples.resolve()}", error)
+        self.assertNotIn(str(alias), error)
+        self.assertEqual(self.recorded(), [])
+        self.assertFalse(path.exists())
+
+    def test_result_equal_to_input_parent_keeps_existing_path_guard(self):
+        completed = self.invoke(output=self.samples)
+        self.assert_blocked(completed)
+        self.assertIn("already exists", completed.stderr)
+        self.assertTrue(self.samples.is_dir())
+        self.assertEqual(self.recorded(), [])
+
+    def test_help_explains_result_directory_without_side_effects(self):
+        completed = self.invoke("--help")
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        text = " ".join(completed.stdout.split())
+        self.assertIn("input file parent directory", text)
+        self.assertIn("installed Skill", text)
+        self.assertEqual(self.recorded(), [])
+        self.assertFalse(self.output.exists())
 
     def test_output_inside_skill_is_rejected(self):
         path = self.skill / "results"

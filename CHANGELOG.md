@@ -4,6 +4,21 @@ All notable changes to the public AutoRE-CLI distribution are recorded here.
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-09-12
+
+- Add bounded `compare-functions` with independent selectors and explicit
+  decoded-text-only comparison claims.
+- Add `function-bounds` for validated AMD64 PE runtime metadata and constrain
+  analyzed spans without claiming complete source-function extents.
+- Add opt-in `--max-input-bytes` and retained-reference interval queries for
+  known string pools; preserve limits and provenance in follow-up commands.
+- Resolve bounded PE x64 import thunks and validate x86 string references from
+  encoded operand semantics, rejecting partial pointer-load false positives.
+- Clarify VA/RVA diagnostics, raw-string coverage warnings, launcher architecture
+  aliases, result-directory isolation and evidence ownership.
+- Rebuild all five platforms locally from
+  `ebf9e1bea0338fc51e9b66777a864f2ac17bd71d`.
+
 ## [0.1.6] - 2026-09-07
 
 - Add immutable snapshot-backed byte recovery with file/slice provenance,

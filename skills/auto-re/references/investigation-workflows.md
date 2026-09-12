@@ -7,6 +7,25 @@ If the request already names one capability or exact selector, begin at that
 matching section. General triage is the fallback for open-ended questions, not
 a prerequisite for every narrow command.
 
+## External Source Retrieval Boundary
+
+Auto-RE does not ship an upstream-source downloader, network retry policy,
+source cache, or GitHub-token configuration. Its distribution installer is
+offline. If source comparison needs GitHub content, retrieval belongs to the
+trusted host or agent harness, not the static analyzer. Host tooling such as
+`gh` may use `GH_TOKEN` or `GITHUB_TOKEN`; these are not Auto-RE settings and
+credentials must never be printed or copied into analysis artifacts.
+
+Where available, an authenticated host-side contents API can avoid raw-download
+host restrictions. Pin the repository, commit and source path; retain the content
+hash and host retrieval status. Reusable host caches should be workspace-local
+and keyed by that identity, not a mutable tag alone. Distinguish empty content
+from rate limiting, denied access, missing files and network failures. Unavailable
+source is unresolved evidence, not proof that code or a library version is absent.
+Never execute fetched sources or sample-derived helpers. Report fetch failures
+to the host-tool owner with sanitized diagnostics; an Auto-RE update cannot fix
+an external harness downloader that is not part of this repository.
+
 ## General Triage
 
 ```bash
@@ -47,6 +66,35 @@ For a large function, prefer an emitted `slice-function` action. Select by an
 existing call target or string reference when available; this is navigation,
 not new recovery.
 
+## PE Runtime-Function Bounds
+
+When installed help lists `function-bounds`, query a PE x64 VA before manually
+selecting a byte range. The result is exception-directory metadata, not a guessed
+padding boundary. Use `range.begin_va` and exclusive `range.end_va` only when
+`status=validated_metadata_range`; retain `unwind_rva` and directory `entry_rva`
+for provenance. `not_found` can mean a leaf without metadata, not missing code.
+Malformed, unsupported and budget-exceeded states do not authorize guessed bounds.
+A metadata record may describe a fragment rather than an entire source function.
+
+## Compare Selected Functions Across Builds
+
+When installed help lists `compare-functions`, choose each function independently:
+
+```sh
+auto-re-cli compare-functions <left-binary> <right-binary> \
+  --left-addr <left-VA> --right-addr <right-VA> --format json
+```
+
+Each side can instead use its own `--left-symbol` or `--right-symbol`. The
+command compares bounded decoded instruction text, not byte signatures or
+semantic equivalence. Default 256 instructions per side, hard maximum 512;
+inspect per-side warnings and limit flags. Instruction address labels are omitted,
+but operands, memory addresses and constants are preserved, so relocation can
+still create meaningful-to-review differences. Equal retained text is not proof
+of complete function identity; a missing byte pattern is not proof of absence.
+Single ELF, PE and Mach-O objects of the same architecture are supported, not raw
+or universal containers. Use `diff` separately for archived analysis results.
+
 ## Static Relationships
 
 - Use `inspect-flow` for a root-centered bounded neighborhood.
@@ -55,7 +103,36 @@ not new recovery.
 - Use `aarch64-refs` for AArch64 formed-address chains.
 
 Follow only progressing record pages or bounded widen actions. Do not treat
-traversal order as runtime order.
+traversal order as runtime order. For string-based role hypotheses, inspect the
+selected function first (or use `inspect-flow --addr <pc> --depth 0`). When
+expanding callees, retain each string's owning node and instruction use site;
+callee-only strings must not rename or label the caller. Compare known control
+functions before accepting a heuristic subsystem label.
+
+For PE x86-64 import jumps, newer analyzers can label proven one-hop callers as
+`DLL!Function`. Keep the encoded branch target (the thunk), `pe_import.slot_address`
+(the IAT slot) and optional `pe_import.thunk_address` separate. A resolved static
+import name does not prove runtime binding; indirect thunk-tail graph edges stay
+inferred. Unsupported jump forms and longer chains remain unresolved.
+
+## String Pools And Table Bases
+
+No exact reference to a name does not prove the name is unused. Names may live
+in a pool accessed through an anchor, an index or an unresolved hash. Inspect
+nearby strings and their exact addresses first. When installed help lists
+`--address-end`, query a known bounded pool interval:
+
+```sh
+auto-re-cli data-xrefs <input> --address <pool-start-VA> \
+  --address-end <exclusive-end-VA> --direction data-to-code --format json
+```
+
+Inspect each row's exact destination, owning function, instruction provenance
+and `matched_selector_fields`, then narrow to the actual anchor address. A row
+for the anchor does not establish which member was accessed. The query filters
+existing retained evidence only; it does not infer stride, record layout or hash
+semantics, and unnamed bases without retained evidence may still be absent.
+Follow emitted pagination with both interval bounds unchanged.
 
 ## Go
 
