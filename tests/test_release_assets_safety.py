@@ -4,11 +4,13 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import tarfile
 import tempfile
 import unittest
 from unittest import mock
+import warnings
 import zipfile
 
 MODULE = Path(__file__).resolve().parents[1] / "scripts/build_release_assets.py"
@@ -39,7 +41,7 @@ class ReleaseAssetsSafetyTests(unittest.TestCase):
         self.home = self.work / "home"
         self.home.mkdir()
         self.manifest_path = self.root / "manifest/release.json"
-        for name, value in (("ROOT", self.root), ("MANIFEST_PATH", self.manifest_path),
+        for name, value in (("ROOT", self.root),
                             ("DEFAULT_OUTPUT", self.root / "release-assets")):
             patcher = mock.patch.object(builder, name, value)
             patcher.start()
@@ -78,15 +80,9 @@ class ReleaseAssetsSafetyTests(unittest.TestCase):
                 )
             else:
                 path.write_text("fixture skill payload\n", encoding="utf-8")
-        verifier = self.root / "scripts/autore_distribution.py"
-        verifier.parent.mkdir(parents=True, exist_ok=True)
-        verifier.write_text(
-            "import json,pathlib\n"
-            "m=json.loads(pathlib.Path('manifest/release.json').read_text())\n"
-            "print(json.dumps({'ok':True,'distribution_scope':m['distribution_scope'],"
-            "'package_target':m['package_target'],'artifact_count':len(m['artifacts'])}))\n",
-            encoding="utf-8",
-        )
+        installer_stub = self.root / "scripts/autore_distribution.py"
+        installer_stub.parent.mkdir(parents=True, exist_ok=True)
+        installer_stub.write_text("# inert fixture helper; never executed\n", encoding="utf-8")
         artifacts = []
         for target in targets:
             rust_target, path_text, signing = RELEASE_CONTRACT[target]
@@ -154,6 +150,280 @@ class ReleaseAssetsSafetyTests(unittest.TestCase):
 
     def save_manifest(self) -> None:
         self.manifest_path.write_text(json.dumps(self.manifest), encoding="utf-8")
+
+    def assert_archived_readmes(self, expected: bytes) -> None:
+        archives = list(self.output.glob("AutoRE-CLI-0.1.3-*.tar.gz"))
+        archives.extend(path for path in self.output.glob("AutoRE-CLI-0.1.3-*.zip")
+                        if "auto-re-skill" not in path.name)
+        self.assertEqual(len(archives), 5)
+        for archive in archives:
+            root_name = archive.name.removesuffix(".tar.gz").removesuffix(".zip")
+            member = f"{root_name}/README.md"
+            if archive.suffix == ".zip":
+                with zipfile.ZipFile(archive) as handle:
+                    actual = handle.read(member)
+            else:
+                with tarfile.open(archive) as handle:
+                    file = handle.extractfile(member)
+                    assert file is not None
+                    actual = file.read()
+            self.assertEqual(actual, expected, archive.name)
+
+    def test_source_edit_before_first_package_cannot_be_rehashed_into_release(self):
+        readme = self.root / "README.md"
+        admitted = readme.read_bytes()
+        original = builder.prepare_package
+        changed = False
+
+        def edit_then_prepare(*args, **kwargs):
+            nonlocal changed
+            if not changed:
+                changed = True
+                readme.write_bytes(admitted + b"changed after admission\n")
+                self.rebuild_checksums()
+            return original(*args, **kwargs)
+
+        with mock.patch.object(builder, "prepare_package", side_effect=edit_then_prepare):
+            try:
+                builder.build_assets(self.output)
+            except builder.ReleaseAssetError:
+                self.assertFalse(self.output.exists())
+            else:
+                self.assert_archived_readmes(admitted)
+        self.assertTrue(changed)
+
+    def test_source_edit_between_platforms_cannot_diverge_common_files(self):
+        readme = self.root / "README.md"
+        admitted = readme.read_bytes()
+        original = builder.prepare_package
+        calls = 0
+
+        def prepare_then_edit(*args, **kwargs):
+            nonlocal calls
+            result = original(*args, **kwargs)
+            calls += 1
+            if calls == 1:
+                readme.write_bytes(admitted + b"changed between platforms\n")
+                self.rebuild_checksums()
+            return result
+
+        with mock.patch.object(builder, "prepare_package", side_effect=prepare_then_edit):
+            try:
+                builder.build_assets(self.output)
+            except builder.ReleaseAssetError:
+                self.assertFalse(self.output.exists())
+            else:
+                self.assert_archived_readmes(admitted)
+        self.assertGreaterEqual(calls, 1)
+
+    def test_snapshot_is_independent_and_manifest_replacement_is_not_admitted(self):
+        admitted_revision = self.manifest["source_revision"]
+        original = builder.verify_input_distribution
+
+        def replace_original_after_snapshot(snapshot):
+            result = original(snapshot)
+            self.assertFalse(os.path.samefile(self.root / "README.md", snapshot / "README.md"))
+            self.manifest["source_revision"] = "b" * 40
+            self.save_manifest()
+            self.rebuild_checksums()
+            return result
+
+        with mock.patch.object(builder, "verify_input_distribution",
+                               side_effect=replace_original_after_snapshot):
+            try:
+                builder.build_assets(self.output)
+            except builder.ReleaseAssetError:
+                self.assertFalse(self.output.exists())
+            else:
+                archive = next(self.output.glob("*linux-x86_64.tar.gz"))
+                with tarfile.open(archive) as handle:
+                    path = "AutoRE-CLI-0.1.3-linux-x86_64/manifest/release.json"
+                    member = handle.extractfile(path)
+                    assert member is not None
+                    self.assertEqual(json.load(member)["source_revision"], admitted_revision)
+
+    def test_verified_snapshot_stops_original_member_opens(self):
+        original_verify = builder.verify_input_distribution
+        original_open = Path.open
+        frozen = False
+
+        def mark_frozen(snapshot):
+            nonlocal frozen
+            result = original_verify(snapshot)
+            frozen = True
+            return result
+
+        def reject_original(path, *args, **kwargs):
+            if frozen and path.absolute().is_relative_to(self.root):
+                raise AssertionError(f"original member reopened after snapshot: {path}")
+            return original_open(path, *args, **kwargs)
+
+        with mock.patch.object(builder, "verify_input_distribution", side_effect=mark_frozen), \
+             mock.patch.object(Path, "open", new=reject_original):
+            builder.build_assets(self.output)
+        self.assertTrue(frozen)
+        self.assert_archived_readmes((self.root / "README.md").read_bytes())
+
+    def test_same_size_source_mutation_during_snapshot_is_not_accepted(self):
+        source = self.root / "README.md"
+        original_bytes = source.read_bytes()
+        original_copy = builder.copy_file
+        mutated = False
+
+        def mutate_at_copy(path, destination, **kwargs):
+            nonlocal mutated
+            if path == source and not mutated:
+                mutated = True
+                source.write_bytes(original_bytes.replace(b"five", b"nine"))
+            return original_copy(path, destination, **kwargs)
+
+        with mock.patch.object(builder, "copy_file", side_effect=mutate_at_copy):
+            with self.assertRaises(builder.ReleaseAssetError):
+                builder.build_assets(self.output)
+        self.assertTrue(mutated)
+        self.assertFalse(self.output.exists())
+
+    def test_streaming_copy_detects_truncation_and_growth(self):
+        source = self.work / "large-controlled.bin"
+        original_bytes = b"A" * (2 * 1024 * 1024)
+        digest = hashlib.sha256(original_bytes).hexdigest()
+        real_fdopen = builder.os.fdopen
+
+        for change in ("truncate", "grow"):
+            with self.subTest(change=change):
+                source.write_bytes(original_bytes)
+                destination = self.work / f"copied-{change}.bin"
+
+                class MutatingReader:
+                    def __init__(self, handle):
+                        self.handle = handle
+                        self.changed = False
+
+                    def __enter__(self):
+                        self.handle.__enter__()
+                        return self
+
+                    def __exit__(self, *args):
+                        return self.handle.__exit__(*args)
+
+                    def fileno(self):
+                        return self.handle.fileno()
+
+                    def read(self, size):
+                        block = self.handle.read(size)
+                        if not self.changed:
+                            self.changed = True
+                            if change == "truncate":
+                                with source.open("r+b") as output:
+                                    output.truncate(512 * 1024)
+                            else:
+                                with source.open("ab") as output:
+                                    output.write(b"B" * (512 * 1024))
+                        return block
+
+                with mock.patch.object(builder.os, "fdopen",
+                                       side_effect=lambda fd, mode: MutatingReader(real_fdopen(fd, mode))):
+                    with self.assertRaises(builder.ReleaseAssetError):
+                        builder.copy_file(source, destination, expected_sha256=digest)
+
+    def test_late_symlink_source_does_not_enter_fixed_snapshot(self):
+        readme = self.root / "README.md"
+        admitted = readme.read_bytes()
+        external = self.work / "foreign-readme"
+        external.write_bytes(b"foreign content")
+        original = builder.prepare_package
+        changed = False
+
+        def replace_source(*args, **kwargs):
+            nonlocal changed
+            if not changed:
+                changed = True
+                readme.unlink()
+                try:
+                    readme.symlink_to(external)
+                except (OSError, NotImplementedError) as error:
+                    self.skipTest(f"symlinks unavailable: {error}")
+            return original(*args, **kwargs)
+
+        with mock.patch.object(builder, "prepare_package", side_effect=replace_source):
+            builder.build_assets(self.output)
+        self.assertTrue(changed)
+        self.assert_archived_readmes(admitted)
+        self.assertEqual(external.read_bytes(), b"foreign content")
+
+    def test_initial_symlink_source_is_rejected_before_output(self):
+        readme = self.root / "README.md"
+        external = self.work / "foreign-readme"
+        external.write_bytes(b"foreign content")
+        readme.unlink()
+        try:
+            readme.symlink_to(external)
+        except (OSError, NotImplementedError) as error:
+            self.skipTest(f"symlinks unavailable: {error}")
+        with self.assertRaises(builder.ReleaseAssetError):
+            builder.build_assets(self.output)
+        self.assertFalse(self.output.exists())
+        self.assertEqual(external.read_bytes(), b"foreign content")
+
+    def test_stage_drift_after_static_verification_fails_before_publication(self):
+        for target in ("linux-x86_64", "windows-x86_64"):
+            with self.subTest(target=target):
+                original = builder.verify_package
+
+                def change_verified_stage(package_root, actual_target):
+                    original(package_root, actual_target)
+                    if actual_target == target:
+                        (package_root / "README.md").write_bytes(b"foreign staged bytes")
+
+                with mock.patch.object(builder, "verify_package",
+                                       side_effect=change_verified_stage):
+                    with self.assertRaises(builder.ReleaseAssetError):
+                        builder.build_assets(self.output)
+                self.assertFalse(self.output.exists())
+
+    def test_skill_stage_drift_after_verification_fails_before_publication(self):
+        original = builder.verify_package
+
+        def change_skill(package_root, target):
+            original(package_root, target)
+            if target == "windows-x86_64":
+                (package_root / "skills/auto-re/SKILL.md").write_bytes(b"foreign skill")
+
+        with mock.patch.object(builder, "verify_package", side_effect=change_skill):
+            with self.assertRaises(builder.ReleaseAssetError):
+                builder.build_assets(self.output)
+        self.assertFalse(self.output.exists())
+
+    def test_late_skill_zip_duplicate_is_rejected_by_archive_readback(self):
+        original = builder.write_skill_zip_from_files
+
+        def duplicate_skill_member(files, skill_root, archive):
+            original(files, skill_root, archive)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message="Duplicate name")
+                with zipfile.ZipFile(archive, "a") as handle:
+                    handle.writestr("SKILL.md", b"foreign")
+
+        with mock.patch.object(builder, "write_skill_zip_from_files",
+                               side_effect=duplicate_skill_member):
+            with self.assertRaisesRegex(builder.ReleaseAssetError,
+                                        "duplicate archive members"):
+                builder.build_assets(self.output)
+        self.assertFalse(self.output.exists())
+
+    def test_existing_output_created_at_publication_is_preserved(self):
+        original = builder._publish_directory_no_replace
+
+        def occupy_then_publish(stage, output):
+            output.mkdir()
+            (output / "sentinel").write_bytes(b"foreign")
+            return original(stage, output)
+
+        with mock.patch.object(builder, "_publish_directory_no_replace",
+                               side_effect=occupy_then_publish):
+            with self.assertRaises(OSError):
+                builder.build_assets(self.output)
+        self.assertEqual((self.output / "sentinel").read_bytes(), b"foreign")
 
     def test_nonempty_output_is_rejected_without_deletion(self) -> None:
         self.output.mkdir()
@@ -266,18 +536,6 @@ class ReleaseAssetsSafetyTests(unittest.TestCase):
         with self.assertRaises(builder.ReleaseAssetError):
             builder.build_assets(self.output)
         self.assertFalse(self.output.exists())
-
-    def test_nonobject_verifier_reply_is_diagnostic(self) -> None:
-        completed = mock.Mock(returncode=0, stdout="[]", stderr="")
-        with mock.patch.object(builder.subprocess, "run", return_value=completed):
-            with self.assertRaises(builder.ReleaseAssetError):
-                builder.verify_package(self.root, "linux-x86_64")
-
-    def test_malformed_verifier_reply_is_diagnostic(self) -> None:
-        completed = mock.Mock(returncode=0, stdout="not JSON", stderr="")
-        with mock.patch.object(builder.subprocess, "run", return_value=completed):
-            with self.assertRaises(builder.ReleaseAssetError):
-                builder.verify_package(self.root, "linux-x86_64")
 
     def test_success_builds_verifiable_deterministic_archives(self) -> None:
         first = builder.build_assets(self.output)
