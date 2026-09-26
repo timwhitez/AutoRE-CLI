@@ -34,6 +34,12 @@ TRUSTED_PROGRAM = "auto-re-cli"
 SUPPORTED_SCHEMA_VERSIONS = frozenset({"0.1.0"})
 SUPPORTED_PROFILES = frozenset({"ai"})
 SUPPORTED_MANIFEST_KINDS = frozenset({"context_bundle", "agent_spill_manifest"})
+IDENTITY_COMMANDS = frozenset({
+    "analyze", "report", "function", "decompile", "slice-function", "cfg",
+    "il", "xrefs", "call-graph", "data-xrefs", "inspect-go", "inspect-rust",
+    "inspect-types", "inspect-aarch64-refs", "inspect-pe", "inspect-die",
+    "inspect-upx", "inspect-vmp", "pe-strings", "pe-resources",
+})
 FORBIDDEN_FLAGS = {"--execute"}
 COMMAND_OWNED_SINK_FLAGS = {"--bundle-dir", "--spill-dir"}
 CONTROL_READ_CHUNK_BYTES = 64 * 1024
@@ -205,9 +211,49 @@ def validate_result_contract(result: dict[str, Any]) -> str:
     owner = result.get("owner")
     kind = result.get("kind")
     if kind == "call_graph" and owner is None:
-        if result.get("profile") not in {"ai", "full"} or not _matches_shape(result, {"root": dict, "budget": dict, "summary": dict, "nodes": list, "edges": list}):
+        profile = result.get("profile")
+        if not isinstance(profile, str) or profile not in {"ai", "full"}:
+            raise ActionError("invalid call_graph.profile: expected ai or full")
+        if not _matches_shape(result, {"root": dict, "budget": dict, "summary": dict, "nodes": list, "edges": list}):
             raise ActionError("invalid call_graph wrapper")
         return "wrapper:call_graph"
+    if kind == "data_xrefs" and owner is None:
+        profile = result.get("profile")
+        if not isinstance(profile, str) or profile not in {"ai", "full"}:
+            raise ActionError("invalid data_xrefs.profile: expected ai or full")
+        direction = result.get("direction")
+        if not isinstance(direction, str) or direction not in {"code_to_data", "data_to_code"}:
+            raise ActionError("invalid data_xrefs.direction")
+        selector = result.get("selector")
+        if not isinstance(selector, dict) or not isinstance(selector.get("kind"), str):
+            raise ActionError("invalid data_xrefs.selector")
+        selector_kind = selector["kind"]
+        if selector_kind == "all":
+            if "value" in selector:
+                raise ActionError("invalid data_xrefs.selector")
+        elif selector_kind in {"function", "string_exact", "global_exact"}:
+            if not isinstance(selector.get("value"), str):
+                raise ActionError("invalid data_xrefs.selector")
+        elif selector_kind in {"function_address", "data_address"}:
+            if type(selector.get("value")) is not int or selector["value"] < 0:
+                raise ActionError("invalid data_xrefs.selector")
+        elif selector_kind == "data_address_range":
+            value = selector.get("value")
+            if (not isinstance(value, dict) or type(value.get("start")) is not int
+                    or type(value.get("end")) is not int
+                    or not 0 <= value["start"] < value["end"]):
+                raise ActionError("invalid data_xrefs.selector")
+        else:
+            raise ActionError("invalid data_xrefs.selector")
+        if (not _matches_shape(result, {"budget": dict, "summary": dict,
+                                        "records": list, "stop_reasons": list,
+                                        "next_actions": list, "warnings": list})
+                or any(not isinstance(row, dict) for row in result["records"])
+                or any(not isinstance(row, dict) for row in result["stop_reasons"])
+                or any(not isinstance(warning, str) for warning in result["warnings"])):
+            raise ActionError("invalid data_xrefs wrapper")
+        _data_xref_actions(result["next_actions"])
+        return "wrapper:data_xrefs"
     if owner is not None or kind is not None:
         if (
             owner != "auto-re-cli"
@@ -264,6 +310,39 @@ def validate_result_contract(result: dict[str, Any]) -> str:
     raise ActionError("result is not a supported Auto-RE wrapper")
 
 
+def _data_xref_actions(actions: list[Any]) -> list[dict[str, Any]]:
+    legacy = {"record_limit": ("data_xrefs.page", "data-xrefs"),
+              "provenance_limit": ("data_xrefs.provenance", "slice-function")}
+    normalized = []
+    stages = set()
+    for action in actions:
+        if (not isinstance(action, dict)
+                or not isinstance(action.get("reason"), str)
+                or not action["reason"].strip()
+                or not isinstance(action.get("argv"), list)
+                or len(action["argv"]) < 2
+                or any(not isinstance(item, str) for item in action["argv"])
+                or any(not isinstance(action.get(field), str) or not action[field].strip()
+                       for field in ("expected_output", "stop_condition"))):
+            raise ActionError("invalid data_xrefs next action")
+        if "stage" in action:
+            stage = action["stage"]
+            if not isinstance(stage, str) or not stage.strip():
+                raise ActionError("invalid data_xrefs next action stage")
+            source = "explicit"
+        else:
+            pair = legacy.get(action["reason"])
+            if pair is None or action["argv"][1] != pair[1]:
+                raise ActionError("cannot derive data_xrefs legacy action stage")
+            stage, _command = pair
+            source = "legacy_reason"
+        if stage in stages:
+            raise ActionError("duplicate data_xrefs next action stage")
+        stages.add(stage)
+        normalized.append({**action, "stage": stage, "_stage_source": source})
+    return normalized
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
@@ -279,31 +358,37 @@ def sha256_file(path: pathlib.Path) -> str:
     return digest.hexdigest()
 
 
-def request_identity(argv: list[str], program_sha256: str) -> dict[str, Any] | None:
-    """Identify a single-input request, excluding only output destinations."""
-    commands = {"analyze", "report", "function", "decompile", "slice-function", "cfg",
-                "il", "xrefs", "call-graph", "inspect-go", "inspect-rust", "inspect-types",
-                "inspect-aarch64-refs", "inspect-pe", "inspect-die", "inspect-upx", "inspect-vmprotect"}
-    if len(argv) < 3 or argv[1] not in commands or argv[2].startswith("-"):
-        return None
+def _request_identity_with_reason(argv: list[str], program_sha256: str) -> tuple[dict[str, Any] | None, str]:
+    """Identify a supported single-input request without its output destinations."""
+    if len(argv) < 2 or argv[1] not in IDENTITY_COMMANDS:
+        return None, "unsupported_command"
+    if len(argv) < 3 or argv[2].startswith("-"):
+        return None, "unsupported_shape"
     try:
         fd = os.open(argv[2], os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOFOLLOW", 0))
+        try:
+            before = os.fstat(fd)
+        except OSError:
+            os.close(fd)
+            raise
+        if not stat.S_ISREG(before.st_mode):
+            os.close(fd)
+            return None, "input_nonregular"
         with os.fdopen(fd, "rb") as handle:
-            before = os.fstat(handle.fileno())
-            if not stat.S_ISREG(before.st_mode) or before.st_size > 512 * 1024 * 1024:
-                return None
+            if before.st_size > 512 * 1024 * 1024:
+                return None, "input_too_large"
             digest = hashlib.sha256()
             observed = 0
             for chunk in iter(lambda: handle.read(CONTROL_READ_CHUNK_BYTES), b""):
                 observed += len(chunk)
                 if observed > before.st_size:
-                    return None
+                    return None, "input_unstable"
                 digest.update(chunk)
             after = os.fstat(handle.fileno())
-            if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (after.st_size, after.st_mtime_ns, after.st_ctime_ns):
-                return None
+            if observed != before.st_size or (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (after.st_size, after.st_mtime_ns, after.st_ctime_ns):
+                return None, "input_unstable"
     except OSError:
-        return None
+        return None, "input_unreadable"
     arguments = [argv[1], "<input-sha256>=" + digest.hexdigest()]
     index = 3
     sink_flags = COMMAND_OWNED_SINK_FLAGS | {"--output"}
@@ -318,7 +403,71 @@ def request_identity(argv: list[str], program_sha256: str) -> dict[str, Any] | N
     identity = {"input_sha256": digest.hexdigest(), "input_bytes": before.st_size,
                 "program_sha256": program_sha256, "analysis_argv": arguments}
     identity["sha256"] = hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    return identity
+    return identity, "available"
+
+
+def request_identity(argv: list[str], program_sha256: str) -> dict[str, Any] | None:
+    return _request_identity_with_reason(argv, program_sha256)[0]
+
+
+def validate_prior_receipt(prior: dict[str, Any]) -> dict[str, Any]:
+    if (type(prior.get("schema_version")) is not int or prior["schema_version"] != 1
+            or prior.get("owner") != "auto-re-skill"
+            or prior.get("kind") != "auto_re_action_execution_receipt"):
+        raise ActionError("invalid prior receipt identity")
+    identity = prior.get("request_identity")
+    if identity is not None:
+        if not isinstance(identity, dict) or set(identity) != {
+            "input_sha256", "input_bytes", "program_sha256", "analysis_argv", "sha256"
+        }:
+            raise ActionError("invalid prior request_identity")
+        digest_fields = ("input_sha256", "program_sha256", "sha256")
+        if any(not isinstance(identity.get(field), str) or
+               re.fullmatch(r"[0-9a-f]{64}", identity[field]) is None
+               for field in digest_fields):
+            raise ActionError("invalid prior request_identity hash")
+        if (type(identity.get("input_bytes")) is not int or identity["input_bytes"] < 0
+                or not isinstance(identity.get("analysis_argv"), list)
+                or not identity["analysis_argv"]
+                or any(not isinstance(item, str) for item in identity["analysis_argv"])):
+            raise ActionError("invalid prior request_identity fields")
+        payload = {field: identity[field] for field in
+                   ("input_sha256", "input_bytes", "program_sha256", "analysis_argv")}
+        expected = hashlib.sha256(json.dumps(payload, sort_keys=True,
+                                             separators=(",", ":")).encode()).hexdigest()
+        if identity["sha256"] != expected:
+            raise ActionError("invalid prior request_identity digest")
+    if "execution_status" in prior and (not isinstance(prior["execution_status"], str)
+                                        or not prior["execution_status"]):
+        raise ActionError("invalid prior execution_status")
+    if "timeout_seconds" in prior:
+        try:
+            process_control.validate_seconds(prior["timeout_seconds"])
+        except process_control.ProcessError as error:
+            raise ActionError("invalid prior timeout_seconds") from error
+    if "leader_reaped" in prior and not isinstance(prior["leader_reaped"], bool):
+        raise ActionError("invalid prior leader_reaped")
+    return prior
+
+
+def assess_continuation(prior: dict[str, Any] | None, identity: dict[str, Any] | None,
+                        timeout_seconds: float) -> str:
+    if prior is None:
+        return "not_requested"
+    prior_identity = prior.get("request_identity")
+    if prior_identity is None or identity is None:
+        return "not_evaluated_unavailable_identity"
+    if prior_identity != identity:
+        return "changed_analysis"
+    if prior.get("execution_status") == "timed_out":
+        if prior.get("leader_reaped") is not True:
+            raise ActionError("unresolved_prior_process: timed out leader was not confirmed reaped")
+        previous_timeout = prior.get("timeout_seconds")
+        if previous_timeout is not None and timeout_seconds > previous_timeout:
+            return "increased_timeout_after_timeout"
+    if "execution_status" not in prior or "timeout_seconds" not in prior:
+        raise ActionError("no_progress: prior receipt lacks status or timeout needed for a safe exception")
+    raise ActionError("no_progress: identical input, tool, selector and budget; inspect the prior result instead of renaming and repeating it")
 
 
 def receipt_log_dir(receipt_path: pathlib.Path) -> pathlib.Path:
@@ -542,11 +691,12 @@ def execute_prepared_with_receipt(
         raise ActionError("trusted program must be a regular file")
     program_version = probe_program_version(resolved_executable)
     program_sha256 = sha256_file(resolved_executable)
-    identity = request_identity(prepared["argv"], program_sha256)
+    identity, identity_reason = _request_identity_with_reason(prepared["argv"], program_sha256)
+    prior = None
     if prior_receipt is not None:
-        prior = load_json_object(prior_receipt, policy=ControlJsonPolicy("prior_receipt", RECEIPT_MAX_BYTES, 16, 10000, 1000, 65536))
-        if identity is not None and prior.get("request_identity") == identity:
-            raise ActionError("no_progress: identical input, tool, selector and budget; inspect the prior result instead of renaming and repeating it")
+        prior = validate_prior_receipt(load_json_object(
+            prior_receipt, policy=ControlJsonPolicy("prior_receipt", RECEIPT_MAX_BYTES, 16, 10000, 1000, 65536)))
+    continuation_check = assess_continuation(prior, identity, timeout_seconds)
 
     try:
         log_dir.mkdir(mode=0o700)
@@ -568,6 +718,11 @@ def execute_prepared_with_receipt(
     exit_code = execution_exit_code(captured)
     ended_at = utc_now()
     duration_ms = round((time.monotonic() - started_monotonic) * 1000)
+    final_identity, final_reason = _request_identity_with_reason(prepared["argv"], program_sha256)
+    if final_identity != identity:
+        identity_reason = "input_unstable_after_execution"
+    elif identity is None:
+        identity_reason = final_reason
 
     try:
         _write_private_bytes(stdout_path, results["stdout"].tail, "stdout tail log")
@@ -586,7 +741,9 @@ def execute_prepared_with_receipt(
                 "sha256": program_sha256,
             },
             "argv": argv,
-            "request_identity": identity if request_identity(prepared["argv"], program_sha256) == identity else None,
+            "request_identity": identity if final_identity == identity else None,
+            "request_identity_unavailable_reason": None if final_identity == identity and identity is not None else identity_reason,
+            "continuation_check": continuation_check,
             "sink": _sink_record(prepared),
             "started_at": started_at,
             "ended_at": ended_at,
@@ -605,6 +762,8 @@ def execute_prepared_with_receipt(
             ),
             "evidence_boundary": "operational_diagnostics_not_target_analysis_evidence",
         }
+        if "action_stage_source" in prepared:
+            receipt_value["action_stage_source"] = prepared["action_stage_source"]
         _write_receipt(receipt, receipt_value)
     except BaseException:
         shutil.rmtree(log_dir, ignore_errors=True)
@@ -618,6 +777,8 @@ def execute_prepared_with_receipt(
         "exit_code": exit_code,
         "process_exit_code": captured.returncode,
         "execution_status": captured.status,
+        "continuation_check": continuation_check,
+        "request_identity_unavailable_reason": receipt_value["request_identity_unavailable_reason"],
         "diagnostics": list(captured.diagnostics),
         "stdout_truncated": receipt_value["stdout"]["truncated"],
         "stderr_truncated": receipt_value["stderr"]["truncated"],
@@ -717,6 +878,8 @@ def prepare_action(
     result_path = result_path.expanduser().resolve()
     result = load_json_object(result_path)
     result_wrapper = validate_result_contract(result)
+    if result_wrapper == "wrapper:data_xrefs":
+        result = {**result, "next_actions": _data_xref_actions(result["next_actions"])}
     action = select_action(result, action_stage)
     argv = validate_argv(action.get("argv"))
     command_owned_sink = any(
@@ -743,7 +906,7 @@ def prepare_action(
         argv.extend(["--output", str(output)])
 
     validate_prepared_argv(argv, command_owned_sink=command_owned_sink)
-    return {
+    prepared = {
         "ok": True,
         "schema_version": result["schema_version"],
         "result_wrapper": result_wrapper,
@@ -754,6 +917,9 @@ def prepare_action(
         "command_owned_sink": command_owned_sink,
         "argv": argv,
     }
+    if "_stage_source" in action:
+        prepared["action_stage_source"] = action["_stage_source"]
+    return prepared
 
 
 def execution_exit_code(result) -> int:
@@ -795,6 +961,8 @@ def main() -> int:
             raise ActionError("--prior-receipt requires --receipt")
         prepared = prepare_action(args.result, args.action_stage, args.output)
         if args.dry_run:
+            if args.prior_receipt is not None:
+                prepared["continuation_check"] = "not_evaluated_dry_run"
             if args.receipt is not None:
                 receipt, logs = prepare_action_receipt_paths(prepared, args.receipt)
                 prepared["planned_receipt"] = str(receipt)

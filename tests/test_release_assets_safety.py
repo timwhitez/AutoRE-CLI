@@ -1,11 +1,14 @@
 """Offline release-builder regressions using inert fixture files, never real binaries."""
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
+import sys
 import tarfile
 import tempfile
 import unittest
@@ -18,6 +21,14 @@ SPEC = importlib.util.spec_from_file_location("release_assets_safety", MODULE)
 assert SPEC is not None and SPEC.loader is not None
 builder = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(builder)
+INSTALLER_SPEC = importlib.util.spec_from_file_location(
+    "release_assets_control_json_installer",
+    Path(__file__).resolve().parents[1] / "scripts/autore_distribution.py",
+)
+assert INSTALLER_SPEC is not None and INSTALLER_SPEC.loader is not None
+installer = importlib.util.module_from_spec(INSTALLER_SPEC)
+sys.modules[INSTALLER_SPEC.name] = installer
+INSTALLER_SPEC.loader.exec_module(installer)
 
 
 RELEASE_CONTRACT = {
@@ -515,6 +526,27 @@ class ReleaseAssetsSafetyTests(unittest.TestCase):
                 with self.assertRaises(builder.ReleaseAssetError):
                     builder.build_assets(self.output)
                 self.assertFalse(self.output.exists())
+
+    def test_platform_target_arrays_and_objects_return_public_json_error(self) -> None:
+        for bad in ([], {}):
+            with self.subTest(target=bad):
+                self.manifest.update(distribution_scope="platform", package_target=bad)
+                self.save_manifest()
+                self.rebuild_checksums()
+                checksums = installer.parse_checksums(self.root)
+                for module in (builder._impl, installer):
+                    with self.assertRaisesRegex(module.DistributionError,
+                                                "invalid package_target"):
+                        module.validate_manifest(self.root, self.manifest, checksums)
+                stderr = io.StringIO()
+                with mock.patch.object(sys, "argv", ["autore_distribution.py", "verify"]), \
+                     mock.patch.object(installer, "distribution_root", return_value=self.root), \
+                     contextlib.redirect_stderr(stderr):
+                    self.assertEqual(installer.main(), 1)
+                lines = stderr.getvalue().splitlines()
+                self.assertEqual(len(lines), 1)
+                self.assertIn("invalid package_target", json.loads(lines[0])["error"])
+                self.assertNotIn("Traceback", stderr.getvalue())
 
     def test_artifact_path_traversal_is_rejected(self) -> None:
         self.manifest["artifacts"][0]["path"] = "../outside"
