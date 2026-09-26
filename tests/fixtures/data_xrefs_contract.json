@@ -1,0 +1,146 @@
+{
+  "schema_version": "0.1.0",
+  "kind": "data_xrefs",
+  "profile": "full",
+  "direction": "code_to_data",
+  "selector": {
+    "kind": "all"
+  },
+  "budget": {
+    "offset": 0,
+    "record_limit": 1,
+    "record_limit_max": 2048,
+    "provenance_limit": 1,
+    "provenance_limit_max": 64
+  },
+  "summary": {
+    "total_count": 2,
+    "emitted_count": 1,
+    "remaining_count": 1,
+    "has_more": true,
+    "next_offset": 1,
+    "validated_count": 1,
+    "unresolved_count": 1,
+    "counts_by_kind": {
+      "address": 1,
+      "string": 1
+    },
+    "counts_by_source": {
+      "static_data_reference": 2
+    },
+    "provenance_truncated_record_count": 1,
+    "provenance_omitted_address_count": 2,
+    "source_variable_identity_claimed": false,
+    "runtime_access_claimed": false,
+    "whole_program_completeness_claimed": false
+  },
+  "records": [
+    {
+      "direction": "code_to_data",
+      "reference_source": "static_data_reference",
+      "kind": "string",
+      "status": "validated",
+      "reason": "validated_string",
+      "source_function_raw_name": "first",
+      "source_function_display_name": "first",
+      "source_function_section": ".text",
+      "source_function_address": 4198400,
+      "instruction_addresses": [
+        4198400
+      ],
+      "provenance_instruction_count": 3,
+      "emitted_provenance_instruction_count": 1,
+      "provenance_truncated": true,
+      "source_instruction_address": 4198408,
+      "address": 20480,
+      "destination_section": ".rodata",
+      "destination_register": "x0",
+      "symbol": "global_alpha",
+      "string_value": "alpha",
+      "formation": "adrp_add",
+      "source_variable_identity_claimed": false,
+      "runtime_access_claimed": false
+    }
+  ],
+  "stop_reasons": [
+    {
+      "reason": "record_limit",
+      "omitted_count": 1
+    },
+    {
+      "reason": "provenance_limit",
+      "omitted_count": 2
+    }
+  ],
+  "next_actions": [
+    {
+      "stage": "data_xrefs.page",
+      "reason": "record_limit",
+      "argv": [
+        "auto-re-cli",
+        "data-xrefs",
+        "input.bin",
+        "--direction",
+        "code-to-data",
+        "--limit",
+        "1",
+        "--provenance-limit",
+        "1",
+        "--format",
+        "json",
+        "--json-profile",
+        "ai",
+        "--offset",
+        "1",
+        "--arch",
+        "x86-64",
+        "--raw-shellcode",
+        "--base-address",
+        "0x1000",
+        "--entry-address",
+        "0x1000",
+        "--max-input-bytes",
+        "1048576",
+        "--max-functions",
+        "8",
+        "--max-instructions-per-function",
+        "64"
+      ],
+      "expected_output": "the next bounded page of the same static data-xref view",
+      "stop_condition": "stop when has_more is false; do not infer omitted or runtime references"
+    },
+    {
+      "stage": "data_xrefs.provenance",
+      "reason": "provenance_limit",
+      "argv": [
+        "auto-re-cli",
+        "slice-function",
+        "input.bin",
+        "--addr",
+        "0x401000",
+        "--slice-start",
+        "0x401008",
+        "--slice-size",
+        "32",
+        "--format",
+        "json",
+        "--arch",
+        "x86-64",
+        "--raw-shellcode",
+        "--base-address",
+        "0x1000",
+        "--entry-address",
+        "0x1000",
+        "--max-input-bytes",
+        "1048576",
+        "--max-functions",
+        "8",
+        "--max-instructions-per-function",
+        "64"
+      ],
+      "expected_output": "a bounded function slice centered on retained static provenance",
+      "stop_condition": "stop after the local slice; additional context does not validate an unresolved target"
+    }
+  ],
+  "warnings": []
+}

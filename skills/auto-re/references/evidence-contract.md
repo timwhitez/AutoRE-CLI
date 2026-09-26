@@ -123,6 +123,12 @@ Each action should include:
 - `stop_condition`
 - exact `argv[]`
 
+For typed `kind=data_xrefs`, the current CLI emits `data_xrefs.page` and
+`data_xrefs.provenance` stages. The helper accepts an older data-xref action
+without a `stage` only when its known reason and argv command agree; a present
+but malformed stage or a duplicate stage is rejected. The adapter does not
+change the original JSON or grant a new command permission.
+
 Execute `argv[]` as an argument vector, not through `sh -c`, `eval`, or string
 concatenation. Review that the command remains `auto-re-cli`, static-only, and
 within the current user request. Preserve input, architecture, raw-shellcode
@@ -237,12 +243,17 @@ For a new action, keep its execution receipt. Supported single-file requests add
 `request_identity`: input bytes/hash, CLI hash and exact analysis arguments,
 excluding output destinations. Identity is unavailable for unsupported command
 shapes, nonregular/unstable files and inputs over 512 MiB; absence never means
-identical. The receipt remains operational evidence, not a transform proof.
+identical. The receipt gives a `request_identity_unavailable_reason` when it
+cannot bind the request. The receipt remains operational evidence, not a transform proof.
 
 Pass `--prior-receipt <previous.json>` together with `--receipt <new.json>` to
 `run_next_action.py` when continuing the same investigation. An identical
 identity stops before analysis with `no_progress`, even if the output filename
-changed. Compare the prior result's warnings and missing evidence before changing
+changed. If the prior execution really timed out and its leader was reaped,
+strictly increasing `--timeout-seconds` permits one explicit continuation.
+Completed exit code 124 does not count as a timeout. A dry-run labels the
+continuation check as untested because it performs no CLI probe or identity
+comparison. Compare the prior result's warnings and missing evidence before changing
 a selector or budget. Changed inputs, CLI builds or budgets produce a new identity.
 For durable output commitments and replay, use the existing `archive`/`replay`
 commands and validated bundles; a request identity alone does not authenticate

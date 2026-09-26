@@ -100,6 +100,10 @@ budget. A passed wrapper check still does not prove the analysis is complete.
 When using `run_next_action.py`, keep `--receipt` and pass `--prior-receipt`
 for a continuation of the same request. Identical input/CLI/selector/budget stops
 before analysis; changing only the output name does not establish progress.
+After a recorded timeout with the leader reaped, a strictly larger
+`--timeout-seconds` permits one explicit retry. A dry-run does not compare the
+real request identity or prior receipt; inspect `continuation_check` in the
+execution receipt for the actual decision.
 
 Name the unanswered question and the evidence needed before choosing a follow-up.
 Prefer an exact returned address or a progressing page over widening all budgets.

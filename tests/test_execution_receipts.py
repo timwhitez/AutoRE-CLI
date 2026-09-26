@@ -31,6 +31,32 @@ doctor = load("skill_doctor")
 control = runner.process_control
 
 
+class ContinuationDecisionTests(unittest.TestCase):
+    def test_timed_out_reaped_budget_increase_is_the_only_duplicate_exception(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "input.bin"
+            source.write_bytes(b"controlled")
+            argv = ["auto-re-cli", "data-xrefs", str(source), "--offset", "1",
+                    "--output", str(Path(directory) / "page.json")]
+            identity = runner.request_identity(argv, "a" * 64)
+            self.assertIsNotNone(identity)
+            prior = {"schema_version": 1, "owner": "auto-re-skill",
+                     "kind": "auto_re_action_execution_receipt",
+                     "request_identity": identity, "execution_status": "timed_out",
+                     "timeout_seconds": 1.0, "leader_reaped": True}
+            self.assertEqual(runner.assess_continuation(
+                runner.validate_prior_receipt(prior), identity, 60),
+                "increased_timeout_after_timeout")
+            for changed in ({"execution_status": "completed", "exit_code": 124},
+                            {"leader_reaped": False}, {"timeout_seconds": 60.0}):
+                with self.subTest(changed=changed), self.assertRaises(runner.ActionError):
+                    runner.assess_continuation({**prior, **changed}, identity, 60)
+            self.assertEqual(runner.request_identity(argv[:-1] + [str(Path(directory) / "other.json")],
+                                                     "a" * 64), identity)
+            self.assertNotEqual(runner.request_identity(argv[:4] + ["2"] + argv[5:],
+                                                        "a" * 64), identity)
+
+
 class ReceiptTests(unittest.TestCase):
     def prepared(self, root, code):
         return {"action_stage": "controlled.fixture", "reason": "test orchestration",

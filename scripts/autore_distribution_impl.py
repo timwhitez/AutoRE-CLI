@@ -409,7 +409,7 @@ def validate_manifest(
             )
         expected_targets = set(RELEASE_TARGETS)
     elif distribution_scope == "platform":
-        if package_target not in RELEASE_TARGETS:
+        if not isinstance(package_target, str) or package_target not in RELEASE_TARGETS:
             raise DistributionError(
                 "platform distribution has an invalid package_target"
             )
