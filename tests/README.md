@@ -7,10 +7,10 @@ or GitHub Actions are needed:
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
 ```
 
-The suite uses temporary files, inert binary-shaped bytes, a controlled verifier
-fixture, and controlled Python subprocesses only. It never executes analyzed
-samples. Archive tests exercise real ZIP/tar and checksum code, but the fixture
-verifier does not certify the production binaries or the full distribution.
+The suite uses temporary files, inert binary-shaped bytes, and controlled
+Python subprocesses only. It never executes analyzed samples. Archive tests
+exercise real ZIP/tar and checksum code with the canonical static distribution
+verifier against synthetic members; they do not certify production binaries.
 POSIX permission/replacement checks are skipped where unsupported; Windows ACLs
 and reparse behavior require native Windows testing. This is not the Rust
 workspace test suite.
