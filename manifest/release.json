@@ -1,44 +1,44 @@
 {
   "artifacts": [
     {
-      "bytes": 17556960,
-      "file_identity": "Mach-O 64-bit executable arm64",
+      "bytes": 17632752,
+      "file_identity": "Mach-O 64-bit arm64 executable, flags:<NOUNDEFS|DYLDLINK|TWOLEVEL|NO_REEXPORTED_DYLIBS|PIE|HAS_TLV_DESCRIPTORS>",
       "path": "bin/macos-arm64/auto-re-cli",
       "rust_target": "aarch64-apple-darwin",
-      "sha256": "dd916730e360dbe691537547f5b8cef79f84356afc5d7af3862cb4ebd9c7d96d",
+      "sha256": "9ea2060df836879a30c54b563bbaed03a4f45fa10d67cf7b3d878b254d0295de",
       "signing": "adhoc",
       "target": "macos-arm64"
     },
     {
-      "bytes": 19954096,
-      "file_identity": "Mach-O 64-bit executable x86_64",
+      "bytes": 19910016,
+      "file_identity": "Mach-O 64-bit x86_64 executable, flags:<NOUNDEFS|DYLDLINK|TWOLEVEL|NO_REEXPORTED_DYLIBS|PIE|HAS_TLV_DESCRIPTORS>",
       "path": "bin/macos-x86_64/auto-re-cli",
       "rust_target": "x86_64-apple-darwin",
-      "sha256": "3d272999c9622d392e65f33d241580a005a6a78b1d73845c5f8cd29cb9650dbe",
+      "sha256": "37775efbc76281430186a2a8abe6f73c4ceb79166b119405699b4692e1047a8d",
       "signing": "adhoc",
       "target": "macos-x86_64"
     },
     {
-      "bytes": 20947608,
-      "file_identity": "ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 2.0.0, stripped",
+      "bytes": 20910896,
+      "file_identity": "ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=69e46c81d597c66c49ffb0dce05359429becd95f, for GNU/Linux 3.2.0, stripped",
       "path": "bin/linux-x86_64/auto-re-cli",
       "rust_target": "x86_64-unknown-linux-gnu",
-      "sha256": "f962389fc384971b6cb08d381983afeb5b996fd00667b9894fb27ee9b8305e20",
+      "sha256": "a0be41e8c05dd0cdf165f47b811aba70f14866d5ce366482d4704ad875ca3467",
       "signing": "not_applicable",
       "target": "linux-x86_64"
     },
     {
-      "bytes": 17581632,
-      "file_identity": "ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, for GNU/Linux 2.0.0, stripped",
+      "bytes": 17576600,
+      "file_identity": "ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, BuildID[sha1]=26dcc9138cb2df6b33082e8f187b17b2b1a929ec, for GNU/Linux 3.7.0, stripped",
       "path": "bin/linux-arm64/auto-re-cli",
       "rust_target": "aarch64-unknown-linux-gnu",
-      "sha256": "6375f8c609c7074fd1aa3f63457350736f15209da89cffb401cb095e5f679531",
+      "sha256": "ec41fa31f048eb60e1054e52c79f2224a78b1d1461122b886d83b1025a682bc9",
       "signing": "not_applicable",
       "target": "linux-arm64"
     },
     {
-      "bytes": 19497472,
-      "file_identity": "PE32+ executable (console) x86-64, for MS Windows",
+      "bytes": 19497984,
+      "file_identity": "PE32+ executable (console) x86-64, for MS Windows, 6 sections",
       "path": "bin/windows-x86_64/auto-re-cli.exe",
       "pe": {
         "architecture": "x86_64",
@@ -63,7 +63,7 @@
         "timestamp": 0
       },
       "rust_target": "x86_64-pc-windows-gnullvm",
-      "sha256": "9bd2472cfca0225a1ef21f0fcf0e241c1c12ce5df1fa72a66f56d81cecc4dacf",
+      "sha256": "3404afdb7fea37ec9d2937c95c7ae5f323224d6b30207e3a0057d98929139e3d",
       "signing": "not_applicable",
       "target": "windows-x86_64"
     }
@@ -101,15 +101,19 @@
     ],
     "name": "auto-re",
     "path": "skills/auto-re",
-    "version": "0.1.7"
+    "version": "0.1.8"
   },
   "source_repository": "auto-re_source",
-  "source_revision": "ebf9e1bea0338fc51e9b66777a864f2ac17bd71d",
+  "source_revision": "762b83581916e233371e40474af80f5c27338f92",
   "third_party_dependency_count": 69,
   "toolchain": {
     "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "cross_host": "linux-x86_64",
+    "llvm_mingw_archive_sha256": "534b92e067b22a6b4441f48ae9240a3341b17825d04d577eab0cf85c44b4deda",
     "pinned_channel": "1.97.1",
-    "rust": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
+    "rcodesign_archive_sha256": "dbe85cedd8ee4217b64e9a0e4c2aef92ab8bcaaa41f20bde99781ff02e600002",
+    "rust": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "zig_archive_sha256": "02aa270f183da276e5b5920b1dac44a63f1a49e55050ebde3aecc9eb82f93239"
   },
-  "version": "0.1.7"
+  "version": "0.1.8"
 }

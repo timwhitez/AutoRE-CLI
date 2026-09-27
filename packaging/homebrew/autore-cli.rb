@@ -1,26 +1,26 @@
 class AutoreCli < Formula
   desc "Bounded static reverse engineering for analysts and AI agents"
   homepage "https://github.com/timwhitez/AutoRE-CLI"
-  version "0.1.6"
+  version "0.1.8"
   license "MIT"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.6/AutoRE-CLI-0.1.6-macos-arm64.tar.gz"
-      sha256 "d538dcef07d84da8c21e0e956d73812e0d32bb3631be8c85d2d591594cd722f4"
+      url "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.8/AutoRE-CLI-0.1.8-macos-arm64.tar.gz"
+      sha256 "89b6043906c146507612a2abda054378809b12faefe1ef261bc259743a435802"
     else
-      url "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.6/AutoRE-CLI-0.1.6-macos-x86_64.tar.gz"
-      sha256 "ceb97b9fbb4c24cae6c74bfcf78bd989c63b5dd1f23dedd74dd8b35f1db61540"
+      url "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.8/AutoRE-CLI-0.1.8-macos-x86_64.tar.gz"
+      sha256 "120dc5be6f13ae8b57e1a0392fbc1d5f21b1365e90cbedf2a0b24dc80a5a4522"
     end
   end
 
   on_linux do
     if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
-      url "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.6/AutoRE-CLI-0.1.6-linux-arm64.tar.gz"
-      sha256 "0a35374f997c2e78176b5ac18b3e06b3201decc0c7e36c1d98ac6321939c6605"
+      url "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.8/AutoRE-CLI-0.1.8-linux-arm64.tar.gz"
+      sha256 "514c4a95c5852b840b5af546ed33c7359d8755416b46acb4e43efdf424bb7581"
     elsif Hardware::CPU.intel? && Hardware::CPU.is_64_bit?
-      url "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.6/AutoRE-CLI-0.1.6-linux-x86_64.tar.gz"
-      sha256 "9f2bfff39105262f00e584ce77853ac3397ac041049f3d7f27649f6aa69135e7"
+      url "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.8/AutoRE-CLI-0.1.8-linux-x86_64.tar.gz"
+      sha256 "f72699d90bbfc6270f98d5d49f94ab94d3cea941186f5215489fcbce8aa82636"
     else
       odie "AutoRE-CLI has no release for this Linux architecture"
     end
