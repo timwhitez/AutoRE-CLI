@@ -4,6 +4,17 @@ All notable changes to the public AutoRE-CLI distribution are recorded here.
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-10-01
+
+- Explain selection, VA units, paging and effective budgets in existing help.
+- Add optional bounded, hash-bound, stateless JSON views to the Agent Skill.
+- Reuse selected-analysis input snapshots through fallback and Go/forwarder
+  enhancement without changing commands, budgets or evidence boundaries.
+- Fix Go funcval recognition of MLIL dereferences and stale register sources.
+- Rebuild all five platforms locally from
+  `d7be29ba6ecf47c0199020b0140dc3ae1edfedbd`.
+- See [release notes](https://github.com/timwhitez/AutoRE-CLI/blob/main/release-notes/v0.1.9.md) for validation limits and upgrade instructions.
+
 ## [0.1.7] - 2026-09-12
 
 - Add bounded `compare-functions` with independent selectors and explicit
