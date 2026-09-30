@@ -25,6 +25,27 @@ proof of no references, including when computed targets lie outside the supplied
 slice. Keep recovered string facts separate from unresolved addresses; a numeric
 target is not itself a string. Embedded object functions retain their own evidence.
 
+## Optional Existing-Result Views
+
+When existing JSON already contains the evidence, use your file tools or the
+optional `python3 scripts/read_result.py <analysis.json> --pointer /records`
+instead of reanalysis. This read-only helper uses RFC 6901 string pointers,
+preserves complete values and ancestor/summary boundaries, and returns at most
+16 KiB including its envelope. Input is capped at 64 MiB; parsing can use more
+memory. The view does not certify source semantics or analysis completeness.
+
+For array pages, use the returned `selection.next_offset` (not requested limit)
+and `--expected-sha256 <source.sha256>`; positive offsets require that digest.
+The current-snapshot digest is a content identity, not source authentication.
+Oversized values/boundaries fail rather than lose evidence. Read a deeper field
+or the original JSON. A view cannot be passed to the continuation runner.
+
+For bundles/spills, first use the existing verifier and explicitly pass its
+receipt's verified `files[].path` and expected digest. The reader does not
+follow receipts or manifests, recover missing copies, execute actions, write
+results, or clean files. Existing explicit verifier cleanup remains unchanged.
+
+
 ## Decoded References Versus Byte Matches
 
 A matching displacement or numeric operand is not sufficient reference evidence.
