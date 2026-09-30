@@ -94,6 +94,7 @@
       "skills/auto-re/references/platform-invocation.md",
       "skills/auto-re/references/safety-and-claims.md",
       "skills/auto-re/scripts/process_control.py",
+      "skills/auto-re/scripts/read_result.py",
       "skills/auto-re/scripts/run_next_action.py",
       "skills/auto-re/scripts/skill_doctor.py",
       "skills/auto-re/scripts/start_analysis.py",
