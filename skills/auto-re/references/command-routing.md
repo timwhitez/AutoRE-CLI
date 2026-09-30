@@ -38,6 +38,9 @@ Load this reference when choosing a command instead of following an emitted
 
 Run `auto-re-cli <command> --help` before inventing an option. Do not pass
 `--json-profile ai` to commands that do not support it.
+Known commands can be called directly; help is optional, not a mandatory
+help/report/function sequence. Installed binaries describe their own version;
+updated repository guidance does not upgrade an installed binary's help.
 
 ## Selectors
 
@@ -50,7 +53,14 @@ Run `auto-re-cli <command> --help` before inventing an option. Do not pass
   is not proof that code or references are absent.
 - Prefer an exact address emitted by Auto-RE over a guessed symbol spelling.
 - Preserve the raw `name`; treat `display_name` as presentation only.
-- For `slice-function`, choose exactly one local selector.
+- For `slice-function`, use at most one local selector; omission selects the
+  first slice. `--slice-index` is zero-based, `--slice-start` is an exact slice
+  start VA, and `--slice-size` counts decoded instructions.
+- The single-function commands prefer the first retained non-runtime-noise
+  function (otherwise the first retained function) when neither `--addr` nor `--symbol` is supplied. `dump-il` requires `--level`;
+  statement offsets index the full CUSTOM IL sequence and limits count
+  statements. Paging/search requires `--level custom --format json`; offsets
+  and search selectors additionally require `--statement-limit`.
 - Follow offsets and limits returned by pagination actions instead of widening
   all budgets.
 - An address inside a function is not automatically the function start; retain
@@ -62,7 +72,7 @@ For container-backed inputs, omit `--arch` unless a specific universal Mach-O
 slice is required. Supported explicit analysis architectures are `x86`,
 `x86_64`, and `aarch64`.
 
-Raw shellcode requires all of:
+The first-evidence launcher requires explicit raw architecture and base:
 
 ```bash
 --raw-shellcode --arch <arch> --base-address <address>
@@ -70,10 +80,20 @@ Raw shellcode requires all of:
 
 Add `--entry-address` only when known. Never infer raw architecture, base, or
 entry from a filename. Preserve these flags in every generated follow-up.
+The native CLI requires `--arch` with `--raw-shellcode`, but permits an omitted
+base (zero); the launcher's explicit-base rule does not change native parsing.
 
 ## Budgets
 
 Use the smallest budget that answers the question:
+
+`--max-functions` limits analysis/discovery and
+`--max-instructions-per-function` limits analysis of each function. They are
+not output row counts or proof of whole-program coverage. Effective defaults
+depend on the command and input mode; consult the installed command's help.
+`--limit` and offsets bound output records/pages. `--max-input-bytes` bounds
+the whole input snapshot, not peak RSS. Read existing JSON fields when they
+already answer the question, without reanalysis or automatic next-action execution.
 
 When installed command help lists `--max-input-bytes`, explicitly increasing it
 allows input snapshots larger than the default 256 MiB. Analyze the original PE
