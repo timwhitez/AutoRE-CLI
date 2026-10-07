@@ -15,6 +15,18 @@ POSIX permission/replacement checks are skipped where unsupported; Windows ACLs
 and reparse behavior require native Windows testing. This is not the Rust
 workspace test suite.
 
+Receipts share producer, admission and prior-reader limits: 256 KiB including
+the final newline, depth 16, 10000 values, 1000 entries per container and 65536
+decoded UTF-8 bytes per string/key. Known metadata is rejected before version
+probing; actual program/version/identity admission precedes analysis and logs.
+The dry-run `receipt_budget` reports the derived encoded upper bound while
+`program_and_identity_checked` remains false. No evidence is truncated to fit.
+The budget reserves bounded version output, process diagnostic prefixes plus
+256 exception characters in each of eight entries, fixed timestamp/status/hash
+formats and explicit 64-bit counter/duration/exit ranges. The final writer
+checks the same size, shape and identity contract; round-trip regressions use
+the real prior loader rather than plain JSON decoding.
+
 Release builds now require a **new output directory in an existing trusted
 parent**. Existing directories (including empty ones) are rejected rather than
 cleared. The default remains `release-assets`; choose a fresh name for another

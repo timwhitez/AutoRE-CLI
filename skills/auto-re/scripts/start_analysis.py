@@ -147,10 +147,13 @@ def run(args: argparse.Namespace) -> tuple[int, dict]:
     target, output = preflight_paths(args)
     prepared = prepare(args, target, output)
     actions.validate_prepared_argv(prepared["argv"], command_owned_sink=False)
+    # Known receipt fields are admitted before doctor can probe the trusted CLI.
+    budget = actions.receipt_budget_plan(prepared, output / "receipts/initial.json.logs",
+        log_tail_bytes=LOG_TAIL_BYTES, timeout_seconds=args.timeout_seconds)
     if args.dry_run:
         return 0, dict(prepared, readiness_checked=False, analysis_executed=False,
                        investigation_complete=False, result_dir=str(output),
-                       result_validation="not_attempted")
+                       result_validation="not_attempted", receipt_budget=budget)
 
     executable = trusted_cli(args, target)
     readiness = doctor.diagnose(SKILL_ROOT, executable=executable)

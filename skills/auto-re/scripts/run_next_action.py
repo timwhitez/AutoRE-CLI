@@ -66,6 +66,14 @@ ACTION_RESULT_POLICY = ControlJsonPolicy(
     500_000,
     16 * 1024 * 1024,
 )
+RECEIPT_POLICY = ControlJsonPolicy("prior_receipt", RECEIPT_MAX_BYTES, 16, 10000, 1000, 65536)
+RECEIPT_UINT_MAX = (1 << 64) - 1
+IDENTITY_INPUT_MAX_BYTES = 512 * 1024 * 1024
+IDENTITY_REASONS = frozenset({"unsupported_command", "unsupported_shape", "input_nonregular",
+    "input_too_large", "input_unstable", "input_unreadable", "available",
+    "input_unstable_after_execution"})
+CONTINUATION_CHECKS = frozenset({"not_requested", "not_evaluated_unavailable_identity",
+    "changed_analysis", "increased_timeout_after_timeout"})
 
 
 class ActionError(ValueError):
@@ -158,6 +166,8 @@ def _validate_json_shape(value: Any, policy: ControlJsonPolicy) -> None:
                     len(current),
                 )
             for key, child in current.items():
+                if not isinstance(key, str):
+                    raise ActionError(f"control_file_structure_limit: kind={policy.kind} object keys must be strings")
                 key_length = _utf8_length(key)
                 if key_length > policy.max_string_bytes:
                     raise _control_file_structure_limit(
@@ -375,7 +385,7 @@ def _request_identity_with_reason(argv: list[str], program_sha256: str) -> tuple
             os.close(fd)
             return None, "input_nonregular"
         with os.fdopen(fd, "rb") as handle:
-            if before.st_size > 512 * 1024 * 1024:
+            if before.st_size > IDENTITY_INPUT_MAX_BYTES:
                 return None, "input_too_large"
             digest = hashlib.sha256()
             observed = 0
@@ -389,7 +399,13 @@ def _request_identity_with_reason(argv: list[str], program_sha256: str) -> tuple
                 return None, "input_unstable"
     except OSError:
         return None, "input_unreadable"
-    arguments = [argv[1], "<input-sha256>=" + digest.hexdigest()]
+    return _make_request_identity(argv, program_sha256, digest.hexdigest(), before.st_size), "available"
+
+
+def _make_request_identity(argv: list[str], program_sha256: str,
+                           input_sha256: str, input_bytes: int) -> dict[str, Any]:
+    """Share the exact duplicated argv projection with side-effect-free admission."""
+    arguments = [argv[1], "<input-sha256>=" + input_sha256]
     index = 3
     sink_flags = COMMAND_OWNED_SINK_FLAGS | {"--output"}
     while index < len(argv):
@@ -400,10 +416,10 @@ def _request_identity_with_reason(argv: list[str], program_sha256: str) -> tuple
         if not any(argument.startswith(flag + "=") for flag in sink_flags):
             arguments.append(argument)
         index += 1
-    identity = {"input_sha256": digest.hexdigest(), "input_bytes": before.st_size,
+    identity = {"input_sha256": input_sha256, "input_bytes": input_bytes,
                 "program_sha256": program_sha256, "analysis_argv": arguments}
     identity["sha256"] = hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    return identity, "available"
+    return identity
 
 
 def request_identity(argv: list[str], program_sha256: str) -> dict[str, Any] | None:
@@ -536,14 +552,20 @@ def _write_private_bytes(path: pathlib.Path, data: bytes, label: str) -> None:
         raise ActionError(detail) from error
 
 
-def _write_receipt(path: pathlib.Path, value: dict[str, Any]) -> None:
+def _encode_receipt(value: dict[str, Any]) -> bytes:
+    _validate_json_shape(value, RECEIPT_POLICY)
+    validate_prior_receipt(value)
     encoded = (json.dumps(value, indent=2, sort_keys=True) + "\n").encode("utf-8")
     if len(encoded) > RECEIPT_MAX_BYTES:
         raise ActionError(
             "execution receipt exceeds limit: "
             f"limit={RECEIPT_MAX_BYTES} observed={len(encoded)}"
         )
-    _write_private_bytes(path, encoded, "execution receipt")
+    return encoded
+
+
+def _write_receipt(path: pathlib.Path, value: dict[str, Any]) -> None:
+    _write_private_bytes(path, _encode_receipt(value), "execution receipt")
 
 
 def probe_program_version(executable: pathlib.Path) -> str:
@@ -599,6 +621,149 @@ def _sink_record(prepared: dict[str, Any]) -> dict[str, Any]:
     return {"ownership": "unresolved"}
 
 
+def _receipt_value(prepared, executable, program_version, program_sha256, identity,
+                   identity_reason, continuation_check, log_dir, captured, started_at,
+                   ended_at, duration_ms, log_tail_bytes, timeout_seconds):
+    stdout_path = log_dir / "stdout.tail.log"
+    stderr_path = log_dir / "stderr.tail.log"
+    argv = [str(executable), *prepared["argv"][1:]]
+    exit_code = execution_exit_code(captured)
+    value = {
+        "schema_version": 1,
+        "owner": "auto-re-skill",
+        "kind": "auto_re_action_execution_receipt",
+        "action_stage": prepared["action_stage"],
+        "reason": prepared["reason"],
+        "expected_output": prepared["expected_output"],
+        "stop_condition": prepared["stop_condition"],
+        "program": {
+            "path": str(executable),
+            "version_output": program_version,
+            "sha256": program_sha256,
+        },
+        "argv": argv,
+        "request_identity": identity,
+        "request_identity_unavailable_reason": identity_reason,
+        "continuation_check": continuation_check,
+        "sink": _sink_record(prepared),
+        "started_at": started_at,
+        "ended_at": ended_at,
+        "duration_ms": duration_ms,
+        "exit_code": exit_code,
+        "process_exit_code": captured.returncode,
+        "execution_status": captured.status,
+        "timeout_seconds": timeout_seconds,
+        "leader_reaped": captured.leader_reaped,
+        "diagnostics": list(captured.diagnostics),
+        "stdout": _stream_receipt(
+            stdout_path, captured.stdout, log_tail_bytes
+        ),
+        "stderr": _stream_receipt(
+            stderr_path, captured.stderr, log_tail_bytes
+        ),
+        "evidence_boundary": "operational_diagnostics_not_target_analysis_evidence",
+    }
+    if "action_stage_source" in prepared:
+        value["action_stage_source"] = prepared["action_stage_source"]
+    _validate_generated_receipt_fields(value)
+    return value
+
+
+def _validate_generated_receipt_fields(value: dict[str, Any]) -> None:
+    """Explicit generator ceilings; invariant failure never clips evidence."""
+    def integer(number, low, high, field):
+        if type(number) is not int or not low <= number <= high:
+            raise ActionError(f"receipt dynamic invariant: {field} outside {low}..{high}")
+
+    integer(value["duration_ms"], 0, RECEIPT_UINT_MAX, "duration_ms")
+    integer(value["exit_code"], -RECEIPT_UINT_MAX, RECEIPT_UINT_MAX + 128, "exit_code")
+    if value["process_exit_code"] is not None:
+        integer(value["process_exit_code"], -RECEIPT_UINT_MAX, RECEIPT_UINT_MAX, "process_exit_code")
+    if value["execution_status"] not in process_control.PROCESS_STATUSES:
+        raise ActionError("receipt dynamic invariant: unsupported execution_status")
+    if value["continuation_check"] not in CONTINUATION_CHECKS:
+        raise ActionError("receipt dynamic invariant: unsupported continuation_check")
+    if (value["request_identity_unavailable_reason"] is not None
+            and value["request_identity_unavailable_reason"] not in IDENTITY_REASONS):
+        raise ActionError("receipt dynamic invariant: unsupported identity reason")
+    for field in ("started_at", "ended_at"):
+        if not isinstance(value[field], str) or len(value[field]) > 27 or not value[field].isascii():
+            raise ActionError(f"receipt dynamic invariant: invalid {field}")
+    diagnostics = value["diagnostics"]
+    if len(diagnostics) > process_control.DIAGNOSTIC_MAX_ENTRIES:
+        raise ActionError("receipt dynamic invariant: too many diagnostics")
+    for diagnostic in diagnostics:
+        if diagnostic == "pipe_drain_timeout":
+            continue
+        if not isinstance(diagnostic, str) or not any(
+            diagnostic.startswith(prefix)
+            and len(diagnostic) - len(prefix) <= process_control.DIAGNOSTIC_EXCEPTION_CHARACTERS
+            for prefix in process_control.DIAGNOSTIC_PREFIXES
+        ):
+            raise ActionError("receipt dynamic invariant: invalid diagnostic")
+    for name in ("stdout", "stderr"):
+        stream = value[name]
+        integer(stream["bytes_total"], 0, RECEIPT_UINT_MAX, f"{name}.bytes_total")
+        integer(stream["bytes_retained"], 0, stream["tail_limit_bytes"], f"{name}.bytes_retained")
+        if stream["bytes_retained"] > stream["bytes_total"]:
+            raise ActionError("receipt dynamic invariant: retained bytes exceed observed bytes")
+
+
+def receipt_budget_plan(prepared: dict[str, Any], log_dir: pathlib.Path, *,
+                        executable: str = "", program_version: str | None = None,
+                        program_sha256: str = "f" * 64,
+                        identity: dict[str, Any] | None = None,
+                        continuation_check: str | None = None,
+                        log_tail_bytes: int = LOG_TAIL_BYTES,
+                        timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS) -> dict[str, Any]:
+    """Encode the common schema with maxima derived from bounded generators.
+
+    The known pass reserves a possible identity without reading the target.
+    The resolved pass also covers an identity disappearing after execution.
+    False is the largest boolean encoding; None is smaller than reserved strings,
+    signed return code and identity object. Hash lengths and argv projection are
+    exact. UTF-16 surrogate pairs cost at most twelve JSON bytes per character.
+    """
+    try:
+        timeout_seconds = process_control.validate_seconds(timeout_seconds)
+    except process_control.ProcessError as error:
+        raise ActionError(str(error)) from error
+    for field in ("action_stage", "reason", "expected_output", "stop_condition"):
+        if not isinstance(prepared.get(field), str) or not prepared[field].strip():
+            raise ActionError(f"prepared action is missing {field}")
+    if "action_stage_source" in prepared and not isinstance(prepared["action_stage_source"], str):
+        raise ActionError("prepared action_stage_source must be a string")
+    if type(log_tail_bytes) is not int or not 0 <= log_tail_bytes <= LOG_TAIL_BYTES:
+        raise ActionError(f"log tail byte limit must be an integer between 0 and {LOG_TAIL_BYTES}")
+    argv = prepared["argv"]
+    if identity is None and len(argv) >= 3 and argv[1] in IDENTITY_COMMANDS and not argv[2].startswith("-"):
+        identity = _make_request_identity(argv, program_sha256, "f" * 64, IDENTITY_INPUT_MAX_BYTES)
+    if program_version is None:
+        program_version = "auto-re-cli " + "9" * (PROGRAM_VERSION_MAX_BYTES - 16) + ".9.9"
+    if len(program_version.encode("utf-8")) > PROGRAM_VERSION_MAX_BYTES or PROGRAM_VERSION_PATTERN.fullmatch(program_version) is None:
+        raise ActionError("receipt dynamic invariant: invalid version output")
+    if continuation_check is None:
+        continuation_check = max(CONTINUATION_CHECKS, key=len)
+    diagnostic = max(process_control.DIAGNOSTIC_PREFIXES, key=len) + "\U0001f600" * process_control.DIAGNOSTIC_EXCEPTION_CHARACTERS
+    stream = CapturedStream(b"", RECEIPT_UINT_MAX, "f" * 64, False)
+    captured = process_control.ProcessResult(-RECEIPT_UINT_MAX,
+        max(process_control.PROCESS_STATUSES, key=len), stream, stream,
+        (diagnostic,) * process_control.DIAGNOSTIC_MAX_ENTRIES, False)
+    value = _receipt_value(prepared, executable, program_version, program_sha256,
+        identity, max(IDENTITY_REASONS, key=len), continuation_check, log_dir,
+        captured, "9999-12-31T23:59:59.999999Z", "9999-12-31T23:59:59.999999Z",
+        RECEIPT_UINT_MAX, log_tail_bytes, timeout_seconds)
+    for name in ("stdout", "stderr"):
+        value[name]["bytes_retained"] = log_tail_bytes
+        value[name]["truncated"] = False
+    # The longest status and the longest mapped exit do not occur together;
+    # reserving each field's maximum covers all admitted status/exit pairs.
+    value["exit_code"] = RECEIPT_UINT_MAX + 128
+    encoded = _encode_receipt(value)
+    return {"encoded_upper_bound": len(encoded), "encoded_limit": RECEIPT_MAX_BYTES,
+            "program_and_identity_checked": bool(executable)}
+
+
 def _command_sink_values(argv: list[str]) -> list[pathlib.Path]:
     sinks: list[pathlib.Path] = []
     for index, argument in enumerate(argv):
@@ -649,7 +814,9 @@ def validate_receipt_sink_separation(
 
 
 def prepare_action_receipt_paths(
-    prepared: dict[str, Any], receipt_path: pathlib.Path
+    prepared: dict[str, Any], receipt_path: pathlib.Path, *,
+    log_tail_bytes: int = LOG_TAIL_BYTES,
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
 ) -> tuple[pathlib.Path, pathlib.Path]:
     """Apply the same side-effect-free receipt preflight to preview and execution."""
     validate_prepared_argv(
@@ -658,6 +825,8 @@ def prepare_action_receipt_paths(
     )
     receipt, logs = prepare_receipt_paths(receipt_path)
     validate_receipt_sink_separation(prepared, receipt, logs)
+    receipt_budget_plan(prepared, logs, log_tail_bytes=log_tail_bytes,
+                        timeout_seconds=timeout_seconds)
     return receipt, logs
 
 
@@ -679,10 +848,11 @@ def execute_prepared_with_receipt(
             f"log tail byte limit must be an integer between 0 and {LOG_TAIL_BYTES}"
         )
     try:
-        process_control.validate_seconds(timeout_seconds)
+        timeout_seconds = process_control.validate_seconds(timeout_seconds)
     except process_control.ProcessError as error:
         raise ActionError(str(error)) from error
-    receipt, log_dir = prepare_action_receipt_paths(prepared, receipt_path)
+    receipt, log_dir = prepare_action_receipt_paths(prepared, receipt_path,
+        log_tail_bytes=log_tail_bytes, timeout_seconds=timeout_seconds)
     try:
         resolved_executable = executable.expanduser().resolve(strict=True)
     except OSError as error:
@@ -695,8 +865,12 @@ def execute_prepared_with_receipt(
     prior = None
     if prior_receipt is not None:
         prior = validate_prior_receipt(load_json_object(
-            prior_receipt, policy=ControlJsonPolicy("prior_receipt", RECEIPT_MAX_BYTES, 16, 10000, 1000, 65536)))
+            prior_receipt, policy=RECEIPT_POLICY))
     continuation_check = assess_continuation(prior, identity, timeout_seconds)
+    receipt_budget_plan(prepared, log_dir, executable=str(resolved_executable),
+        program_version=program_version, program_sha256=program_sha256,
+        identity=identity, continuation_check=continuation_check,
+        log_tail_bytes=log_tail_bytes, timeout_seconds=timeout_seconds)
 
     try:
         log_dir.mkdir(mode=0o700)
@@ -727,43 +901,13 @@ def execute_prepared_with_receipt(
     try:
         _write_private_bytes(stdout_path, results["stdout"].tail, "stdout tail log")
         _write_private_bytes(stderr_path, results["stderr"].tail, "stderr tail log")
-        receipt_value = {
-            "schema_version": 1,
-            "owner": "auto-re-skill",
-            "kind": "auto_re_action_execution_receipt",
-            "action_stage": prepared["action_stage"],
-            "reason": prepared["reason"],
-            "expected_output": prepared["expected_output"],
-            "stop_condition": prepared["stop_condition"],
-            "program": {
-                "path": str(resolved_executable),
-                "version_output": program_version,
-                "sha256": program_sha256,
-            },
-            "argv": argv,
-            "request_identity": identity if final_identity == identity else None,
-            "request_identity_unavailable_reason": None if final_identity == identity and identity is not None else identity_reason,
-            "continuation_check": continuation_check,
-            "sink": _sink_record(prepared),
-            "started_at": started_at,
-            "ended_at": ended_at,
-            "duration_ms": duration_ms,
-            "exit_code": exit_code,
-            "process_exit_code": captured.returncode,
-            "execution_status": captured.status,
-            "timeout_seconds": timeout_seconds,
-            "leader_reaped": captured.leader_reaped,
-            "diagnostics": list(captured.diagnostics),
-            "stdout": _stream_receipt(
-                stdout_path, results["stdout"], log_tail_bytes
-            ),
-            "stderr": _stream_receipt(
-                stderr_path, results["stderr"], log_tail_bytes
-            ),
-            "evidence_boundary": "operational_diagnostics_not_target_analysis_evidence",
-        }
-        if "action_stage_source" in prepared:
-            receipt_value["action_stage_source"] = prepared["action_stage_source"]
+        receipt_value = _receipt_value(
+            prepared, resolved_executable, program_version, program_sha256,
+            identity if final_identity == identity else None,
+            None if final_identity == identity and identity is not None else identity_reason,
+            continuation_check, log_dir, captured, started_at, ended_at, duration_ms,
+            log_tail_bytes, timeout_seconds,
+        )
         _write_receipt(receipt, receipt_value)
     except BaseException:
         shutil.rmtree(log_dir, ignore_errors=True)
@@ -964,9 +1108,12 @@ def main() -> int:
             if args.prior_receipt is not None:
                 prepared["continuation_check"] = "not_evaluated_dry_run"
             if args.receipt is not None:
-                receipt, logs = prepare_action_receipt_paths(prepared, args.receipt)
+                receipt, logs = prepare_action_receipt_paths(prepared, args.receipt,
+                    timeout_seconds=args.timeout_seconds)
                 prepared["planned_receipt"] = str(receipt)
                 prepared["planned_log_dir"] = str(logs)
+                prepared["receipt_budget"] = receipt_budget_plan(
+                    prepared, logs, timeout_seconds=args.timeout_seconds)
             json.dump(prepared, sys.stdout, indent=2, sort_keys=True)
             sys.stdout.write("\n")
             return 0

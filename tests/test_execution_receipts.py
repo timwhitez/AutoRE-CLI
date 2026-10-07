@@ -68,7 +68,8 @@ class ReceiptTests(unittest.TestCase):
         with patch.object(runner, "probe_program_version", return_value="auto-re-cli 0.1.3"):
             status, summary = runner.execute_prepared_with_receipt(
                 self.prepared(root, code), Path(sys.executable), root / "receipt.json", **kwargs)
-        receipt = json.loads((root / "receipt.json").read_text())
+        receipt = runner.validate_prior_receipt(runner.load_json_object(
+            root / "receipt.json", policy=runner.RECEIPT_POLICY))
         self.assertEqual(receipt["exit_code"], status)
         self.assertEqual(receipt["execution_status"], summary["execution_status"])
         self.assertTrue(receipt["leader_reaped"])
@@ -162,7 +163,8 @@ class ReceiptTests(unittest.TestCase):
                     out, err = process.communicate(timeout=10)
                     self.assertEqual(process.returncode, 130, err.decode(errors="replace"))
                     self.assertEqual(json.loads(out)["execution_status"], "cancelled")
-                    receipt = json.loads((root / "receipt.json").read_text())
+                    receipt = runner.validate_prior_receipt(runner.load_json_object(
+                        root / "receipt.json", policy=runner.RECEIPT_POLICY))
                     self.assertEqual(receipt["execution_status"], "cancelled")
                     self.assertTrue(receipt["leader_reaped"])
                     self.assertNotIn(b"Traceback", err)

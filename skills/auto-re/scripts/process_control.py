@@ -20,6 +20,12 @@ from typing import NamedTuple, Optional
 DEFAULT_TIMEOUT_SECONDS = 900.0
 READ_CHUNK_BYTES = 64 * 1024
 POLL_SECONDS = 0.01
+DIAGNOSTIC_MAX_ENTRIES = 8
+DIAGNOSTIC_EXCEPTION_CHARACTERS = 256
+DIAGNOSTIC_PREFIXES = ("terminate_failed: ", "group_check_failed: ", "kill_failed: ",
+    "reap_failed: ", "capture_or_setup_failed: ", "job_close_failed: ", "capture_finish_failed: ")
+PROCESS_STATUSES = frozenset({"completed", "cancelled", "timed_out", "output_limit",
+                              "capture_failed", "cleanup_failed"})
 
 
 class ProcessError(ValueError):
@@ -223,7 +229,7 @@ def _cleanup(process, job, grace_seconds: float, reap_seconds: float) -> list[st
     except ProcessLookupError:
         pass
     except OSError as error:
-        errors.append(f"terminate_failed: {str(error)[:256]}")
+        errors.append(f"terminate_failed: {str(error)[:DIAGNOSTIC_EXCEPTION_CHARACTERS]}")
     deadline = time.monotonic() + grace_seconds
     while time.monotonic() < deadline:
         process.poll()
@@ -231,7 +237,7 @@ def _cleanup(process, job, grace_seconds: float, reap_seconds: float) -> list[st
             if not _group_exists(process):
                 break
         except OSError as error:
-            errors.append(f"group_check_failed: {str(error)[:256]}")
+            errors.append(f"group_check_failed: {str(error)[:DIAGNOSTIC_EXCEPTION_CHARACTERS]}")
             break
         time.sleep(POLL_SECONDS)
     try:
@@ -244,11 +250,11 @@ def _cleanup(process, job, grace_seconds: float, reap_seconds: float) -> list[st
     except ProcessLookupError:
         pass
     except OSError as error:
-        errors.append(f"kill_failed: {str(error)[:256]}")
+        errors.append(f"kill_failed: {str(error)[:DIAGNOSTIC_EXCEPTION_CHARACTERS]}")
     try:
         process.wait(timeout=reap_seconds)
     except (OSError, subprocess.TimeoutExpired) as error:
-        errors.append(f"reap_failed: {str(error)[:256]}")
+        errors.append(f"reap_failed: {str(error)[:DIAGNOSTIC_EXCEPTION_CHARACTERS]}")
     return errors
 
 
@@ -332,9 +338,9 @@ def run_process(
             status = "cancelled"
         except (OSError, ProcessError) as error:
             if process is None:
-                raise ProcessError(f"cannot launch trusted program: {str(error)[:256]}") from error
+                raise ProcessError(f"cannot launch trusted program: {str(error)[:DIAGNOSTIC_EXCEPTION_CHARACTERS]}") from error
             status = "capture_failed"
-            diagnostics.append(f"capture_or_setup_failed: {str(error)[:256]}")
+            diagnostics.append(f"capture_or_setup_failed: {str(error)[:DIAGNOSTIC_EXCEPTION_CHARACTERS]}")
         finally:
             with _signals(cleanup=True):
                 if process is not None:
@@ -346,7 +352,7 @@ def run_process(
                     try:
                         job.close()
                     except OSError as error:
-                        diagnostics.append(f"job_close_failed: {str(error)[:256]}")
+                        diagnostics.append(f"job_close_failed: {str(error)[:DIAGNOSTIC_EXCEPTION_CHARACTERS]}")
                         if status == "completed":
                             status = "cleanup_failed"
                 # No reader threads exist. Even escaped descendants cannot force
@@ -364,7 +370,7 @@ def run_process(
                         if not progressed:
                             time.sleep(POLL_SECONDS)
                 except OSError as error:
-                    diagnostics.append(f"capture_finish_failed: {str(error)[:256]}")
+                    diagnostics.append(f"capture_finish_failed: {str(error)[:DIAGNOSTIC_EXCEPTION_CHARACTERS]}")
                     if status == "completed":
                         status = "capture_failed"
                 finally:
@@ -380,7 +386,7 @@ def run_process(
         for stream in streams:
             stream.complete = False
     return ProcessResult(process.returncode, status, streams[0].snapshot(), streams[1].snapshot(),
-                         tuple(diagnostics[:8]), process.returncode is not None)
+                         tuple(diagnostics[:DIAGNOSTIC_MAX_ENTRIES]), process.returncode is not None)
 
 
 def probe_output(executable, *, max_bytes: int = 4096, timeout_seconds: float = 10.0) -> bytes:
@@ -411,7 +417,7 @@ def _job_worker(argv: list[str]) -> int:
     except KeyboardInterrupt:
         return 130
     except OSError as error:
-        print(f"trusted CLI launch failed: {str(error)[:256]}", file=sys.stderr)
+        print(f"trusted CLI launch failed: {str(error)[:DIAGNOSTIC_EXCEPTION_CHARACTERS]}", file=sys.stderr)
         return 125
 
 
