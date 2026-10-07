@@ -87,10 +87,17 @@ base (zero); the launcher's explicit-base rule does not change native parsing.
 
 Use the smallest budget that answers the question:
 
-`--max-functions` limits analysis/discovery and
-`--max-instructions-per-function` limits analysis of each function. They are
-not output row counts or proof of whole-program coverage. Effective defaults
-depend on the command and input mode; consult the installed command's help.
+`--max-functions` requests a function discovery/retention budget, and
+`--max-instructions-per-function` limits decoding of each analyzed function.
+For `function`, `slice-function`, `dump-il`, and `dump-cfg`, the default function
+request is `2000`; selected scope uses `max(requested max-functions, 32768)`
+internally on object and raw inputs, including the default first-function
+selector. Smaller explicit requests do not lower this floor. It is not a
+mandatory discovery count, a hard cap on all discovery work, an output row
+count, a peak RSS limit, a promise to materialize `32768` functions, or proof of
+whole-program coverage. The selected result contains only the selected analyzed
+body. Explicit instruction budgets override the instruction default. Other
+commands keep their command/input-specific rules; consult the installed help.
 `--limit` and offsets bound output records/pages. `--max-input-bytes` bounds
 the whole input snapshot, not peak RSS. Read existing JSON fields when they
 already answer the question, without reanalysis or automatic next-action execution.
