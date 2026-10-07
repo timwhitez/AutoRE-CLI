@@ -96,6 +96,14 @@ class StartAnalysisTests(unittest.TestCase):
     def recorded(self):
         return [json.loads(line) for line in self.events.read_text().splitlines()] if self.events.exists() else []
 
+    def test_oversized_receipt_symbol_is_rejected_before_doctor_or_output(self):
+        for flags in ((), ("--dry-run",)):
+            with self.subTest(flags=flags):
+                result = self.invoke("--symbol", "A" * 70000, *flags)
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertEqual(self.recorded(), [])
+                self.assertFalse(self.output.exists())
+
     def analysis_calls(self):
         return [args for args in self.recorded() if args != ["--version"]]
 

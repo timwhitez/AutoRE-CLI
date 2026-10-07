@@ -83,7 +83,8 @@ class ReceiptWriteSafetyTests(unittest.TestCase):
         receipt, _ = runner.prepare_receipt_paths(self.path)
         receipt.write_bytes(b"written after preflight")
         with self.assertRaises(runner.ActionError):
-            runner._write_receipt(receipt, {"ok": True})
+            runner._write_receipt(receipt, {"schema_version": 1, "owner": "auto-re-skill",
+                "kind": "auto_re_action_execution_receipt", "request_identity": None})
         self.assertTrue(receipt.exists())
         self.assertEqual(receipt.read_bytes(), b"written after preflight")
 

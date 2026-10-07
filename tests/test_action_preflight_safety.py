@@ -101,7 +101,8 @@ class ActionPreflightSafetyTests(unittest.TestCase):
 
     def dry_run(self, sink: Path) -> tuple[int, str, str]:
         args = mock.Mock(result=self.root / "result.json", action_stage="test",
-                         output=None, receipt=self.receipt, dry_run=True)
+                         output=None, receipt=self.receipt, dry_run=True,
+                         prior_receipt=None, timeout_seconds=runner.DEFAULT_TIMEOUT_SECONDS)
         stdout, stderr = io.StringIO(), io.StringIO()
         with mock.patch.object(runner, "parse_args", return_value=args), \
              mock.patch.object(runner, "prepare_action", return_value=self.prepared(sink)), \
