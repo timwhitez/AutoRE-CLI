@@ -1,4 +1,4 @@
-"""Exact C1 admission against real P0 DTOs and explicitly spec-derived P1 forms."""
+"""Exact C1 admission against real P0 DTOs and producer-verified P1 forms."""
 import copy
 import importlib.util
 import hashlib
@@ -28,7 +28,7 @@ class ResultKindContractTests(unittest.TestCase):
         with self.assertRaisesRegex(runner.ActionError, "^" + prefix):
             runner.validate_result_contract(result)
 
-    def test_real_and_spec_derived_supported_pairs(self):
+    def test_real_and_producer_verified_supported_pairs(self):
         for row in CASES:
             with self.subTest(case=row["id"]):
                 self.assertEqual(runner.validate_result_contract(row["result"]), row["label"])
@@ -36,7 +36,7 @@ class ResultKindContractTests(unittest.TestCase):
                 if "derived_from" in row:
                     original = next(r["result"] for r in CASES if r["id"] == row["derived_from"])
                     self.assertEqual({k: v for k, v in row["result"].items() if k != "kind"}, original)
-                    self.assertIn("spec-derived", row["provenance"])
+                    self.assertIn("producer-verified", row["provenance"])
 
     def test_kind_and_version_reject_before_shape_fallback(self):
         for row in CASES:
