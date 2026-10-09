@@ -1,0 +1,273 @@
+{
+  "kind": "auto_re_agent_task_cases",
+  "schema_version": 1,
+  "fixtures": {
+    "raw_ret": {
+      "source_hex": "909090c3",
+      "architecture": "x86-64",
+      "base_address": 4096,
+      "compile_settings": "not compiled; explicit NOP NOP NOP RET bytes; never execute"
+    },
+    "cli_help": {
+      "source": "CLI 0.1.10 dump-il contract: --level required; installed --help supplies evidence",
+      "compile_settings": "not compiled"
+    },
+    "retained": {
+      "source": "fixtures.py constructs exact JSON values; no analyzer-derived truth",
+      "compile_settings": "not compiled"
+    },
+    "corrupt": {
+      "source": "fixtures.py writes a truncated JSON object",
+      "compile_settings": "not compiled"
+    }
+  },
+  "cases": [
+    {
+      "id": "direct_narrow",
+      "phase": "cold",
+      "prompt": "Show the CFG at VA 0x1000 using one direct narrow call.",
+      "fixture": "raw_ret",
+      "reference_plan": [
+        "dump-cfg ret.bin --raw-shellcode --arch x86-64 --base-address 0x1000 --addr 0x1000 --format json"
+      ],
+      "facts": [
+        {
+          "id": "selected_address",
+          "value": 4096,
+          "support": {
+            "artifact": "cfg.json",
+            "pointer": "/function/address"
+          }
+        },
+        {
+          "id": "block_start",
+          "value": 4096,
+          "support": {
+            "artifact": "cfg.json",
+            "pointer": "/basic_blocks/0/start"
+          }
+        },
+        {
+          "id": "block_end",
+          "value": 4100,
+          "support": {
+            "artifact": "cfg.json",
+            "pointer": "/basic_blocks/0/end"
+          }
+        },
+        {
+          "id": "terminal_successors",
+          "value": [],
+          "support": {
+            "artifact": "cfg.json",
+            "pointer": "/basic_blocks/0/successors"
+          }
+        }
+      ],
+      "boundaries": [
+        "static_only",
+        "selected_scope"
+      ]
+    },
+    {
+      "id": "unfamiliar_parameters",
+      "phase": "cold",
+      "prompt": "Discover which IL level parameter is required without analyzing the input.",
+      "fixture": "cli_help",
+      "reference_plan": [
+        "dump-il --help"
+      ],
+      "facts": [
+        {
+          "id": "required_level",
+          "value": true,
+          "support": {
+            "artifact": "help.json",
+            "pointer": "/required_level"
+          }
+        }
+      ],
+      "boundaries": [
+        "help_is_not_analysis"
+      ]
+    },
+    {
+      "id": "known_function",
+      "phase": "cold",
+      "prompt": "Inspect the known function at VA 0x1000 directly.",
+      "fixture": "raw_ret",
+      "reference_plan": [
+        "function ret.bin --raw-shellcode --arch x86-64 --base-address 0x1000 --addr 0x1000 --format json"
+      ],
+      "facts": [
+        {
+          "id": "selected_address",
+          "value": 4096,
+          "support": {
+            "artifact": "function.json",
+            "pointer": "/function/address"
+          }
+        },
+        {
+          "id": "terminal_instruction",
+          "value": "ret",
+          "support": {
+            "artifact": "function.json",
+            "pointer": "/function/instructions/3/mnemonic"
+          }
+        }
+      ],
+      "boundaries": [
+        "static_only",
+        "selected_scope"
+      ]
+    },
+    {
+      "id": "large_artifact",
+      "phase": "retained",
+      "prompt": "Recover the entire synthetic large string and unfamiliar object keys exactly.",
+      "fixture": "retained",
+      "reference_plan": [
+        "read_result.py large.json --pointer /function/pseudo --mode string (hash-bound continuation)",
+        "read_result.py large.json --pointer /metadata/language --mode keys"
+      ],
+      "facts": [
+        {
+          "id": "pseudo",
+          "value": {
+            "repeat": "A雪\\\"\n",
+            "count": 6000
+          },
+          "support": {
+            "artifact": "recovered.json",
+            "pointer": "/pseudo"
+          },
+          "value_encoding": "repeat"
+        },
+        {
+          "id": "keys",
+          "value": [
+            "go",
+            "rust",
+            "c",
+            "unknown",
+            "~/",
+            "empty"
+          ],
+          "support": {
+            "artifact": "recovered.json",
+            "pointer": "/keys"
+          }
+        }
+      ],
+      "boundaries": [
+        "synthetic_not_semantics",
+        "partial_analysis"
+      ]
+    },
+    {
+      "id": "absent_vs_unknown",
+      "phase": "retained",
+      "prompt": "Distinguish a complete empty inventory from an incomplete empty inventory.",
+      "fixture": "retained",
+      "reference_plan": [
+        "read_result.py knowledge.json --pointer /complete",
+        "read_result.py knowledge.json --pointer /partial"
+      ],
+      "facts": [
+        {
+          "id": "complete_entries",
+          "value": [],
+          "support": {
+            "artifact": "knowledge.json",
+            "pointer": "/complete/entries"
+          }
+        },
+        {
+          "id": "complete_coverage",
+          "value": true,
+          "support": {
+            "artifact": "knowledge.json",
+            "pointer": "/complete/completion"
+          }
+        },
+        {
+          "id": "partial_entries",
+          "value": [],
+          "support": {
+            "artifact": "knowledge.json",
+            "pointer": "/partial/entries"
+          }
+        },
+        {
+          "id": "partial_coverage",
+          "value": false,
+          "support": {
+            "artifact": "knowledge.json",
+            "pointer": "/partial/completion"
+          }
+        }
+      ],
+      "boundaries": [
+        "complete_inventory_absent",
+        "partial_inventory_unknown",
+        "synthetic_not_semantics"
+      ]
+    },
+    {
+      "id": "existing_result",
+      "phase": "retained",
+      "prompt": "Read the retained selected address without running analysis again.",
+      "fixture": "retained",
+      "reference_plan": [
+        "read_result.py existing.json --pointer /function/address"
+      ],
+      "facts": [
+        {
+          "id": "selected_address",
+          "value": 4096,
+          "support": {
+            "artifact": "existing.json",
+            "pointer": "/function/address"
+          }
+        }
+      ],
+      "boundaries": [
+        "synthetic_not_semantics",
+        "selected_scope",
+        "no_reanalysis"
+      ]
+    },
+    {
+      "id": "corrupted_artifact",
+      "phase": "retained",
+      "prompt": "Stop after one attempt to read corrupted JSON; do not reanalyze or treat it as evidence.",
+      "fixture": "corrupt",
+      "reference_plan": [
+        "read_result.py corrupt.json --pointer /function/address"
+      ],
+      "facts": [
+        {
+          "id": "stopped",
+          "value": true,
+          "support": {
+            "artifact": "stop.json",
+            "pointer": "/stopped"
+          }
+        },
+        {
+          "id": "reason",
+          "value": "invalid_json_or_structure",
+          "support": {
+            "artifact": "stop.json",
+            "pointer": "/reason"
+          }
+        }
+      ],
+      "boundaries": [
+        "corrupt_not_evidence",
+        "no_reanalysis"
+      ]
+    }
+  ]
+}
