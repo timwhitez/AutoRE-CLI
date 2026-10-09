@@ -43,3 +43,9 @@ the complete 16 KiB envelope including newline. The blocked-task cases use
 synthetic data matching controlled static-analysis artifact shapes; generated
 analysis results and target binaries are not packaged. Direct host reads of a
 verified original artifact remain valid. Views cannot be action-runner roots.
+
+Request identity tests pin the CLI 0.1.10 command contract and option arities in
+`fixtures/cli_identity_0_1_10.json`. The table covers all subcommands, including
+explicit exclusions; unknown versions yield `unsupported_command`. This tests
+identity coverage, independently of execution admission. Source tests compare
+the fixture with the actual Clap model; public tests need no Rust toolchain.

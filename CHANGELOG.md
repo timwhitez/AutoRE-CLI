@@ -6,6 +6,10 @@ All notable changes to the public AutoRE-CLI distribution are recorded here.
 
 - Add optional bounded object-key and exact Unicode string recovery views to the
   Agent Skill reader; preserve default v1 output and hash-bound boundaries.
+- Fix Skill request-identity coverage with an explicit CLI 0.1.10 command/argv
+  contract, option-aware input discovery and release drift tests. Preserve
+  execution admission and exact argument order; unaudited versions and excluded
+  multi-input/batch/archive requests remain explicitly unavailable.
 
 ## [0.1.9] - 2026-10-01
 
