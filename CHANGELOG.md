@@ -8,6 +8,8 @@ All notable changes to the public AutoRE-CLI distribution are recorded here.
   evidence to its command, and reject hybrid/control JSON before action selection.
   Preserve labels and process receipts; no producer or release is enabled.
 
+- Add optional bounded object-key and exact Unicode string recovery views to the
+  Agent Skill reader; preserve default v1 output and hash-bound boundaries.
 - Fix Skill request-identity coverage with an explicit CLI 0.1.10 command/argv
   contract, option-aware input discovery and release drift tests. Preserve
   execution admission and exact argument order; unaudited versions and excluded

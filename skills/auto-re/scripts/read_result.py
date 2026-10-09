@@ -219,25 +219,124 @@ def build_view(document, source, pointer, tokens, offset, limit):
     return encoded
 
 
+def _value_type(value):
+    return ('null' if value is None else 'object' if isinstance(value, dict)
+            else 'array' if isinstance(value, list) else 'boolean' if isinstance(value, bool)
+            else 'string' if isinstance(value, str) else 'number')
+
+
+def build_recovery_view(document, source, pointer, tokens, mode, position, limit):
+    if position < 0 or not 1 <= limit <= (256 if mode == 'keys' else 4096):
+        raise ViewError('invalid_pagination')
+    value, boundaries = select_value(document, tokens)
+    if not isinstance(value, dict if mode == 'keys' else str):
+        raise ViewError('mode_type_mismatch')
+    total = len(value)
+    if position > total:
+        raise ViewError('offset_out_of_range')
+    selection = {'pointer': pointer, 'mode': mode, 'value_type': _value_type(value),
+                 'has_more': False}
+    if mode == 'keys':
+        selection.update(offset=position, limit=limit, total_items=total, returned_items=0)
+        next_field = 'next_offset'
+    else:
+        selection.update(start=position, length=limit, end=position, total_length=total)
+        next_field = 'next_start'
+    result = {'ok': True, 'kind': 'auto_re_artifact_view', 'view_schema_version': 2,
+              'source': source, 'selection': selection, 'source_boundaries': boundaries,
+              'boundary_capture_complete': True, 'analysis_completeness': 'not_evaluated',
+              'data': [] if mode == 'keys' else ''}
+    encoded = _encoded(result)
+    if len(encoded) > MAX_OUTPUT_BYTES:
+        raise ViewError('boundary_too_large')
+    if position == total:
+        return encoded
+
+    def advance(end):
+        selection['has_more'] = end < total
+        if end < total:
+            selection[next_field] = end
+        else:
+            selection.pop(next_field, None)
+        if mode == 'keys':
+            selection['returned_items'] = end - position
+        else:
+            selection['end'] = end
+            result['data'] = value[position:end]
+        return _encoded(result)
+
+    end = min(total, position + limit)
+    if mode == 'string':
+        candidate = advance(end)
+        if len(candidate) <= MAX_OUTPUT_BYTES:
+            return candidate
+        # Test the terminal candidate first: removing continuation metadata can
+        # make it smaller than a preceding fragment. Interior sizes are monotone.
+        low, high, encoded = position + 1, end - 1, None
+        while low <= high:
+            middle = (low + high) // 2
+            candidate = advance(middle)
+            if len(candidate) <= MAX_OUTPUT_BYTES:
+                encoded = candidate
+                low = middle + 1
+            else:
+                high = middle - 1
+        if encoded is None:
+            raise ViewError('value_too_large')
+        return encoded
+
+    encoded = None
+    for index, name in enumerate(list(value)[position:end], position):
+        child = pointer + '/' + name.replace('~', '~0').replace('/', '~1')
+        if len(child.encode('utf-8')) > 1024:
+            if encoded is None:
+                raise ViewError('value_too_large')
+            return encoded
+        result['data'].append({'name': name, 'value_type': _value_type(value[name]), 'pointer': child})
+        candidate = advance(index + 1)
+        if len(candidate) > MAX_OUTPUT_BYTES:
+            if encoded is None:
+                raise ViewError('value_too_large')
+            return encoded
+        encoded = candidate
+    return encoded
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('path', type=pathlib.Path)
     parser.add_argument('--pointer', required=True, help='RFC 6901 string pointer; empty string selects root')
-    parser.add_argument('--offset', type=int, default=0)
-    parser.add_argument('--limit', type=int, default=DEFAULT_LIMIT)
+    parser.add_argument('--mode', choices=('value', 'keys', 'string'), default='value')
+    parser.add_argument('--offset', type=int)
+    parser.add_argument('--limit', type=int)
+    parser.add_argument('--start', type=int)
+    parser.add_argument('--length', type=int)
     parser.add_argument('--expected-sha256')
     args = parser.parse_args()
     try:
         tokens = pointer_tokens(args.pointer)
-        if args.offset > 0 and args.expected_sha256 is None:
+        if ((args.mode == 'string' and (args.offset is not None or args.limit is not None))
+                or (args.mode != 'string' and (args.start is not None or args.length is not None))):
+            raise ViewError('invalid_pagination')
+        if args.mode == 'string':
+            position = args.start if args.start is not None else 0
+            limit = args.length if args.length is not None else 1024
+        else:
+            position = args.offset if args.offset is not None else 0
+            limit = args.limit if args.limit is not None else DEFAULT_LIMIT
+        if position > 0 and args.expected_sha256 is None:
             raise ViewError('expected_sha256_required')
-        if args.offset < 0 or not 1 <= args.limit <= 256:
+        if position < 0 or not 1 <= limit <= (4096 if args.mode == 'string' else 256):
             raise ViewError('invalid_pagination')
         document, source = read_source(args.path, args.expected_sha256)
-        sys.stdout.buffer.write(build_view(document, source, args.pointer, tokens, args.offset, args.limit))
+        if args.mode == 'value':
+            encoded = build_view(document, source, args.pointer, tokens, position, limit)
+        else:
+            encoded = build_recovery_view(document, source, args.pointer, tokens, args.mode, position, limit)
+        sys.stdout.buffer.write(encoded)
     except ViewError as error:
         # Domain diagnostics never echo unbounded parser errors or source content.
-        diagnostic = {'ok': False, 'kind': 'auto_re_artifact_view', 'view_schema_version': 1,
+        diagnostic = {'ok': False, 'kind': 'auto_re_artifact_view', 'view_schema_version': 1 if args.mode == 'value' else 2,
                       'error': str(error), 'pointer': args.pointer[:128]}
         sys.stderr.write(json.dumps(diagnostic, ensure_ascii=True, separators=(',', ':')) + '\n')
         return 1
