@@ -112,8 +112,12 @@ creation packages supplied JSON; it does not rerun or authenticate analysis,
 collect external bundle/spill members, or prove the recorded command produced it.
 Use the existing bundle/spill verifier separately for required external members.
 
-Replay and bounded reads perform no new analysis and produce no new analysis
-execution receipt. They are explicit artifact operations with checked destinations;
+Replay exposes the retained analysis and creates no new analysis execution
+receipt. The regression changes the original and contained inputs to a different
+valid controlled fixture, then removes them, and checks byte-equal frozen replay
+rendering, unchanged archive bytes and bounded evidence. It counts top-level
+analyzer launches by the harness; internal shipped-binary invocation counts are
+NOT_VERIFIED. These are explicit artifact operations with checked destinations;
 do not treat them as a successful duplicate execution or silently satisfy a new
 analysis output sink. Identical completed execution still stops with `no_progress`.
 The only existing duplicate exception remains a recorded timeout with a reaped
