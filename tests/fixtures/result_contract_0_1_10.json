@@ -11,7 +11,7 @@
       "sha256": "066dbad14e3489213ebfddca55e94bb7fe38b9eb3b85d96c12c623fd091a631a"
     }
   },
-  "c0_p1": "UNSUPPORTED, fail closed; proposed kinds reach unsupported Auto-RE manifest identity; no P1 producer exists",
+  "c0_p1": "UNSUPPORTED, fail closed; producer-verified kinds reach unsupported Auto-RE manifest identity; no released P1 producer",
   "cases": [
     {
       "id": "function-0",
@@ -281,7 +281,7 @@
       "id": "function-0-kinds-v1",
       "command": "function",
       "label": "wrapper:function",
-      "provenance": "P1 spec-derived; no P1 producer exists",
+      "provenance": "P1 producer-verified source checkout DTO; public CLI 0.1.10 lacks selector",
       "derived_from": "function-0",
       "result": {
         "schema_version": "0.1.0",
@@ -574,7 +574,7 @@
       "id": "dump-cfg-1-kinds-v1",
       "command": "dump-cfg",
       "label": "wrapper:cfg",
-      "provenance": "P1 spec-derived; no P1 producer exists",
+      "provenance": "P1 producer-verified source checkout DTO; public CLI 0.1.10 lacks selector",
       "derived_from": "dump-cfg-1",
       "result": {
         "schema_version": "0.1.0",
@@ -787,7 +787,7 @@
       "id": "slice-function-2-kinds-v1",
       "command": "slice-function",
       "label": "wrapper:slice_function",
-      "provenance": "P1 spec-derived; no P1 producer exists",
+      "provenance": "P1 producer-verified source checkout DTO; public CLI 0.1.10 lacks selector",
       "derived_from": "slice-function-2",
       "result": {
         "schema_version": "0.1.0",
@@ -1105,7 +1105,7 @@
       "id": "slice-function-3-kinds-v1",
       "command": "slice-function",
       "label": "wrapper:slice_function",
-      "provenance": "P1 spec-derived; no P1 producer exists",
+      "provenance": "P1 producer-verified source checkout DTO; public CLI 0.1.10 lacks selector",
       "derived_from": "slice-function-3",
       "result": {
         "schema_version": "0.1.0",
@@ -1312,7 +1312,7 @@
       "id": "inspect-flow-4-kinds-v1",
       "command": "inspect-flow",
       "label": "wrapper:flow_graph",
-      "provenance": "P1 spec-derived; no P1 producer exists",
+      "provenance": "P1 producer-verified source checkout DTO; public CLI 0.1.10 lacks selector",
       "derived_from": "inspect-flow-4",
       "result": {
         "schema_version": "0.1.0",
@@ -1436,7 +1436,7 @@
       "id": "dump-il-5-kinds-v1",
       "command": "dump-il",
       "label": "wrapper:function",
-      "provenance": "P1 spec-derived; no P1 producer exists",
+      "provenance": "P1 producer-verified source checkout DTO; public CLI 0.1.10 lacks selector",
       "derived_from": "dump-il-5",
       "result": {
         "schema_version": "0.1.0",
@@ -1542,7 +1542,7 @@
       "id": "dump-il-6-kinds-v1",
       "command": "dump-il",
       "label": "wrapper:function",
-      "provenance": "P1 spec-derived; no P1 producer exists",
+      "provenance": "P1 producer-verified source checkout DTO; public CLI 0.1.10 lacks selector",
       "derived_from": "dump-il-6",
       "result": {
         "schema_version": "0.1.0",
@@ -1641,7 +1641,7 @@
       "id": "dump-il-7-kinds-v1",
       "command": "dump-il",
       "label": "wrapper:function",
-      "provenance": "P1 spec-derived; no P1 producer exists",
+      "provenance": "P1 producer-verified source checkout DTO; public CLI 0.1.10 lacks selector",
       "derived_from": "dump-il-7",
       "result": {
         "schema_version": "0.1.0",
@@ -28507,7 +28507,7 @@
       "id": "dump-il-8-kinds-v1",
       "command": "dump-il",
       "label": "wrapper:function",
-      "provenance": "P1 spec-derived; no P1 producer exists",
+      "provenance": "P1 producer-verified source checkout DTO; public CLI 0.1.10 lacks selector",
       "derived_from": "dump-il-8",
       "result": {
         "schema_version": "0.1.0",
@@ -55486,7 +55486,7 @@
       "id": "inspect-passes-9-kinds-v1",
       "command": "inspect-passes",
       "label": "wrapper:function",
-      "provenance": "P1 spec-derived; no P1 producer exists",
+      "provenance": "P1 producer-verified source checkout DTO; public CLI 0.1.10 lacks selector",
       "derived_from": "inspect-passes-9",
       "result": {
         "schema_version": "0.1.0",
@@ -55807,7 +55807,7 @@
       "id": "decompile-10-kinds-v1",
       "command": "decompile",
       "label": "profile:ai",
-      "provenance": "P1 spec-derived; no P1 producer exists",
+      "provenance": "P1 producer-verified source checkout DTO; public CLI 0.1.10 lacks selector",
       "derived_from": "decompile-10",
       "result": {
         "schema_version": "0.1.0",
@@ -56407,7 +56407,7 @@
       "id": "report-11-kinds-v1",
       "command": "report",
       "label": "profile:ai",
-      "provenance": "P1 spec-derived; no P1 producer exists",
+      "provenance": "P1 producer-verified source checkout DTO; public CLI 0.1.10 lacks selector",
       "derived_from": "report-11",
       "result": {
         "schema_version": "0.1.0",
@@ -56973,7 +56973,7 @@
       "id": "report-12-kinds-v1",
       "command": "report",
       "label": "profile:ai",
-      "provenance": "P1 spec-derived; no P1 producer exists",
+      "provenance": "P1 producer-verified source checkout DTO; public CLI 0.1.10 lacks selector",
       "derived_from": "report-12",
       "result": {
         "schema_version": "0.1.0",
@@ -57192,7 +57192,7 @@
       "id": "report-13-kinds-v1",
       "command": "report",
       "label": "profile:ai",
-      "provenance": "P1 spec-derived; no P1 producer exists",
+      "provenance": "P1 producer-verified source checkout DTO; public CLI 0.1.10 lacks selector",
       "derived_from": "report-13",
       "result": {
         "schema_version": "0.1.0",
@@ -57400,7 +57400,7 @@
       "id": "report-14-kinds-v1",
       "command": "report",
       "label": "profile:ai",
-      "provenance": "P1 spec-derived; no P1 producer exists",
+      "provenance": "P1 producer-verified source checkout DTO; public CLI 0.1.10 lacks selector",
       "derived_from": "report-14",
       "result": {
         "schema_version": "0.1.0",
@@ -57611,7 +57611,7 @@
       "id": "report-15-kinds-v1",
       "command": "report",
       "label": "profile:ai",
-      "provenance": "P1 spec-derived; no P1 producer exists",
+      "provenance": "P1 producer-verified source checkout DTO; public CLI 0.1.10 lacks selector",
       "derived_from": "report-15",
       "result": {
         "schema_version": "0.1.0",
@@ -57946,7 +57946,7 @@
       "id": "report-16-kinds-v1",
       "command": "report",
       "label": "profile:ai",
-      "provenance": "P1 spec-derived; no P1 producer exists",
+      "provenance": "P1 producer-verified source checkout DTO; public CLI 0.1.10 lacks selector",
       "derived_from": "report-16",
       "result": {
         "schema_version": "0.1.0",
@@ -58405,7 +58405,7 @@
       "id": "report-17-kinds-v1",
       "command": "report",
       "label": "profile:ai",
-      "provenance": "P1 spec-derived; no P1 producer exists",
+      "provenance": "P1 producer-verified source checkout DTO; public CLI 0.1.10 lacks selector",
       "derived_from": "report-17",
       "result": {
         "schema_version": "0.1.0",
