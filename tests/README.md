@@ -36,6 +36,14 @@ archives and checksums are staged before the completed directory is published.
 Trusted parents are required; these checks do not provide a sandbox against
 hostile concurrent directory mutation.
 
+Reader recovery tests preserve all v1 cases and exercise v2 `keys`/`string`
+pages: document-order keys and escaped pointer round-trips, exact Unicode
+scalar reconstruction, hash-bound continuation, explicit typed failures, and
+the complete 16 KiB envelope including newline. The blocked-task cases use
+synthetic data matching controlled static-analysis artifact shapes; generated
+analysis results and target binaries are not packaged. Direct host reads of a
+verified original artifact remain valid. Views cannot be action-runner roots.
+
 Request identity tests pin the CLI 0.1.10 command contract and option arities in
 `fixtures/cli_identity_0_1_10.json`. The table covers all subcommands, including
 explicit exclusions; unknown versions yield `unsupported_command`. This tests
