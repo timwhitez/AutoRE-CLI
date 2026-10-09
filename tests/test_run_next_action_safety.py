@@ -51,7 +51,7 @@ class RunNextActionSafetyTests(unittest.TestCase):
         result.write_text(json.dumps({
             "schema_version": "0.1.0",
             "display_name": "controlled",
-            "function": {},
+            "function": {}, "static_byte_evidence": {},
             "next_actions": [{
                 "stage": "function.selected",
                 "reason": "controlled safety regression",
@@ -171,6 +171,7 @@ class RunNextActionSafetyTests(unittest.TestCase):
                 runner.validate_result_contract({
                     "schema_version": "0.1.0", "owner": "auto-re-cli",
                     "kind": kind, "files": [],
+                    **({"profile": "ai"} if kind == "context_bundle" else {}),
                 })
 
     def test_supported_manifest_kinds_remain_accepted(self) -> None:
@@ -179,6 +180,7 @@ class RunNextActionSafetyTests(unittest.TestCase):
                 self.assertEqual(runner.validate_result_contract({
                     "schema_version": "0.1.0", "owner": "auto-re-cli",
                     "kind": kind, "files": [],
+                    **({"profile": "ai"} if kind == "context_bundle" else {}),
                 }), f"manifest:{kind}")
 
     def test_cli_malformed_kind_returns_json_not_traceback(self) -> None:
