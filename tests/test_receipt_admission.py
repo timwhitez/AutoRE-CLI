@@ -171,7 +171,7 @@ class ReceiptAdmissionTests(unittest.TestCase):
                     action[field] = "A" * 70000
                     parent = root / "parent.json"
                     parent.write_text(json.dumps({"schema_version": "0.1.0", "profile": "ai",
-                        "binary": {}, "summary": {}, "next_actions": [action]}))
+                        "flat": False, "inspections": {}, "recovered_types": [], "functions": [], "binary": {}, "summary": {}, "next_actions": [action]}))
                     args = argparse.Namespace(result=parent, action_stage=action["stage"],
                         output=root / "analysis.json", receipt=root / "receipt.json",
                         prior_receipt=None, timeout_seconds=900, dry_run=dry_run)
@@ -190,7 +190,7 @@ class ReceiptAdmissionTests(unittest.TestCase):
             root = Path(directory)
             parent = root / "parent.json"
             parent.write_text(json.dumps({"schema_version": "0.1.0", "profile": "ai",
-                "binary": {}, "summary": {}, "next_actions": [{"stage": "next", "reason": "A" * 70000,
+                "flat": False, "inspections": {}, "recovered_types": [], "functions": [], "binary": {}, "summary": {}, "next_actions": [{"stage": "next", "reason": "A" * 70000,
                 "expected_output": "JSON", "stop_condition": "one run",
                 "argv": ["auto-re-cli", "report", "missing"]}]}))
             args = argparse.Namespace(result=parent, action_stage="next", output=root / "analysis.json",

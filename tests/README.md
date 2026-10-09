@@ -41,3 +41,11 @@ Request identity tests pin the CLI 0.1.10 command contract and option arities in
 explicit exclusions; unknown versions yield `unsupported_command`. This tests
 identity coverage, independently of execution admission. Source tests compare
 the fixture with the actual Clap model; public tests need no Rust toolchain.
+
+Result admission fixtures in `fixtures/result_contract_0_1_10.json` contain real
+static CLI 0.1.10 DTOs from inert controlled inputs, with binary/input/stdout
+digests and exact argv. Proposed kinds are explicitly spec-derived by adding
+only `kind`; no new producer exists. The suite checks P0/C1 and spec-derived
+P1/C1, mutations, passive additive evidence and command-bound first evidence.
+C0/P1 selected forms are unsupported and fail closed. Installed release pairs
+remain NOT_VERIFIED; checkout tests do not certify an upgrade.

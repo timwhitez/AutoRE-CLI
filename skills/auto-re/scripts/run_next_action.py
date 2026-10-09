@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import math
 import os
 import pathlib
 import re
@@ -342,6 +343,8 @@ def _read_bounded_control_bytes(
 
 
 def _utf8_length(value: str) -> int:
+    if any(0xD800 <= code <= 0xDFFF for code in map(ord, value)):
+        raise ActionError("invalid_result_boundary: unpaired JSON surrogate")
     return sum(
         1 if code <= 0x7F else 2 if code <= 0x7FF else 3 if code <= 0xFFFF else 4
         for code in map(ord, value)
@@ -368,6 +371,8 @@ def _validate_json_shape(value: Any, policy: ControlJsonPolicy) -> None:
                 raise _control_file_structure_limit(
                     policy, "string_bytes", policy.max_string_bytes, length
                 )
+        elif isinstance(current, float) and not math.isfinite(current):
+            raise ActionError("invalid_result_boundary: non-finite JSON number")
         elif isinstance(current, list):
             if len(current) > policy.max_container_entries:
                 raise _control_file_structure_limit(
@@ -399,6 +404,15 @@ def _validate_json_shape(value: Any, policy: ControlJsonPolicy) -> None:
                 stack.append((child, depth + 1))
 
 
+def _unique_json_members(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, child in pairs:
+        if key in value:
+            raise ActionError("invalid_result_boundary: duplicate JSON member")
+        value[key] = child
+    return value
+
+
 def load_json_object(
     path: pathlib.Path,
     *,
@@ -411,18 +425,20 @@ def load_json_object(
                 raise _control_file_too_large(policy, opened_size)
             data = _read_bounded_control_bytes(handle, policy)
         try:
-            value = json.loads(data.decode("utf-8"))
+            value = json.loads(data.decode("utf-8"), object_pairs_hook=_unique_json_members)
         except RecursionError as error:
             raise _control_file_structure_limit(policy, "depth", policy.max_depth, policy.max_depth + 1) from error
+        except ActionError:
+            raise
         except ValueError as error:
-            raise ActionError(f"cannot read result JSON: {str(error)[:512]}") from error
+            raise ActionError(f"invalid_result_boundary: cannot read result JSON: {str(error)[:512]}") from error
     except ActionError:
         raise
     except (OSError, UnicodeDecodeError, json.JSONDecodeError, RecursionError) as error:
-        raise ActionError(f"cannot read result JSON: {error}") from error
+        raise ActionError(f"invalid_result_boundary: cannot read result JSON: {error}") from error
     _validate_json_shape(value, policy)
     if not isinstance(value, dict):
-        raise ActionError("result JSON root must be an object")
+        raise ActionError("invalid_result_boundary: result JSON root must be an object")
     return value
 
 
@@ -430,114 +446,223 @@ def _matches_shape(result: dict[str, Any], shape: dict[str, type]) -> bool:
     return all(isinstance(result.get(field), expected) for field, expected in shape.items())
 
 
-def validate_result_contract(result: dict[str, Any]) -> str:
+# Admission freezes root DTO fields, not nested evidence semantics. Unknown
+# evidence stays passive; only reviewed controls can select actions/authority.
+_FUNCTION_META = {"go_compiler_function": dict, "rust_symbol_name_hint": str,
+                  "rust_source_context": dict, "slice_budget": dict, "next_actions": list}
+_IDENTITY = {"display_name": str, "function": dict}
+_NULL_OBJECT = (dict, type(None))
+_NULL_ARRAY = (list, type(None))
+_RESULT_FIELDS = {
+    "function_detail": ({**_IDENTITY, "static_byte_evidence": dict},
+                        {**_FUNCTION_META, "inferred_role": dict}),
+    "function_cfg": ({**_IDENTITY, "basic_blocks": list}, _FUNCTION_META),
+    "function_slice": ({**_IDENTITY, "slice_size": int, "slice": dict,
+        "semantic_summary": dict, "block_summaries": list, "instructions": list,
+        "mlil": list, "hlil_flat": list, "pseudo_function_flat": str, "pseudo_flat": str},
+        {**{k: v for k, v in _FUNCTION_META.items() if k != "slice_budget"},
+         "inferred_role": dict, "warnings": list}),
+    "function_flow_graph": ({"root": dict, "summary": dict, "nodes": list,
+                             "edges": list, "warnings": list}, {"next_actions": list}),
+    "function_il": ({**_IDENTITY, "level": str}, {**_FUNCTION_META, "inferred_role": dict}),
+    "function_passes": ({**_IDENTITY, "hlil_passes": list, "render_passes": list}, _FUNCTION_META),
+    "decompile_ai": ({"flat": bool, "binary": dict, "inspections": dict,
+        "summary": dict, "recovered_types": list, "functions": list}, {"next_actions": list}),
+    "report_ai": ({"sections": list, "binary": _NULL_OBJECT, "inspections": _NULL_OBJECT,
+        "summary": _NULL_OBJECT, "flow": _NULL_OBJECT, "recovered_types": _NULL_ARRAY,
+        "functions": _NULL_ARRAY, "protection_playbook_count": int, "protection_playbooks": list},
+        {"global_string_samples": list, "current_findings": list, "next_actions": list}),
+    "inspect-go": ({"binary": dict, "language": dict, "go": _NULL_OBJECT,
+                    "warnings": list}, {"next_actions": list}),
+    "inspect-rust": ({"binary": dict, "language": dict, "rust": _NULL_OBJECT,
+                      "warnings": list}, {"next_actions": list}),
+    "inspect-die": ({"file": dict, "fingerprint": dict, "language": dict,
+        "protections": list, "normalizations": list, "summary": dict,
+        "flow_root": _NULL_OBJECT, "recovered_types": list, "interesting_functions": list,
+        "warnings": list}, {"package": dict, "global_string_samples": list, "next_actions": list}),
+    "upx": ({"inspection": _NULL_OBJECT, "next_actions": list, "warnings": list}, {}),
+    "vm_protect": ({"inspection": _NULL_OBJECT, "next_actions": list, "warnings": list}, {}),
+    "pe_resources": ({"input": dict, "budget": dict, "summary": dict, "records": list,
+        "stop_reasons": list, "next_actions": list, "warnings": list}, {}),
+    "pe_strings": ({"input": dict, "budget": dict, "summary": dict, "records": list,
+        "stop_reasons": list, "next_actions": list, "warnings": list}, {}),
+    "call_graph": ({"root": dict, "budget": dict, "summary": dict, "nodes": list,
+                    "edges": list}, {"stop_reasons": list, "next_actions": list, "warnings": list}),
+    "data_xrefs": ({"direction": str, "selector": dict, "budget": dict, "summary": dict,
+        "records": list, "stop_reasons": list, "next_actions": list, "warnings": list}, {}),
+    "context_bundle": ({"files": list}, {"next_actions": list}),
+    "agent_spill_manifest": ({"files": list}, {"next_actions": list}),
+}
+_IL_PAGING = {"statement_limit": int, "statement_contains": str, "statement_address": int,
+    "statement_contains_search_offset": int, "statement_address_search_offset": int,
+    "next_statement_offset": int, "next_statement_contains_offset": int}
+_IL_FIELDS = {
+    "llil": ({"instructions": list}, {}), "mlil": ({"instructions": list}, {}),
+    "hlil": ({"flat": bool, "statements": list}, {}),
+    "custom": ({"summary": dict, "semantic_ast": dict, "statement_offset": int,
+                "statements_truncated": bool, "statements": list}, _IL_PAGING),
+}
+_RESULT_COMMANDS = {
+    "function_detail": "function", "function_cfg": "dump-cfg",
+    "function_slice": "slice-function", "function_flow_graph": "inspect-flow",
+    "function_il": "dump-il", "function_passes": "inspect-passes",
+    "decompile_ai": "decompile", "report_ai": "report",
+    "upx": "inspect-upx", "vm_protect": "inspect-vmp",
+    "pe_resources": "pe-resources", "pe_strings": "pe-strings",
+    "call_graph": "call-graph", "data_xrefs": "data-xrefs",
+}
+_RESULT_LABELS = {"function_detail": "wrapper:function", "function_cfg": "wrapper:cfg",
+    "function_slice": "wrapper:slice_function", "function_flow_graph": "wrapper:flow_graph",
+    "function_il": "wrapper:function", "function_passes": "wrapper:function",
+    "call_graph": "wrapper:call_graph", "data_xrefs": "wrapper:data_xrefs"}
+_SELECTED_KINDS = frozenset(_RESULT_COMMANDS) - {
+    "upx", "vm_protect", "pe_resources", "pe_strings", "call_graph", "data_xrefs"}
+_LEGACY_SIGNALS = {
+    "function_detail": {"static_byte_evidence"}, "function_cfg": {"basic_blocks"},
+    "function_slice": {"slice", "slice_size"}, "function_flow_graph": {"root", "nodes", "edges"},
+    "function_il": {"level"}, "function_passes": {"hlil_passes", "render_passes"},
+    "decompile_ai": {"flat"}, "report_ai": {"sections"}, "inspect-go": {"go"},
+    "inspect-rust": {"rust"}, "inspect-die": {"file", "fingerprint"},
+}
+_KNOWN_RESULT_FIELDS = set().union(*(set(req) | set(opt) for req, opt in _RESULT_FIELDS.values()),
+    *(set(req) | set(opt) for req, opt in _IL_FIELDS.values()))
+
+
+def _validate_result_actions(result: dict[str, Any], family: str) -> None:
+    if "next_actions" not in result:
+        return
+    actions = result["next_actions"]
+    if family == "data_xrefs":
+        try:
+            _data_xref_actions(actions)
+        except ActionError as error:
+            raise ActionError("invalid_result_boundary: " + str(error)) from error
+        return
+    if family in {"pe_resources", "pe_strings"}:
+        actions = _pe_actions(actions, family)
+    stages = set()
+    for row in actions:
+        if (not isinstance(row, dict)
+                or any(not isinstance(row.get(field), str) or not row[field].strip()
+                       for field in ("stage", "reason", "expected_output", "stop_condition"))
+                or not isinstance(row.get("argv"), list)
+                or any(not isinstance(arg, str) for arg in row["argv"])):
+            raise ActionError("invalid_result_boundary: invalid next action stage or controls")
+        if row["stage"] in stages:
+            raise ActionError("invalid_result_boundary: duplicate next action stage")
+        stages.add(row["stage"])
+
+
+def _pe_actions(actions: list[Any], family: str) -> list[dict[str, Any]]:
+    normalized = []
+    for row in actions:
+        if isinstance(row, dict) and "stage" not in row:
+            argv = row.get("argv")
+            if (row.get("reason") != "record_limit" or not isinstance(argv, list)
+                    or not argv or argv[0] != _RESULT_COMMANDS[family]):
+                raise ActionError("invalid_result_boundary: invalid PE legacy action")
+            row = {**row, "stage": family + ".page"}
+        normalized.append(row)
+    return normalized
+
+
+def validate_result_contract(result: dict[str, Any], *, command: str | None = None) -> str:
     schema_version = result.get("schema_version")
     if not isinstance(schema_version, str) or schema_version not in SUPPORTED_SCHEMA_VERSIONS:
-        supported = ", ".join(sorted(SUPPORTED_SCHEMA_VERSIONS))
-        raise ActionError(
-            f"unsupported result schema_version {schema_version!r}; supported: {supported}"
-        )
-
-    owner = result.get("owner")
-    kind = result.get("kind")
-    if kind == "call_graph" and owner is None:
-        profile = result.get("profile")
-        if not isinstance(profile, str) or profile not in {"ai", "full"}:
-            raise ActionError("invalid call_graph.profile: expected ai or full")
-        if not _matches_shape(result, {"root": dict, "budget": dict, "summary": dict, "nodes": list, "edges": list}):
-            raise ActionError("invalid call_graph wrapper")
-        return "wrapper:call_graph"
-    if kind == "data_xrefs" and owner is None:
-        profile = result.get("profile")
-        if not isinstance(profile, str) or profile not in {"ai", "full"}:
-            raise ActionError("invalid data_xrefs.profile: expected ai or full")
+        raise ActionError(f"unsupported_result_version: unsupported result schema_version {schema_version!r}")
+    explicit = "kind" in result
+    if explicit:
+        kind = result["kind"]
+        if not isinstance(kind, str) or kind not in _SELECTED_KINDS | {
+                "call_graph", "data_xrefs", "upx", "vm_protect", "pe_resources", "pe_strings",
+                *SUPPORTED_MANIFEST_KINDS}:
+            raise ActionError(f"unsupported_result_kind: {kind!r}")
+        family = kind
+    else:
+        candidates = [family for family, fields in _LEGACY_SIGNALS.items() if fields & result.keys()
+                      and not (family == "decompile_ai" and "level" in result)]
+        if len(candidates) > 1:
+            raise ActionError("ambiguous_legacy_result: conflicting family discriminators")
+        if not candidates:
+            raise ActionError("invalid_result_fields: result is not a supported Auto-RE wrapper")
+        family = candidates[0]
+    manifest = family in SUPPORTED_MANIFEST_KINDS
+    if (manifest and result.get("owner") != "auto-re-cli") or (not manifest and "owner" in result):
+        raise ActionError("invalid_result_boundary: invalid result owner")
+    expected_profile = ({"ai", "full"} if family in {"call_graph", "data_xrefs"} else
+                        {"ai"} if family in {"decompile_ai", "report_ai", "inspect-go", "inspect-rust",
+                            "inspect-die", "upx", "vm_protect", "pe_resources", "pe_strings", "context_bundle"}
+                        else None)
+    profile = result.get("profile")
+    if ((expected_profile is None and "profile" in result) or
+            (expected_profile is not None and (not isinstance(profile, str) or profile not in expected_profile))):
+        raise ActionError(f"invalid_result_profile: invalid {family}.profile: {profile!r}")
+    required, optional = _RESULT_FIELDS[family]
+    if family == "function_il":
+        level = result.get("level")
+        if not isinstance(level, str) or level not in _IL_FIELDS:
+            raise ActionError("invalid_result_fields: unsupported IL level")
+        il_required, il_optional = _IL_FIELDS[level]
+        required = {**required, **il_required}
+        optional = {**optional, **il_optional}
+    allowed = set(required) | set(optional)
+    conflicts = ((_KNOWN_RESULT_FIELDS | {"level", "sections"}) & result.keys()) - allowed
+    if conflicts:
+        reason = "invalid_result_fields" if explicit else "ambiguous_legacy_result"
+        raise ActionError(f"{reason}: foreign family fields: {', '.join(sorted(conflicts))}")
+    for field, expected in {**required, **optional}.items():
+        if field not in result and field in optional:
+            continue
+        value = result.get(field)
+        if field not in result or not isinstance(value, expected) or (expected is int and type(value) is not int):
+            raise ActionError(f"invalid_result_fields: invalid {family}.{field}")
+        if expected is int:
+            minimum = 1 if field in {"slice_size", "statement_limit"} else 0
+            if value < minimum or (field == "statement_address" and value > 2**64 - 1):
+                raise ActionError(f"invalid_result_fields: invalid {family}.{field}")
+    if family == "report_ai":
+        sections = result["sections"]
+        if (any(not isinstance(section, str) or section not in {
+                "binary", "inspections", "summary", "types", "flow", "functions"} for section in sections)
+                or len(set(sections)) != len(sections)):
+            raise ActionError("invalid_result_fields: invalid report sections")
+    if family == "data_xrefs":
         direction = result.get("direction")
         if not isinstance(direction, str) or direction not in {"code_to_data", "data_to_code"}:
-            raise ActionError("invalid data_xrefs.direction")
+            raise ActionError("invalid_result_fields: invalid data_xrefs.direction")
         selector = result.get("selector")
         if not isinstance(selector, dict) or not isinstance(selector.get("kind"), str):
-            raise ActionError("invalid data_xrefs.selector")
+            raise ActionError("invalid_result_fields: invalid data_xrefs.selector")
         selector_kind = selector["kind"]
         if selector_kind == "all":
             if "value" in selector:
-                raise ActionError("invalid data_xrefs.selector")
+                raise ActionError("invalid_result_fields: invalid data_xrefs.selector")
         elif selector_kind in {"function", "string_exact", "global_exact"}:
             if not isinstance(selector.get("value"), str):
-                raise ActionError("invalid data_xrefs.selector")
+                raise ActionError("invalid_result_fields: invalid data_xrefs.selector")
         elif selector_kind in {"function_address", "data_address"}:
-            if type(selector.get("value")) is not int or selector["value"] < 0:
-                raise ActionError("invalid data_xrefs.selector")
+            if type(selector.get("value")) is not int or not 0 <= selector["value"] <= 2**64 - 1:
+                raise ActionError("invalid_result_fields: invalid data_xrefs.selector")
         elif selector_kind == "data_address_range":
             value = selector.get("value")
             if (not isinstance(value, dict) or type(value.get("start")) is not int
                     or type(value.get("end")) is not int
-                    or not 0 <= value["start"] < value["end"]):
-                raise ActionError("invalid data_xrefs.selector")
+                    or not 0 <= value["start"] < value["end"] <= 2**64 - 1):
+                raise ActionError("invalid_result_fields: invalid data_xrefs.selector")
         else:
-            raise ActionError("invalid data_xrefs.selector")
+            raise ActionError("invalid_result_fields: invalid data_xrefs.selector")
         if (not _matches_shape(result, {"budget": dict, "summary": dict,
                                         "records": list, "stop_reasons": list,
                                         "next_actions": list, "warnings": list})
                 or any(not isinstance(row, dict) for row in result["records"])
                 or any(not isinstance(row, dict) for row in result["stop_reasons"])
                 or any(not isinstance(warning, str) for warning in result["warnings"])):
-            raise ActionError("invalid data_xrefs wrapper")
-        _data_xref_actions(result["next_actions"])
-        return "wrapper:data_xrefs"
-    if owner is not None or kind is not None:
-        if (
-            owner != "auto-re-cli"
-            or not isinstance(kind, str)
-            or kind not in SUPPORTED_MANIFEST_KINDS
-        ):
-            raise ActionError(
-                "unsupported Auto-RE manifest identity: "
-                f"owner={owner!r} kind={kind!r}"
-            )
-        if not isinstance(result.get("files"), list):
-            raise ActionError("Auto-RE manifest wrapper must contain files[]")
-        profile = result.get("profile")
-        if profile is not None and (
-            not isinstance(profile, str) or profile not in SUPPORTED_PROFILES
-        ):
-            raise ActionError(f"unsupported result profile: {profile!r}")
-        return f"manifest:{kind}"
+            raise ActionError("invalid_result_fields: invalid data_xrefs wrapper")
 
-    profile = result.get("profile")
-    if profile is not None:
-        if not isinstance(profile, str) or profile not in SUPPORTED_PROFILES:
-            raise ActionError(f"unsupported result profile: {profile!r}")
-        if not _matches_shape(result, {"binary": dict, "summary": dict}):
-            raise ActionError(
-                "profile:ai result must contain binary and summary objects"
-            )
-        return "profile:ai"
-
-    wrapper_shapes: tuple[tuple[str, dict[str, type]], ...] = (
-        (
-            "flow_graph",
-            {"root": dict, "summary": dict, "nodes": list, "edges": list},
-        ),
-        (
-            "slice_function",
-            {
-                "display_name": str,
-                "function": dict,
-                "slice": dict,
-                "instructions": list,
-            },
-        ),
-        (
-            "cfg",
-            {"display_name": str, "function": dict, "basic_blocks": list},
-        ),
-        ("function", {"display_name": str, "function": dict}),
-    )
-    for wrapper_name, shape in wrapper_shapes:
-        if _matches_shape(result, shape):
-            return f"wrapper:{wrapper_name}"
-
-    raise ActionError("result is not a supported Auto-RE wrapper")
+    _validate_result_actions(result, family)
+    if command is not None and command != _RESULT_COMMANDS.get(family, family):
+        raise ActionError(f"result_command_mismatch: {command} received {family}")
+    return (f"manifest:{family}" if manifest else _RESULT_LABELS.get(family, "profile:ai"))
 
 
 def _data_xref_actions(actions: list[Any]) -> list[dict[str, Any]]:
@@ -1289,6 +1414,8 @@ def prepare_action(
     result_wrapper = validate_result_contract(result)
     if result_wrapper == "wrapper:data_xrefs":
         result = {**result, "next_actions": _data_xref_actions(result["next_actions"])}
+    elif result.get("kind") in {"pe_resources", "pe_strings"}:
+        result = {**result, "next_actions": _pe_actions(result["next_actions"], result["kind"])}
     action = select_action(result, action_stage)
     argv = validate_argv(action.get("argv"))
     command_owned_sink = any(
