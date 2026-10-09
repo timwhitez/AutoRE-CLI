@@ -1,8 +1,10 @@
 """Local-only continuation regressions; execute controlled Python, never samples."""
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import importlib.util
+import io
 import json
 import os
 import pathlib
@@ -192,6 +194,152 @@ class RunNextActionSafetyTests(unittest.TestCase):
         self.assertFalse(json.loads(completed.stderr)["ok"])
         self.assertNotIn("Traceback", completed.stderr)
         self.assertEqual(completed.stdout, "")
+
+    def test_call_graph_profile_type_error_stops_before_version_probe(self) -> None:
+        base = {"schema_version": "0.1.0", "kind": "call_graph", "root": {},
+                "budget": {}, "summary": {}, "nodes": [], "edges": [],
+                "next_actions": [{"stage": "function.selected", "reason": "controlled",
+                                  "expected_output": "JSON", "stop_condition": "one result",
+                                  "argv": ["auto-re-cli", "function", "input.bin"]}]}
+        for profile in ([], {}):
+            with self.subTest(profile=profile):
+                result = self.root / "call_graph.json"
+                result.write_text(json.dumps({**base, "profile": profile}), encoding="utf-8")
+                stderr = io.StringIO()
+                receipt = self.root / "receipt.json"
+                output = self.root / "next.json"
+                with mock.patch.object(sys, "argv", ["run_next_action.py", str(result),
+                                                    "--action-stage", "function.selected",
+                                                    "--output", str(output),
+                                                    "--receipt", str(receipt)]), \
+                     mock.patch.object(runner.shutil, "which") as probe, \
+                     contextlib.redirect_stderr(stderr):
+                    self.assertEqual(runner.main(), 1)
+                lines = stderr.getvalue().splitlines()
+                self.assertEqual(len(lines), 1)
+                self.assertIn("call_graph.profile", json.loads(lines[0])["error"])
+                self.assertNotIn("Traceback", stderr.getvalue())
+                probe.assert_not_called()
+                self.assertFalse(output.exists())
+                self.assertFalse(receipt.exists())
+                self.assertFalse(runner.receipt_log_dir(receipt).exists())
+        for profile in ("ai", "full"):
+            self.assertEqual(runner.validate_result_contract({**base, "profile": profile}),
+                             "wrapper:call_graph")
+        with self.assertRaises(runner.ActionError):
+            runner.validate_result_contract({"schema_version": "0.1.0", "profile": "full",
+                                             "binary": {}, "summary": {}})
+
+    def test_real_receipt_entry_allows_only_reaped_timeout_budget_increase(self) -> None:
+        source = self.root / "input.bin"
+        source.write_bytes(b"controlled")
+        argv = ["auto-re-cli", "data-xrefs", str(source), "--offset", "1"]
+        result = self.result_file(argv)
+        executable = pathlib.Path(sys.executable).resolve()
+        identity = runner.request_identity(argv, runner.sha256_file(executable))
+        self.assertIsNotNone(identity)
+        self.assertEqual(identity, runner.request_identity(
+            argv + ["--output", str(self.root / "other.json")],
+            runner.sha256_file(executable)))
+        self.assertNotEqual(identity, runner.request_identity(
+            argv[:-1] + ["2"], runner.sha256_file(executable)))
+        prior = self.root / "prior.json"
+        prior_value = {"schema_version": 1, "owner": "auto-re-skill",
+                       "kind": "auto_re_action_execution_receipt",
+                       "request_identity": identity, "execution_status": "timed_out",
+                       "timeout_seconds": 1.0, "leader_reaped": True}
+        prior.write_text(json.dumps(prior_value), encoding="utf-8")
+        empty = runner.CapturedStream(b"", 0, hashlib.sha256(b"").hexdigest())
+        captured = runner.process_control.ProcessResult(0, "completed", empty, empty, (), True)
+
+        receipt = self.root / "allowed.json"
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with mock.patch.object(sys, "argv", ["run_next_action.py", str(result),
+                                            "--action-stage", "function.selected",
+                                            "--output", str(self.root / "page.json"),
+                                            "--receipt", str(receipt),
+                                            "--prior-receipt", str(prior),
+                                            "--timeout-seconds", "60"]), \
+             mock.patch.object(runner.shutil, "which", return_value=str(executable)), \
+             mock.patch.object(runner, "probe_program_version",
+                               return_value="auto-re-cli 0.1.10") as probe, \
+             mock.patch.object(runner.process_control, "run_process",
+                               return_value=captured) as run, \
+             contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            self.assertEqual(runner.main(), 0)
+        self.assertEqual(stderr.getvalue(), "")
+        self.assertEqual(json.loads(stdout.getvalue())["continuation_check"],
+                         "increased_timeout_after_timeout")
+        self.assertEqual(json.loads(receipt.read_text())["continuation_check"],
+                         "increased_timeout_after_timeout")
+        probe.assert_called_once()
+        run.assert_called_once()
+        self.assertEqual(run.call_args.kwargs["timeout_seconds"], 60.0)
+
+        prior_value.update(execution_status="completed", exit_code=124)
+        prior.write_text(json.dumps(prior_value), encoding="utf-8")
+        blocked_receipt = self.root / "blocked.json"
+        blocked_output = self.root / "blocked-output.json"
+        stderr = io.StringIO()
+        with mock.patch.object(sys, "argv", ["run_next_action.py", str(result),
+                                            "--action-stage", "function.selected",
+                                            "--output", str(blocked_output),
+                                            "--receipt", str(blocked_receipt),
+                                            "--prior-receipt", str(prior),
+                                            "--timeout-seconds", "60"]), \
+             mock.patch.object(runner.shutil, "which", return_value=str(executable)), \
+             mock.patch.object(runner, "probe_program_version",
+                               return_value="auto-re-cli 0.1.10") as probe, \
+             mock.patch.object(runner.process_control, "run_process") as run, \
+             contextlib.redirect_stderr(stderr):
+            self.assertEqual(runner.main(), 1)
+        self.assertIn("no_progress", json.loads(stderr.getvalue())["error"])
+        probe.assert_called_once()
+        run.assert_not_called()
+        self.assertFalse(blocked_receipt.exists())
+        self.assertFalse(runner.receipt_log_dir(blocked_receipt).exists())
+        self.assertFalse(blocked_output.exists())
+
+        preview_receipt = self.root / "preview.json"
+        stdout = io.StringIO()
+        with mock.patch.object(sys, "argv", ["run_next_action.py", str(result),
+                                            "--action-stage", "function.selected",
+                                            "--output", str(self.root / "preview-output.json"),
+                                            "--receipt", str(preview_receipt),
+                                            "--prior-receipt", str(prior), "--dry-run"]), \
+             mock.patch.object(runner.shutil, "which") as which, \
+             mock.patch.object(runner, "probe_program_version") as probe, \
+             mock.patch.object(runner.process_control, "run_process") as run, \
+             contextlib.redirect_stdout(stdout):
+            self.assertEqual(runner.main(), 0)
+        self.assertEqual(json.loads(stdout.getvalue())["continuation_check"],
+                         "not_evaluated_dry_run")
+        which.assert_not_called()
+        probe.assert_not_called()
+        run.assert_not_called()
+        self.assertFalse(preview_receipt.exists())
+
+        prior_value["request_identity"] = None
+        prior.write_text(json.dumps(prior_value), encoding="utf-8")
+        unknown_receipt = self.root / "unknown-identity.json"
+        stdout = io.StringIO()
+        with mock.patch.object(sys, "argv", ["run_next_action.py", str(result),
+                                            "--action-stage", "function.selected",
+                                            "--output", str(self.root / "unknown-output.json"),
+                                            "--receipt", str(unknown_receipt),
+                                            "--prior-receipt", str(prior)]), \
+             mock.patch.object(runner.shutil, "which", return_value=str(executable)), \
+             mock.patch.object(runner, "probe_program_version",
+                               return_value="auto-re-cli 0.1.10"), \
+             mock.patch.object(runner.process_control, "run_process",
+                               return_value=captured) as run, \
+             contextlib.redirect_stdout(stdout):
+            self.assertEqual(runner.main(), 0)
+        self.assertEqual(json.loads(stdout.getvalue())["continuation_check"],
+                         "not_evaluated_unavailable_identity")
+        self.assertEqual(json.loads(unknown_receipt.read_text())["request_identity"],
+                         identity)
+        run.assert_called_once()
 
     @unittest.skipUnless(os.name == "posix", "requires POSIX symlinks")
     def test_symlink_aliased_command_sink_is_rejected(self) -> None:

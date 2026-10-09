@@ -569,14 +569,14 @@ def _pe_actions(actions: list[Any], family: str) -> list[dict[str, Any]]:
 def validate_result_contract(result: dict[str, Any], *, command: str | None = None) -> str:
     schema_version = result.get("schema_version")
     if not isinstance(schema_version, str) or schema_version not in SUPPORTED_SCHEMA_VERSIONS:
-        raise ActionError(f"unsupported_result_version: unsupported result schema_version {schema_version!r}")
+        raise ActionError(f"unsupported_result_version: unsupported result schema_version {repr(schema_version)[:128]}")
     explicit = "kind" in result
     if explicit:
         kind = result["kind"]
         if not isinstance(kind, str) or kind not in _SELECTED_KINDS | {
                 "call_graph", "data_xrefs", "upx", "vm_protect", "pe_resources", "pe_strings",
                 *SUPPORTED_MANIFEST_KINDS}:
-            raise ActionError(f"unsupported_result_kind: {kind!r}")
+            raise ActionError(f"unsupported_result_kind: {repr(kind)[:128]}")
         family = kind
     else:
         candidates = [family for family, fields in _LEGACY_SIGNALS.items() if fields & result.keys()
@@ -596,7 +596,7 @@ def validate_result_contract(result: dict[str, Any], *, command: str | None = No
     profile = result.get("profile")
     if ((expected_profile is None and "profile" in result) or
             (expected_profile is not None and (not isinstance(profile, str) or profile not in expected_profile))):
-        raise ActionError(f"invalid_result_profile: invalid {family}.profile: {profile!r}")
+        raise ActionError(f"invalid_result_profile: invalid {family}.profile: {repr(profile)[:128]}")
     required, optional = _RESULT_FIELDS[family]
     if family == "function_il":
         level = result.get("level")
@@ -606,6 +606,11 @@ def validate_result_contract(result: dict[str, Any], *, command: str | None = No
         required = {**required, **il_required}
         optional = {**optional, **il_optional}
     allowed = set(required) | set(optional)
+    if manifest:
+        # Manifest metadata stays passive; B owns its integrity/path admission.
+        allowed |= {"selector", "budget", "warnings"}
+        if family == "context_bundle":
+            allowed |= {"sections", "current_findings", "protection_playbook_count", "protection_playbooks"}
     conflicts = ((_KNOWN_RESULT_FIELDS | {"level", "sections"}) & result.keys()) - allowed
     if conflicts:
         reason = "invalid_result_fields" if explicit else "ambiguous_legacy_result"

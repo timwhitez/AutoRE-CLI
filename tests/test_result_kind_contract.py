@@ -193,6 +193,23 @@ class ResultKindContractTests(unittest.TestCase):
         bad = copy.deepcopy(result); bad["next_actions"][0]["argv"][0] = "pe-resources"
         self.reject(bad, "invalid_result_boundary")
 
+    def test_discriminator_errors_are_bounded_at_the_validator(self):
+        for field in ("kind", "schema_version", "profile"):
+            with self.subTest(field=field):
+                with self.assertRaises(runner.ActionError) as caught:
+                    runner.validate_result_contract({**dto("function"), field: "x" * 100000})
+                self.assertLess(len(str(caught.exception)), 256)
+
+    def test_real_manifests_keep_independent_integrity_boundary(self):
+        for row in FIXTURE["manifests"]:
+            with self.subTest(kind=row["label"]):
+                self.assertEqual(runner.validate_result_contract(row["result"]), row["label"])
+                with self.assertRaisesRegex(runner.ActionError, "^result_command_mismatch"):
+                    runner.validate_result_contract(row["result"], command=row["command"])
+                # Shape admission never verifies referenced files or their hashes.
+                mutated = copy.deepcopy(row["result"]); mutated["files"][0]["sha256"] = "not-verified-here"
+                self.assertEqual(runner.validate_result_contract(mutated), row["label"])
+
     def test_manifest_identity_tuples(self):
         for kind, profile in (("context_bundle", "ai"), ("agent_spill_manifest", None)):
             result = {"schema_version": "0.1.0", "kind": kind, "owner": "auto-re-cli", "files": []}

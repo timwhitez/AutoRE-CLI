@@ -59420,5 +59420,401 @@
       },
       "stdout_sha256": "426b9f41d0c43ed248c488df688f447862fb477eb55dabd5a27e890120152bbd"
     }
+  ],
+  "manifests": [
+    {
+      "command": "report",
+      "argv": [
+        "report",
+        "ret.bin",
+        "--raw-shellcode",
+        "--arch",
+        "x86-64",
+        "--base-address",
+        "0x1000",
+        "--format",
+        "json",
+        "--json-profile",
+        "ai",
+        "--bundle-dir",
+        "bundle-fixture"
+      ],
+      "provenance": "P0 real CLI 0.1.10 manifest DTO",
+      "manifest_sha256": "fca4a931d33d4cda53f28624ea7c6386a3e5536ed6356d0ce94a7c7ae9e4e1d2",
+      "label": "manifest:context_bundle",
+      "result": {
+        "schema_version": "0.1.0",
+        "kind": "context_bundle",
+        "owner": "auto-re-cli",
+        "stage": "report.context_bundle",
+        "profile": "ai",
+        "workflow_stage": "entry_flow",
+        "bundle_dir": "bundle-fixture",
+        "manifest_path": "manifest.json",
+        "sections": [
+          "binary",
+          "inspections",
+          "summary",
+          "types",
+          "flow",
+          "functions"
+        ],
+        "files": [
+          {
+            "section": "binary",
+            "section_id": "binary",
+            "ownership": "command",
+            "path": "binary.json",
+            "sha256": "f347a4b6acf6582564d57f782d707e1188eed87592e0968dde4c9a96c9b4a229",
+            "bytes": 418
+          },
+          {
+            "section": "inspections",
+            "section_id": "inspections",
+            "ownership": "command",
+            "path": "inspections.json",
+            "sha256": "bc57272e0464ff2cf6edfb86ff75491c5c1522cdd76fc7393f4eedd356261f2b",
+            "bytes": 153
+          },
+          {
+            "section": "summary",
+            "section_id": "summary",
+            "ownership": "command",
+            "path": "summary.json",
+            "sha256": "aa1afcf9e9be5c56af1cd75f85e493abecd9138db72d45e4d5ebcf335dcae27f",
+            "bytes": 501
+          },
+          {
+            "section": "types",
+            "section_id": "types",
+            "ownership": "command",
+            "path": "types.json",
+            "sha256": "67e04776045bc4fb660ab40e1a4663583165c3c24005f8d5e3f5010dc8ff8452",
+            "bytes": 71
+          },
+          {
+            "section": "flow",
+            "section_id": "flow",
+            "ownership": "command",
+            "path": "flow.json",
+            "sha256": "f3cea90443eb7c66a6ae36eca8c77ab15045c8609bdc17d4a8f9c29c0a1c80f6",
+            "bytes": 1713
+          },
+          {
+            "section": "functions",
+            "section_id": "functions",
+            "ownership": "command",
+            "path": "functions.json",
+            "sha256": "e18a91b393c9f080634749868ecc1316bb18c270c225c979ddd1bf94c072ff6b",
+            "bytes": 3057
+          }
+        ],
+        "selector": {
+          "input": "ret.bin",
+          "arch": "x86_64",
+          "raw_shellcode": true,
+          "base_address": "0x1000",
+          "entry_address": null,
+          "include_noise": false,
+          "flat": false
+        },
+        "budget": {
+          "max_functions": 8192,
+          "max_instructions_per_function": 16384,
+          "limit": null,
+          "function_offset": 0,
+          "emitted_function_count": 1,
+          "total_function_count": 1,
+          "remaining_function_count": 0,
+          "has_more": false,
+          "next_function_offset": null,
+          "flow_depth": 2,
+          "flow_per_node_limit": 6,
+          "flow_node_limit": 24,
+          "flow_emitted_node_count": 1,
+          "flow_emitted_edge_count": 0,
+          "flow_truncated": false
+        },
+        "warnings": [
+          "function sub_00001000 @ 0x1000: raw-shellcode string reference coverage is incomplete: no original containing image context; an empty string_references array does not establish absence of string references"
+        ],
+        "completion": {
+          "state": "complete",
+          "complete": true,
+          "truncated": false,
+          "stop_reasons": []
+        },
+        "current_findings": [
+          {
+            "category": "binary",
+            "status": "validated",
+            "summary": "loaded Raw Single X86_64 entry=0x1000",
+            "evidence": [
+              "format=Raw",
+              "container=Single",
+              "architecture=X86_64",
+              "entry=0x1000"
+            ]
+          },
+          {
+            "category": "language",
+            "status": "inferred",
+            "summary": "detected language Unknown confidence=0",
+            "evidence": [
+              "detected_language=Unknown",
+              "language_confidence=0"
+            ]
+          },
+          {
+            "category": "function_inventory",
+            "status": "validated",
+            "summary": "emitted 1 of 1 function(s); remaining=0",
+            "evidence": [
+              "function_count=1",
+              "total_function_count=1",
+              "function_offset=0",
+              "remaining_function_count=0",
+              "has_more=false"
+            ]
+          },
+          {
+            "category": "recovered_types",
+            "status": "not_claimed",
+            "summary": "no recovered type evidence in the selected section",
+            "evidence": [
+              "recovered_type_count=0"
+            ]
+          },
+          {
+            "category": "flow_root",
+            "status": "inferred",
+            "summary": "static flow rooted at sub_00001000 with 1 node(s) and 0 edge(s)",
+            "evidence": [
+              "root_name=sub_00001000",
+              "root_display_name=sub_00001000",
+              "root_address=0x1000",
+              "node_count=1",
+              "edge_count=0",
+              "truncated=false"
+            ]
+          },
+          {
+            "category": "warning",
+            "status": "not_claimed",
+            "summary": "function sub_00001000 @ 0x1000: raw-shellcode string reference coverage is incomplete: no original containing image context; an empty string_references array does not establish absence of string references",
+            "evidence": [
+              "function sub_00001000 @ 0x1000: raw-shellcode string reference coverage is incomplete: no original containing image context; an empty string_references array does not establish absence of string references"
+            ]
+          }
+        ],
+        "next_actions": [
+          {
+            "stage": "inspect_passes.structuring_uncertainty",
+            "reason": "sub_00001000 has structuring fallback or skipped-pass notes worth auditing",
+            "expected_output": "inspect-passes JSON wrapper with HLIL and render pass statuses for the selected function",
+            "stop_condition": "stop after recording applied/skipped pass notes; do not treat pass output as source-level correctness",
+            "argv": [
+              "auto-re-cli",
+              "inspect-passes",
+              "ret.bin",
+              "--arch",
+              "x86_64",
+              "--raw-shellcode",
+              "--base-address",
+              "0x1000",
+              "--addr",
+              "0x1000",
+              "--max-functions",
+              "8192",
+              "--max-instructions-per-function",
+              "16384",
+              "--format",
+              "json"
+            ]
+          },
+          {
+            "stage": "function.selected",
+            "reason": "inspect the current static flow root pseudo output",
+            "expected_output": "single-function JSON wrapper with traceable function identity, IL arrays, HLIL, and pseudo output",
+            "stop_condition": "stop after recording evidence-backed behavior for the selected root or when the function output indicates the selector is unresolved",
+            "argv": [
+              "auto-re-cli",
+              "function",
+              "ret.bin",
+              "--arch",
+              "x86_64",
+              "--raw-shellcode",
+              "--base-address",
+              "0x1000",
+              "--addr",
+              "0x1000",
+              "--max-functions",
+              "8192",
+              "--max-instructions-per-function",
+              "16384",
+              "--format",
+              "json"
+            ]
+          },
+          {
+            "stage": "dump_il.custom",
+            "reason": "inspect the stable CUSTOM IL for the current static flow root",
+            "expected_output": "dump-il JSON wrapper with CUSTOM IL summary and bounded statements",
+            "stop_condition": "stop after collecting validated/inferred CUSTOM IL statements needed for the finding; do not continue if the selected function is missing",
+            "argv": [
+              "auto-re-cli",
+              "dump-il",
+              "ret.bin",
+              "--arch",
+              "x86_64",
+              "--raw-shellcode",
+              "--base-address",
+              "0x1000",
+              "--level",
+              "custom",
+              "--addr",
+              "0x1000",
+              "--statement-limit",
+              "256",
+              "--max-functions",
+              "8192",
+              "--max-instructions-per-function",
+              "16384",
+              "--format",
+              "json"
+            ]
+          },
+          {
+            "stage": "inspect_passes.selected",
+            "reason": "inspect structuring and printer pass status for the current static flow root",
+            "expected_output": "inspect-passes JSON wrapper with HLIL and render pass status records",
+            "stop_condition": "stop after checking applied/skipped pass reasons for the selected root; use findings as pass evidence rather than a source-level correctness claim",
+            "argv": [
+              "auto-re-cli",
+              "inspect-passes",
+              "ret.bin",
+              "--arch",
+              "x86_64",
+              "--raw-shellcode",
+              "--base-address",
+              "0x1000",
+              "--addr",
+              "0x1000",
+              "--max-functions",
+              "8192",
+              "--max-instructions-per-function",
+              "16384",
+              "--format",
+              "json"
+            ]
+          }
+        ],
+        "protection_playbook_count": 1,
+        "protection_playbooks": [
+          {
+            "playbook_id": "shellcode_as_data",
+            "entry_evidence": [
+              "raw_shellcode=true",
+              "base_address=0x1000"
+            ],
+            "argv": [
+              "auto-re-cli",
+              "analyze",
+              "ret.bin",
+              "--arch",
+              "x86_64",
+              "--raw-shellcode",
+              "--base-address",
+              "0x1000",
+              "--max-functions",
+              "8192",
+              "--max-instructions-per-function",
+              "16384",
+              "--format",
+              "json"
+            ],
+            "budget": {
+              "entry_evidence_limit": 8,
+              "warning_limit": 8,
+              "stop_condition_limit": 8,
+              "next_action_limit": 8,
+              "non_claim_limit": 8,
+              "record_limit": 64,
+              "provenance_limit": 128,
+              "stdout_byte_limit": 65536,
+              "slice_size": 96
+            },
+            "expected_output": "bounded raw-shellcode static decode and CFG evidence with explicit selectors",
+            "warnings": [
+              "function sub_00001000 @ 0x1000: raw-shellcode string reference coverage is incomplete: no original containing image context; an empty string_references array does not establish absence of string references"
+            ],
+            "evidence_state": "implemented",
+            "stop_conditions": [
+              "stop after static decode and CFG evidence",
+              "stop on explicit unsupported input or budget exhaustion"
+            ],
+            "next_actions": [],
+            "non_claims": [
+              "not shellcode execution",
+              "not dynamic behavior",
+              "not source semantics",
+              "not whole-sample completeness"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "command": "decompile",
+      "argv": [
+        "decompile",
+        "ret.bin",
+        "--raw-shellcode",
+        "--arch",
+        "x86-64",
+        "--base-address",
+        "0x1000",
+        "--format",
+        "json",
+        "--json-profile",
+        "ai",
+        "--spill-dir",
+        "spill-fixture"
+      ],
+      "provenance": "P0 real CLI 0.1.10 manifest DTO",
+      "manifest_sha256": "146cc3df934712770dcafedfe51293675302a6fc686ec2b6c753ddd3f1e43ee5",
+      "label": "manifest:agent_spill_manifest",
+      "result": {
+        "schema_version": "0.1.0",
+        "kind": "agent_spill_manifest",
+        "owner": "auto-re-cli",
+        "surface_id": "decompile_ai",
+        "spill_root": "spill-fixture",
+        "manifest_path": "manifest.json",
+        "files": [
+          {
+            "ownership": "command",
+            "path": "decompile_ai.json",
+            "section_id": "decompile_ai",
+            "sha256": "2ba6b203e5d61c611878d029a2424bcc068cba9d8009fbf428190a8ee3e8026d",
+            "bytes": 3998
+          }
+        ],
+        "selector": {},
+        "budget": {},
+        "warnings": [
+          "function sub_00001000 @ 0x1000: raw-shellcode string reference coverage is incomplete: no original containing image context; an empty string_references array does not establish absence of string references"
+        ],
+        "completion": {
+          "state": "complete",
+          "complete": true,
+          "truncated": false,
+          "stop_reasons": []
+        },
+        "next_actions": [],
+        "stdout_budget_bytes": 65536,
+        "payload_bytes": 3998
+      }
+    }
   ]
 }
