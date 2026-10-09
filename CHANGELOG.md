@@ -4,6 +4,9 @@ All notable changes to the public AutoRE-CLI distribution are recorded here.
 
 ## [Unreleased]
 
+- Add optional bounded object-key and exact Unicode string recovery views to the
+  Agent Skill reader; preserve default v1 output and hash-bound boundaries.
+
 ## [0.1.9] - 2026-10-01
 
 - Explain selection, VA units, paging and effective budgets in existing help.

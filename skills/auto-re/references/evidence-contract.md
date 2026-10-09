@@ -34,11 +34,33 @@ preserves complete values and ancestor/summary boundaries, and returns at most
 16 KiB including its envelope. Input is capped at 64 MiB; parsing can use more
 memory. The view does not certify source semantics or analysis completeness.
 
+Default `--mode value` preserves the original v1 view and complete values.
 For array pages, use the returned `selection.next_offset` (not requested limit)
 and `--expected-sha256 <source.sha256>`; positive offsets require that digest.
 The current-snapshot digest is a content identity, not source authentication.
-Oversized values/boundaries fail rather than lose evidence. Read a deeper field
-or the original JSON. A view cannot be passed to the continuation runner.
+
+For an unfamiliar large object, `--mode keys --offset 0 --limit 32` returns a
+v2 page of exact `name`, `value_type`, and escaped child `pointer` entries in
+JSON document order. Follow `selection.next_offset` with the same source hash.
+For an oversized string, `--mode string --start 0 --length 1024` returns a v2
+exact decoded fragment, measured in Unicode scalar values, with `total_length`
+and exclusive `end`. Follow `selection.next_start` with the same source hash;
+never calculate continuation from the requested length. Limits are 1..256 keys
+or 1..4096 scalars. Both modes may return fewer entries/scalars to keep the
+whole envelope, including newline, within 16 KiB. Escaped surrogate pairs count
+as one scalar; combining characters remain separate scalars.
+
+`--offset`/`--limit` apply only to value/keys; `--start`/`--length` only to string.
+Nonmatching flags are `invalid_pagination`. Continued reads require a digest
+(`expected_sha256_required`); changed bytes are `source_changed`. Wrong types
+are `mode_type_mismatch`; past-end positions are `offset_out_of_range`. Exactly
+at end returns an empty page with no continuation. Lone surrogates, malformed
+JSON, enormous boundaries (`boundary_too_large`), and a first scalar/key that
+cannot fit (`value_too_large`) fail explicitly. Child pointers over 1024 UTF-8
+bytes fail without truncation. Not every pointer is finitely readable. Use a
+deeper field or verified original JSON and host file tools when sufficient.
+All views remain semantics-not-validated and `analysis_completeness=not_evaluated`;
+a view cannot be passed to the continuation runner.
 
 For bundles/spills, first use the existing verifier and explicitly pass its
 receipt's verified `files[].path` and expected digest. The reader does not
