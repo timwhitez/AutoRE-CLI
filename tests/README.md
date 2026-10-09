@@ -35,3 +35,9 @@ existing `/trusted/builds` parent outside the checkout. Within the checkout, use
 archives and checksums are staged before the completed directory is published.
 Trusted parents are required; these checks do not provide a sandbox against
 hostile concurrent directory mutation.
+
+Request identity tests pin the CLI 0.1.10 command contract and option arities in
+`fixtures/cli_identity_0_1_10.json`. The table covers all subcommands, including
+explicit exclusions; unknown versions yield `unsupported_command`. This tests
+identity coverage, independently of execution admission. Source tests compare
+the fixture with the actual Clap model; public tests need no Rust toolchain.

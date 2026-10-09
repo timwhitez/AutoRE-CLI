@@ -34,12 +34,232 @@ TRUSTED_PROGRAM = "auto-re-cli"
 SUPPORTED_SCHEMA_VERSIONS = frozenset({"0.1.0"})
 SUPPORTED_PROFILES = frozenset({"ai"})
 SUPPORTED_MANIFEST_KINDS = frozenset({"context_bundle", "agent_spill_manifest"})
-IDENTITY_COMMANDS = frozenset({
-    "analyze", "report", "function", "decompile", "slice-function", "cfg",
-    "il", "xrefs", "call-graph", "data-xrefs", "inspect-go", "inspect-rust",
-    "inspect-types", "inspect-aarch64-refs", "inspect-pe", "inspect-die",
-    "inspect-upx", "inspect-vmp", "pe-strings", "pe-resources",
-})
+# Audited CLI contract, not an execution authorization list. Keep the release
+# fixture and source Clap drift test in sync when auditing another version.
+IDENTITY_CONTRACT_VERSION = "0.1.10"
+IDENTITY_GLOBAL_VALUE_OPTIONS = ["--output"]
+IDENTITY_COMMAND_CONTRACT = {
+    "aarch64-refs": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--address --arch --base-address --entry-address --format --function --function-addr "
+            "--instruction-limit --json-profile --limit --max-functions --max-input-bytes "
+            "--max-instructions-per-function --offset --output --spill-dir"
+        ).split(),
+        "switch_options": "--raw-shellcode".split(),
+    },
+    "analyze": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--arch --base-address --entry-address --format --max-functions --max-input-bytes "
+            "--max-instructions-per-function --output --spill-dir --style"
+        ).split(),
+        "switch_options": "--raw-shellcode".split(),
+    },
+    "archive": {"classification": "archive_replay", "aliases": []},
+    "batch": {"classification": "batch", "aliases": []},
+    "batch-diff": {"classification": "batch", "aliases": []},
+    "batch-replay": {"classification": "batch", "aliases": []},
+    "bench": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--arch --base-address --entry-address --format --iterations --max-functions "
+            "--max-input-bytes --max-instructions-per-function --output --spill-dir --style"
+        ).split(),
+        "switch_options": "--raw-shellcode".split(),
+    },
+    "call-graph": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--addr --arch --base-address --depth --edge-limit --entry-address --format "
+            "--json-profile --max-functions --max-input-bytes --max-instructions-per-function "
+            "--node-limit --output --spill-dir --symbol"
+        ).split(),
+        "switch_options": "--raw-shellcode".split(),
+    },
+    "compare-functions": {"classification": "multi_input", "aliases": []},
+    "data-xrefs": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--address --address-end --arch --base-address --direction --entry-address --format "
+            "--function --function-addr --global --json-profile --limit --max-functions "
+            "--max-input-bytes --max-instructions-per-function --offset --output --provenance-limit "
+            "--spill-dir --string"
+        ).split(),
+        "switch_options": "--raw-shellcode".split(),
+    },
+    "decompile": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--arch --base-address --entry-address --format --function-offset --json-profile "
+            "--limit --max-functions --max-input-bytes --max-instructions-per-function "
+            "--max-output-lines --output --spill-dir --style"
+        ).split(),
+        "switch_options": "--flat --include-noise --raw-shellcode --split-output".split(),
+    },
+    "diff": {"classification": "archive_replay", "aliases": []},
+    "dump-cfg": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--addr --arch --base-address --entry-address --format --max-functions "
+            "--max-input-bytes --max-instructions-per-function --output --spill-dir --symbol"
+        ).split(),
+        "switch_options": "--raw-shellcode".split(),
+    },
+    "dump-il": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--addr --arch --base-address --entry-address --format --level --max-functions "
+            "--max-input-bytes --max-instructions-per-function --output --spill-dir "
+            "--statement-address --statement-contains --statement-limit --statement-offset --symbol"
+        ).split(),
+        "switch_options": "--flat --raw-shellcode".split(),
+    },
+    "dump-llvm": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--addr --arch --base-address --entry-address --max-functions --max-input-bytes "
+            "--max-instructions-per-function --output --spill-dir --symbol"
+        ).split(),
+        "switch_options": "--raw-shellcode".split(),
+    },
+    "fold-pair-bytes": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": "--output --spill-dir".split(),
+        "switch_options": "".split(),
+    },
+    "function": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--addr --arch --base-address --entry-address --format --max-functions "
+            "--max-input-bytes --max-instructions-per-function --output --spill-dir --style "
+            "--symbol"
+        ).split(),
+        "switch_options": "--flat --raw-shellcode".split(),
+    },
+    "function-bounds": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": "--addr --format --max-input-bytes --output --spill-dir".split(),
+        "switch_options": "".split(),
+    },
+    "help": {"classification": "metadata_no_input", "aliases": []},
+    "inspect-die": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--arch --base-address --entry-address --format --json-profile --max-functions "
+            "--max-input-bytes --max-instructions-per-function --output --spill-dir"
+        ).split(),
+        "switch_options": "--raw-shellcode".split(),
+    },
+    "inspect-flow": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--addr --arch --base-address --depth --entry-address --format --max-functions "
+            "--max-input-bytes --max-instructions-per-function --node-limit --output "
+            "--per-node-limit --spill-dir --symbol"
+        ).split(),
+        "switch_options": "--raw-shellcode".split(),
+    },
+    "inspect-go": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--arch --base-address --entry-address --format --function-offset --json-profile "
+            "--limit --max-functions --max-input-bytes --max-instructions-per-function --output "
+            "--spill-dir"
+        ).split(),
+        "switch_options": "--raw-shellcode".split(),
+    },
+    "inspect-passes": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--addr --arch --base-address --entry-address --format --max-functions "
+            "--max-input-bytes --max-instructions-per-function --output --spill-dir --symbol"
+        ).split(),
+        "switch_options": "--raw-shellcode".split(),
+    },
+    "inspect-rust": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--arch --base-address --entry-address --format --function-offset --json-profile "
+            "--limit --max-functions --max-input-bytes --max-instructions-per-function --output "
+            "--spill-dir"
+        ).split(),
+        "switch_options": "--raw-shellcode".split(),
+    },
+    "inspect-types": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--arch --base-address --entry-address --format --max-functions --max-input-bytes "
+            "--max-instructions-per-function --output --scalar-evidence-limit "
+            "--scalar-evidence-offset --spill-dir --variable-function-limit "
+            "--variable-function-offset --variable-hint-limit --variable-hint-offset"
+        ).split(),
+        "switch_options": "--raw-shellcode".split(),
+    },
+    "inspect-upx": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--arch --base-address --entry-address --format --json-profile --max-functions "
+            "--max-input-bytes --max-instructions-per-function --output --spill-dir"
+        ).split(),
+        "switch_options": "--raw-shellcode".split(),
+    },
+    "inspect-vmp": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--arch --base-address --entry-address --format --json-profile --max-functions "
+            "--max-input-bytes --max-instructions-per-function --output --spill-dir"
+        ).split(),
+        "switch_options": "--raw-shellcode".split(),
+    },
+    "pe-resources": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--decoded-characters --format --json-profile --limit --max-input-bytes --offset "
+            "--output --reference-provenance --resource-depth --resource-entries "
+            "--resource-payload-bytes --scan-bytes --spill-dir"
+        ).split(),
+        "switch_options": "".split(),
+    },
+    "pe-strings": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--arch --base-address --decoded-characters --entry-address --format --json-profile "
+            "--limit --max-functions --max-input-bytes --max-instructions-per-function --offset "
+            "--output --reference-provenance --resource-depth --resource-entries "
+            "--resource-payload-bytes --scan-bytes --spill-dir"
+        ).split(),
+        "switch_options": "--raw-shellcode".split(),
+    },
+    "recover-bytes": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--addr --max-functions --max-input-bytes --max-instructions-per-function --output "
+            "--spill-dir"
+        ).split(),
+        "switch_options": "".split(),
+    },
+    "replay": {"classification": "archive_replay", "aliases": []},
+    "report": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--arch --base-address --bundle-dir --entry-address --flow-depth --flow-node-limit "
+            "--flow-per-node-limit --format --function-offset --json-profile --limit "
+            "--max-functions --max-input-bytes --max-instructions-per-function --max-output-lines "
+            "--output --sections --spill-dir --style"
+        ).split(),
+        "switch_options": "--flat --include-noise --raw-shellcode --split-output".split(),
+    },
+    "slice-function": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--addr --arch --base-address --contains-call --contains-string --entry-address "
+            "--format --max-functions --max-input-bytes --max-instructions-per-function --output "
+            "--slice-index --slice-size --slice-start --spill-dir --style --symbol"
+        ).split(),
+        "switch_options": "--raw-shellcode".split(),
+    },
+}
 FORBIDDEN_FLAGS = {"--execute"}
 COMMAND_OWNED_SINK_FLAGS = {"--bundle-dir", "--spill-dir"}
 CONTROL_READ_CHUNK_BYTES = 64 * 1024
@@ -368,14 +588,64 @@ def sha256_file(path: pathlib.Path) -> str:
     return digest.hexdigest()
 
 
-def _request_identity_with_reason(argv: list[str], program_sha256: str) -> tuple[dict[str, Any] | None, str]:
-    """Identify a supported single-input request without its output destinations."""
-    if len(argv) < 2 or argv[1] not in IDENTITY_COMMANDS:
+def _identity_argv_shape(argv: list[str]) -> tuple[int | None, set[int], str]:
+    """Locate the sole positional and parsed sinks using the pinned arity table."""
+    index = 1
+    sinks: set[int] = set()
+    while index < len(argv) and argv[index].startswith("-"):
+        flag, equals, _value = argv[index].partition("=")
+        if flag not in IDENTITY_GLOBAL_VALUE_OPTIONS:
+            return None, sinks, "unsupported_shape"
+        sinks.add(index)
+        if not equals:
+            index += 1
+            if index >= len(argv) or argv[index].startswith("-"):
+                return None, sinks, "unsupported_shape"
+            sinks.add(index)
+        index += 1
+    if index >= len(argv):
+        return None, sinks, "unsupported_command"
+    contract = IDENTITY_COMMAND_CONTRACT.get(argv[index])
+    if contract is None or contract["classification"] != "single_input":
+        return None, sinks, "unsupported_command"
+    index += 1
+    input_index = None
+    positional_only = False
+    while index < len(argv):
+        argument = argv[index]
+        if argument == "--" and not positional_only:
+            positional_only = True
+        elif argument.startswith("-") and not positional_only:
+            flag, equals, _value = argument.partition("=")
+            if flag in contract["value_options"]:
+                if flag in COMMAND_OWNED_SINK_FLAGS | {"--output"}:
+                    sinks.add(index)
+                    if not equals:
+                        sinks.add(index + 1)
+                if not equals:
+                    index += 1
+                    if index >= len(argv) or argv[index].startswith("-"):
+                        return None, sinks, "unsupported_shape"
+            elif flag not in contract["switch_options"] or equals:
+                return None, sinks, "unsupported_shape"
+        elif input_index is None:
+            input_index = index
+        else:
+            return None, sinks, "unsupported_shape"
+        index += 1
+    return input_index, sinks, "available" if input_index is not None else "unsupported_shape"
+
+
+def _request_identity_with_reason(argv: list[str], program_sha256: str,
+                                  program_version: str = "auto-re-cli " + IDENTITY_CONTRACT_VERSION) -> tuple[dict[str, Any] | None, str]:
+    """Identify an audited single-input request without its output destinations."""
+    if program_version != "auto-re-cli " + IDENTITY_CONTRACT_VERSION:
         return None, "unsupported_command"
-    if len(argv) < 3 or argv[2].startswith("-"):
-        return None, "unsupported_shape"
+    input_index, _sinks, reason = _identity_argv_shape(argv)
+    if input_index is None:
+        return None, reason
     try:
-        fd = os.open(argv[2], os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOFOLLOW", 0))
+        fd = os.open(argv[input_index], os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOFOLLOW", 0))
         try:
             before = os.fstat(fd)
         except OSError:
@@ -405,25 +675,20 @@ def _request_identity_with_reason(argv: list[str], program_sha256: str) -> tuple
 def _make_request_identity(argv: list[str], program_sha256: str,
                            input_sha256: str, input_bytes: int) -> dict[str, Any]:
     """Share the exact duplicated argv projection with side-effect-free admission."""
-    arguments = [argv[1], "<input-sha256>=" + input_sha256]
-    index = 3
-    sink_flags = COMMAND_OWNED_SINK_FLAGS | {"--output"}
-    while index < len(argv):
-        argument = argv[index]
-        if argument in sink_flags:
-            index += 2
-            continue
-        if not any(argument.startswith(flag + "=") for flag in sink_flags):
-            arguments.append(argument)
-        index += 1
+    input_index, sinks, reason = _identity_argv_shape(argv)
+    if input_index is None:
+        raise ActionError("cannot project request identity: " + reason)
+    arguments = ["<input-sha256>=" + input_sha256 if index == input_index else argument
+                 for index, argument in enumerate(argv) if index > 0 and index not in sinks]
     identity = {"input_sha256": input_sha256, "input_bytes": input_bytes,
                 "program_sha256": program_sha256, "analysis_argv": arguments}
     identity["sha256"] = hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     return identity
 
 
-def request_identity(argv: list[str], program_sha256: str) -> dict[str, Any] | None:
-    return _request_identity_with_reason(argv, program_sha256)[0]
+def request_identity(argv: list[str], program_sha256: str,
+                     program_version: str = "auto-re-cli " + IDENTITY_CONTRACT_VERSION) -> dict[str, Any] | None:
+    return _request_identity_with_reason(argv, program_sha256, program_version)[0]
 
 
 def validate_prior_receipt(prior: dict[str, Any]) -> dict[str, Any]:
@@ -736,7 +1001,7 @@ def receipt_budget_plan(prepared: dict[str, Any], log_dir: pathlib.Path, *,
     if type(log_tail_bytes) is not int or not 0 <= log_tail_bytes <= LOG_TAIL_BYTES:
         raise ActionError(f"log tail byte limit must be an integer between 0 and {LOG_TAIL_BYTES}")
     argv = prepared["argv"]
-    if identity is None and len(argv) >= 3 and argv[1] in IDENTITY_COMMANDS and not argv[2].startswith("-"):
+    if identity is None and _identity_argv_shape(argv)[0] is not None:
         identity = _make_request_identity(argv, program_sha256, "f" * 64, IDENTITY_INPUT_MAX_BYTES)
     if program_version is None:
         program_version = "auto-re-cli " + "9" * (PROGRAM_VERSION_MAX_BYTES - 16) + ".9.9"
@@ -861,7 +1126,7 @@ def execute_prepared_with_receipt(
         raise ActionError("trusted program must be a regular file")
     program_version = probe_program_version(resolved_executable)
     program_sha256 = sha256_file(resolved_executable)
-    identity, identity_reason = _request_identity_with_reason(prepared["argv"], program_sha256)
+    identity, identity_reason = _request_identity_with_reason(prepared["argv"], program_sha256, program_version)
     prior = None
     if prior_receipt is not None:
         prior = validate_prior_receipt(load_json_object(
@@ -892,7 +1157,7 @@ def execute_prepared_with_receipt(
     exit_code = execution_exit_code(captured)
     ended_at = utc_now()
     duration_ms = round((time.monotonic() - started_monotonic) * 1000)
-    final_identity, final_reason = _request_identity_with_reason(prepared["argv"], program_sha256)
+    final_identity, final_reason = _request_identity_with_reason(prepared["argv"], program_sha256, program_version)
     if final_identity != identity:
         identity_reason = "input_unstable_after_execution"
     elif identity is None:
