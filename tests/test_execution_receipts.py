@@ -147,7 +147,7 @@ class ReceiptTests(unittest.TestCase):
                 cli.chmod(0o700)
                 parent = root / "result.json"
                 parent.write_text(json.dumps({"schema_version": "0.1.0", "profile": "ai",
-                    "binary": {}, "summary": {}, "next_actions": [{"stage": "fixture", "reason": "test",
+                    "flat": False, "inspections": {}, "recovered_types": [], "functions": [], "binary": {}, "summary": {}, "next_actions": [{"stage": "fixture", "reason": "test",
                     "expected_output": "fixture", "stop_condition": "one run",
                     "argv": [runner.TRUSTED_PROGRAM, "fixture"]}]}))
                 env = dict(os.environ, PATH=str(root)+os.pathsep+os.environ.get("PATH", ""))

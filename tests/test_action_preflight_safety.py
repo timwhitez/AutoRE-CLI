@@ -89,6 +89,7 @@ class ActionPreflightSafetyTests(unittest.TestCase):
                 runner.validate_result_contract({
                     "schema_version": "0.1.0", "owner": "auto-re-cli",
                     "kind": kind, "files": [],
+                    **({"profile": "ai"} if kind == "context_bundle" else {}),
                 })
 
     def test_known_manifest_kinds_still_work(self) -> None:
@@ -97,6 +98,7 @@ class ActionPreflightSafetyTests(unittest.TestCase):
                 self.assertEqual(runner.validate_result_contract({
                     "schema_version": "0.1.0", "owner": "auto-re-cli",
                     "kind": kind, "files": [],
+                    **({"profile": "ai"} if kind == "context_bundle" else {}),
                 }), f"manifest:{kind}")
 
     def dry_run(self, sink: Path) -> tuple[int, str, str]:

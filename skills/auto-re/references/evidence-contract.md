@@ -25,6 +25,31 @@ proof of no references, including when computed targets lie outside the supplied
 slice. Keep recovered string facts separate from unresolved addresses; a numeric
 target is not itself a string. Embedded object functions retain their own evidence.
 
+## Result Admission
+
+The continuation helper admits exact string schema version `0.1.0`, frozen
+legacy root families and their reserved explicit kinds. Unknown/present-null
+kinds, unsupported versions, wrong profiles, mixed family controls and malformed
+actions fail before selection. First evidence also binds the root to its actual
+command; an IL/pass result cannot stand in for a function, nor decompile for a
+report. Partial reports can retain null unselected sections. Native AI inspection
+roots keep their existing signatures and kinds.
+
+Non-conflicting evidence, including passive `warnings` on function roots, stays
+passive. Shared evidence names alone do not define a competing family. Verifier
+output carrying verified-root/cleanup/consumption controls is operational output
+and is rejected even when it copies a manifest kind, owner and version. Admission does not validate
+nested analysis semantics or replace path, hash, process, resource or receipt
+checks. Normalized labels remain compatibility labels, not command identities.
+The optional reader retains its separate non-admissible viewing role.
+
+The eight reserved kinds (`function_detail`, `function_cfg`, `function_slice`,
+`function_flow_graph`, `function_il`, `function_passes`, `decompile_ai`,
+`report_ai`) are consumer contracts tested with spec-derived fixtures; CLI
+0.1.10 does not produce them. Older consumers reject these selected forms.
+No producer selector, release or installed upgrade is introduced here. The
+repository Skill stays 0.1.10; same-version managed repacks remain refused.
+
 ## Optional Existing-Result Views
 
 When existing JSON already contains the evidence, use your file tools or the
@@ -214,13 +239,19 @@ property and must be checked; these settings cannot prevent external deletion.
 
 ## Next Actions
 
-Each action should include:
+Each action must include:
 
 - `stage`
 - `reason`
 - `expected_output`
 - `stop_condition`
 - exact `argv[]`
+
+Native `pe_resources` / `pe_strings` paging actions may omit `stage` only for
+`reason=record_limit` with the matching argv command. The helper assigns
+`pe_resources.page` / `pe_strings.page`; other omissions fail closed. Baseline
+PE argv omits the program and remains unchanged; selecting it still fails the
+runner's independent trusted-program check.
 
 For typed `kind=data_xrefs`, the current CLI emits `data_xrefs.page` and
 `data_xrefs.provenance` stages. The helper accepts an older data-xref action

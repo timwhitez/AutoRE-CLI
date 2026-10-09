@@ -65,11 +65,11 @@ class FirstEvidenceContractTests(unittest.TestCase):
         self.assertTrue((self.output / "analysis.json").is_file())
 
     def test_report_rejects_recognized_but_wrong_function_wrapper(self):
-        self.inject_result("{'schema_version': '0.1.0', 'display_name': 'f', 'function': {}}")
+        self.inject_result("next(row['result'] for row in fixture['cases'] if row['command'] == 'function' and 'derived_from' not in row)")
         self.failure("ok")
 
     def test_function_rejects_ai_report_wrapper(self):
-        self.inject_result("{'schema_version': '0.1.0', 'profile': 'ai', 'binary': {}, 'summary': {}}")
+        self.inject_result("next(row['result'] for row in fixture['cases'] if row['command'] == 'report' and 'derived_from' not in row)")
         completed = self.invoke("--addr", "0x10")
         self.assertEqual(completed.returncode, 1)
         result = json.loads(completed.stderr)
@@ -78,8 +78,35 @@ class FirstEvidenceContractTests(unittest.TestCase):
         self.assertEqual(len(self.analysis_calls()), 1)
 
     def test_report_rejects_manifest_in_place_of_document(self):
-        self.inject_result("{'schema_version': '0.1.0', 'owner': 'auto-re-cli', 'kind': 'context_bundle', 'files': []}")
+        self.inject_result("{'schema_version': '0.1.0', 'owner': 'auto-re-cli', 'kind': 'context_bundle', 'profile': 'ai', 'files': []}")
         self.failure("ok")
+
+    def test_report_rejects_decompile_with_same_label_and_preserves_receipt(self):
+        self.inject_result("next(row['result'] for row in fixture['cases'] if row['command'] == 'decompile' and 'derived_from' in row)")
+        self.assertIn("result_command_mismatch", self.failure("ok")["error"])
+
+    def test_function_rejects_il_and_passes_with_same_label(self):
+        for command, selected in ((command, selected) for command in ("dump-il", "inspect-passes") for selected in (False, True)):
+            with self.subTest(command=command, selected=selected):
+                self.setUp()
+                self.inject_result(f"next(row['result'] for row in fixture['cases'] if row['command'] == {command!r} and ('derived_from' in row) == {selected})")
+                completed = self.invoke("--addr", "0x10")
+                result = json.loads(completed.stderr)
+                self.assertEqual(completed.returncode, 1)
+                self.assertIn("result_command_mismatch", result["error"])
+                stored = json.loads(Path(result["receipt_path"]).read_text())
+                self.assertEqual(stored["process_exit_code"], 0)
+                self.assertEqual(stored["exit_code"], 0)
+                for stream in ("stdout", "stderr"):
+                    self.assertTrue(Path(stored[stream]["path"]).is_file())
+
+    def test_native_cross_command_substitution_preserves_receipt(self):
+        self.inject_result("next(row['result'] for row in fixture['cases'] if row['command'] == 'inspect-rust')")
+        completed = self.invoke("--command", "inspect-go")
+        self.assertEqual(completed.returncode, 1)
+        result = json.loads(completed.stderr)
+        self.assertIn("result_command_mismatch", result["error"])
+        self.assertEqual(json.loads(Path(result["receipt_path"]).read_text())["exit_code"], 0)
 
     def test_error_message_is_bounded(self):
         self.inject_result("{'schema_version': 'x' * 100000}")

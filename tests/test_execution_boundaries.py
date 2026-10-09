@@ -31,7 +31,7 @@ doctor = load("skill_doctor")
 
 
 def document(argv):
-    return {"schema_version": "0.1.0", "profile": "ai", "binary": {}, "summary": {},
+    return {"schema_version": "0.1.0", "profile": "ai", "flat": False, "inspections": {}, "recovered_types": [], "functions": [], "binary": {}, "summary": {},
             "next_actions": [{"stage": "next", "reason": "inspect evidence",
                               "expected_output": "JSON", "stop_condition": "one result",
                               "argv": argv}]}

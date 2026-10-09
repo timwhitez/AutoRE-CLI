@@ -184,7 +184,7 @@ def run(args: argparse.Namespace) -> tuple[int, dict]:
         if not stat.S_ISREG(result_path.lstat().st_mode):
             raise actions.ActionError("analysis JSON must be a direct regular file")
         result = actions.load_json_object(result_path)
-        wrapper = actions.validate_result_contract(result)
+        wrapper = actions.validate_result_contract(result, command=args.command)
         expected = "wrapper:function" if args.command == "function" else "profile:ai"
         if wrapper != expected:
             raise actions.ActionError(f"{args.command} expected {expected}, received {wrapper}")
