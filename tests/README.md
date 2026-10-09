@@ -58,3 +58,10 @@ fixtures do not certify a release or installed pair. The suite checks P0/C1 and 
 P1/C1, mutations, passive additive evidence and command-bound first evidence.
 C0/P1 selected forms are unsupported and fail closed. Installed release pairs
 remain NOT_VERIFIED; checkout tests do not certify an upgrade.
+
+Task outcomes are evaluated by the maintainer-only
+[`agent_evals/README.md`](agent_evals/README.md) contract. Seven independent
+fixture cases, an atomic-claim/evidence scorer, safe-stop and negation failures,
+and scripted cold/retained baselines extend routing tests. The bounded baseline
+compares merged #40/#41/#42 with each first parent; response bytes are an explicit
+token proxy. No model calls or Skill instruction/version changes are included.
