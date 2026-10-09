@@ -1,6 +1,7 @@
 """Exact C1 admission against real P0 DTOs and explicitly spec-derived P1 forms."""
 import copy
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -10,6 +11,9 @@ ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("kind_contract_runner", ROOT / "skills/auto-re/scripts/run_next_action.py")
 runner = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(runner)
+BUNDLE_SPEC = importlib.util.spec_from_file_location("kind_contract_bundle", ROOT / "skills/auto-re/scripts/verify_bundle.py")
+bundle = importlib.util.module_from_spec(BUNDLE_SPEC)
+BUNDLE_SPEC.loader.exec_module(bundle)
 FIXTURE = json.loads((ROOT / "tests/fixtures/result_contract_0_1_10.json").read_text())
 CASES = FIXTURE["cases"]
 
@@ -209,6 +213,53 @@ class ResultKindContractTests(unittest.TestCase):
                 # Shape admission never verifies referenced files or their hashes.
                 mutated = copy.deepcopy(row["result"]); mutated["files"][0]["sha256"] = "not-verified-here"
                 self.assertEqual(runner.validate_result_contract(mutated), row["label"])
+
+    def test_review_verifier_operational_outputs_are_not_manifests(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); payload = root / "payload.json"
+            content = b'{"static_fixture":true}'
+            payload.write_bytes(content)
+            for row in FIXTURE["manifests"]:
+                with self.subTest(kind=row["label"]):
+                    manifest = {**row["result"], "files": [{"path": payload.name,
+                        "ownership": "command", "bytes": len(content),
+                        "sha256": hashlib.sha256(content).hexdigest()}]}
+                    self.assertEqual(runner.validate_result_contract(manifest), row["label"])
+                    passive = {**manifest, "warnings": [], "summary": {"note": "passive"}}
+                    path = root / "manifest.json"; path.write_text(json.dumps(manifest))
+                    output = bundle.validate_manifest(path)
+                    try:
+                        self.assertTrue({"verified_root", "cleanup_token", "consumption_contract"} <= output.keys())
+                        self.reject(output, "invalid_result_boundary")
+                    finally:
+                        bundle.remove_verified_root(Path(output["verified_root"]))
+                    self.assertEqual(payload.read_bytes(), content)
+                    self.assertEqual(runner.validate_result_contract(passive), row["label"])
+
+    def test_review_passive_warnings_preserve_function_argv_and_sink(self):
+        action = {"stage": "next", "reason": "inspect", "expected_output": "JSON",
+                  "stop_condition": "one", "argv": ["auto-re-cli", "function", "ret.bin"]}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); path = root / "result.json"; sink = root / "next.json"
+            for selected in (False, True):
+                with self.subTest(selected=selected):
+                    result = {**dto("function", selected), "next_actions": [action]}
+                    path.write_text(json.dumps(result))
+                    baseline = runner.prepare_action(path, "next", sink)
+                    path.write_text(json.dumps({**result, "warnings": []}))
+                    amended = runner.prepare_action(path, "next", sink)
+                    self.assertEqual(baseline["argv"], amended["argv"])
+                    self.assertEqual(baseline["command_owned_sink"], amended["command_owned_sink"])
+                    self.assertEqual(baseline["result_wrapper"], amended["result_wrapper"])
+                    self.assertFalse(sink.exists())
+
+    def test_review_passive_shared_fields_do_not_define_another_family(self):
+        for selected in (False, True):
+            for field, value in (("summary", {}), ("budget", {}),
+                                 ("current_findings", []), ("flat", False)):
+                with self.subTest(selected=selected, field=field):
+                    self.assertEqual(runner.validate_result_contract(
+                        {**dto("function", selected), field: value}), "wrapper:function")
 
     def test_manifest_identity_tuples(self):
         for kind, profile in (("context_bundle", "ai"), ("agent_spill_manifest", None)):

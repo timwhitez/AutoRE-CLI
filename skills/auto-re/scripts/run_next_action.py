@@ -517,15 +517,12 @@ _RESULT_LABELS = {"function_detail": "wrapper:function", "function_cfg": "wrappe
     "call_graph": "wrapper:call_graph", "data_xrefs": "wrapper:data_xrefs"}
 _SELECTED_KINDS = frozenset(_RESULT_COMMANDS) - {
     "upx", "vm_protect", "pe_resources", "pe_strings", "call_graph", "data_xrefs"}
-_LEGACY_SIGNALS = {
-    "function_detail": {"static_byte_evidence"}, "function_cfg": {"basic_blocks"},
-    "function_slice": {"slice", "slice_size"}, "function_flow_graph": {"root", "nodes", "edges"},
-    "function_il": {"level"}, "function_passes": {"hlil_passes", "render_passes"},
-    "decompile_ai": {"flat"}, "report_ai": {"sections"}, "inspect-go": {"go"},
-    "inspect-rust": {"rust"}, "inspect-die": {"file", "fingerprint"},
+_LEGACY_SIGNATURES = {
+    family: set(_RESULT_FIELDS[family][0])
+    for family in _SELECTED_KINDS | {"inspect-go", "inspect-rust", "inspect-die"}
 }
-_KNOWN_RESULT_FIELDS = set().union(*(set(req) | set(opt) for req, opt in _RESULT_FIELDS.values()),
-    *(set(req) | set(opt) for req, opt in _IL_FIELDS.values()))
+_IL_SUBSHAPE_FIELDS = set().union(
+    *(set(required) | set(optional) for required, optional in _IL_FIELDS.values()))
 
 
 def _validate_result_actions(result: dict[str, Any], family: str) -> None:
@@ -579,14 +576,16 @@ def validate_result_contract(result: dict[str, Any], *, command: str | None = No
             raise ActionError(f"unsupported_result_kind: {repr(kind)[:128]}")
         family = kind
     else:
-        candidates = [family for family, fields in _LEGACY_SIGNALS.items() if fields & result.keys()
-                      and not (family == "decompile_ai" and "level" in result)]
+        candidates = [family for family, fields in _LEGACY_SIGNATURES.items()
+                      if fields <= result.keys()]
         if len(candidates) > 1:
             raise ActionError("ambiguous_legacy_result: conflicting family discriminators")
         if not candidates:
             raise ActionError("invalid_result_fields: result is not a supported Auto-RE wrapper")
         family = candidates[0]
     manifest = family in SUPPORTED_MANIFEST_KINDS
+    if manifest and {"verified_root", "cleanup_token", "consumption_contract"} <= result.keys():
+        raise ActionError("invalid_result_boundary: verifier operational output is not a result manifest")
     if (manifest and result.get("owner") != "auto-re-cli") or (not manifest and "owner" in result):
         raise ActionError("invalid_result_boundary: invalid result owner")
     expected_profile = ({"ai", "full"} if family in {"call_graph", "data_xrefs"} else
@@ -605,13 +604,33 @@ def validate_result_contract(result: dict[str, Any], *, command: str | None = No
         il_required, il_optional = _IL_FIELDS[level]
         required = {**required, **il_required}
         optional = {**optional, **il_optional}
-    allowed = set(required) | set(optional)
-    if manifest:
-        # Manifest metadata stays passive; B owns its integrity/path admission.
-        allowed |= {"selector", "budget", "warnings"}
-        if family == "context_bundle":
-            allowed |= {"sections", "current_findings", "protection_playbook_count", "protection_playbooks"}
-    conflicts = ((_KNOWN_RESULT_FIELDS | {"level", "sections"}) & result.keys()) - allowed
+    conflicts = set()
+    if family != "function_il" and "level" in result:
+        conflicts.add("level")
+    if family not in {"report_ai", "context_bundle"} and "sections" in result:
+        conflicts.add("sections")
+    function_root = _IDENTITY.keys() <= required.keys()
+    if function_root:
+        for foreign, fields in (("function_cfg", {"basic_blocks"}),
+                                ("function_slice", {"slice", "slice_size"}),
+                                ("function_passes", {"hlil_passes", "render_passes"})):
+            if family != foreign:
+                conflicts |= fields & result.keys()
+        conflicts |= {"root", "nodes", "edges"} & result.keys()
+    elif "function" in result:
+        conflicts.add("function")
+    if family == "inspect-die" and "binary" in result:
+        conflicts.add("binary")
+    if family == "report_ai" and "flat" in result:
+        conflicts.add("flat")
+    if family == "function_il":
+        conflicts |= (_IL_SUBSHAPE_FIELDS & result.keys()) - (set(il_required) | set(il_optional))
+    for foreign, fields in _LEGACY_SIGNATURES.items():
+        # Explicit call_graph shares the frozen flow shape.
+        if foreign == family or (family == "call_graph" and foreign == "function_flow_graph"):
+            continue
+        if fields <= result.keys():
+            conflicts |= fields
     if conflicts:
         reason = "invalid_result_fields" if explicit else "ambiguous_legacy_result"
         raise ActionError(f"{reason}: foreign family fields: {', '.join(sorted(conflicts))}")

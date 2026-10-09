@@ -4,6 +4,9 @@ All notable changes to the public AutoRE-CLI distribution are recorded here.
 
 ## [Unreleased]
 
+- Reject verifier operational outputs at result admission and permit passive
+  shared evidence such as function warnings without changing prepared actions.
+
 - Admit exact legacy and reserved result-kind contracts in the Skill, bind first
   evidence to its command, and reject hybrid/control JSON before action selection.
   Preserve labels and process receipts; no producer or release is enabled.

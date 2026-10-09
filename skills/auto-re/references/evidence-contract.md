@@ -35,7 +35,10 @@ command; an IL/pass result cannot stand in for a function, nor decompile for a
 report. Partial reports can retain null unselected sections. Native AI inspection
 roots keep their existing signatures and kinds.
 
-Unknown non-conflicting evidence stays passive. Admission does not validate
+Non-conflicting evidence, including passive `warnings` on function roots, stays
+passive. Shared evidence names alone do not define a competing family. Verifier
+output carrying verified-root/cleanup/consumption controls is operational output
+and is rejected even when it copies a manifest kind, owner and version. Admission does not validate
 nested analysis semantics or replace path, hash, process, resource or receipt
 checks. Normalized labels remain compatibility labels, not command identities.
 The optional reader retains its separate non-admissible viewing role.
