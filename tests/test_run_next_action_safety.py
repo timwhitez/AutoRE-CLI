@@ -260,7 +260,7 @@ class RunNextActionSafetyTests(unittest.TestCase):
                                             "--timeout-seconds", "60"]), \
              mock.patch.object(runner.shutil, "which", return_value=str(executable)), \
              mock.patch.object(runner, "probe_program_version",
-                               return_value="auto-re-cli 0.1.7") as probe, \
+                               return_value="auto-re-cli 0.1.10") as probe, \
              mock.patch.object(runner.process_control, "run_process",
                                return_value=captured) as run, \
              contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
@@ -287,7 +287,7 @@ class RunNextActionSafetyTests(unittest.TestCase):
                                             "--timeout-seconds", "60"]), \
              mock.patch.object(runner.shutil, "which", return_value=str(executable)), \
              mock.patch.object(runner, "probe_program_version",
-                               return_value="auto-re-cli 0.1.7") as probe, \
+                               return_value="auto-re-cli 0.1.10") as probe, \
              mock.patch.object(runner.process_control, "run_process") as run, \
              contextlib.redirect_stderr(stderr):
             self.assertEqual(runner.main(), 1)
@@ -328,7 +328,7 @@ class RunNextActionSafetyTests(unittest.TestCase):
                                             "--prior-receipt", str(prior)]), \
              mock.patch.object(runner.shutil, "which", return_value=str(executable)), \
              mock.patch.object(runner, "probe_program_version",
-                               return_value="auto-re-cli 0.1.7"), \
+                               return_value="auto-re-cli 0.1.10"), \
              mock.patch.object(runner.process_control, "run_process",
                                return_value=captured) as run, \
              contextlib.redirect_stdout(stdout):

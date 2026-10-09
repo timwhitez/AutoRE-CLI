@@ -4,6 +4,11 @@ All notable changes to the public AutoRE-CLI distribution are recorded here.
 
 ## [Unreleased]
 
+- Fix Skill request-identity coverage with an explicit CLI 0.1.10 command/argv
+  contract, option-aware input discovery and release drift tests. Preserve
+  execution admission and exact argument order; unaudited versions and excluded
+  multi-input/batch/archive requests remain explicitly unavailable.
+
 ## [0.1.9] - 2026-10-01
 
 - Explain selection, VA units, paging and effective budgets in existing help.
