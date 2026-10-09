@@ -68,6 +68,58 @@ follow receipts or manifests, recover missing copies, execute actions, write
 results, or clean files. Existing explicit verifier cleanup remains unchanged.
 
 
+## Retained scope: create, replay, bounded read
+
+For CLI and Skill 0.1.10, use explicit replay when the retained analysis already
+contains the requested evidence. Check `auto-re-cli --version` and local
+`archive --help` / `replay --help`; these commands do not provide automatic reuse.
+Run one static analysis first and save its JSON outside the checkout. Record its
+exact input SHA-256, CLI build hash/version, argv, schema, selectors, budgets and
+external static dependencies alongside it. Archive only that result's scope:
+
+```sh
+auto-re-cli analyze /evidence/sample.bin --max-functions 1 \
+  --max-instructions-per-function 8 --format json --output /evidence/analysis.json
+auto-re-cli archive /evidence/sample.bin /evidence/analysis.json \
+  --archive-dir /evidence/retained \
+  --command 'auto-re-cli analyze /evidence/sample.bin --max-functions 1 --max-instructions-per-function 8 --format json --output /evidence/analysis.json' \
+  --format json
+auto-re-cli replay /evidence/retained --format json --output /evidence/replayed.json
+python3 /path/to/auto-re/scripts/read_result.py /evidence/replayed.json --pointer /output_hash_verified
+python3 /path/to/auto-re/scripts/read_result.py /evidence/replayed.json --pointer /archive_members_verified
+python3 /path/to/auto-re/scripts/read_result.py /evidence/replayed.json --pointer /warnings
+python3 /path/to/auto-re/scripts/read_result.py /evidence/replayed.json \
+  --pointer /analysis/functions/0/instructions --limit 1
+```
+
+The example pointer applies to retained `analyze` JSON; choose a pointer that
+exists in the original command's schema. Replay wraps the unchanged payload
+under `/analysis`. Follow the returned `selection.next_offset` and bind further
+pages with `--expected-sha256 <source.sha256>` from the reader; do not use the
+archive output digest for the replay wrapper. Each view is at most 16 KiB
+including its envelope/newline; the helper still reads the full JSON (up to
+64 MiB) and does not independently verify the archive. Read retained warnings,
+completion/truncation and budgets at their actual `/analysis/...` pointers too.
+A complete reader page does not expand retained analysis coverage.
+
+`output_hash_verified=true` verifies output bytes against metadata.
+`archive_members_verified` is `input_hash_verified && output_hash_verified`;
+input verification failures can warn while output verification succeeds.
+Output byte mismatch fails with `archive_output_integrity_failed` before exposing
+JSON. Neither flag authenticates a producer: metadata and members can be
+replaced together, and `--command` is descriptive caller-supplied text. Archive
+creation packages supplied JSON; it does not rerun or authenticate analysis,
+collect external bundle/spill members, or prove the recorded command produced it.
+Use the existing bundle/spill verifier separately for required external members.
+
+Replay and bounded reads perform no new analysis and produce no new analysis
+execution receipt. They are explicit artifact operations with checked destinations;
+do not treat them as a successful duplicate execution or silently satisfy a new
+analysis output sink. Identical completed execution still stops with `no_progress`.
+The only existing duplicate exception remains a recorded timeout with a reaped
+leader and a strictly larger timeout. If requested evidence is absent, name that
+missing scope before choosing a new analysis; do not repeat identical analysis.
+
 ## Decoded References Versus Byte Matches
 
 A matching displacement or numeric operand is not sufficient reference evidence.
