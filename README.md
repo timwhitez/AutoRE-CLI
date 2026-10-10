@@ -4,397 +4,271 @@
 
 [![Validate Distribution](https://github.com/timwhitez/AutoRE-CLI/actions/workflows/validate.yml/badge.svg)](https://github.com/timwhitez/AutoRE-CLI/actions/workflows/validate.yml)
 [![Release](https://img.shields.io/github/v/release/timwhitez/AutoRE-CLI?display_name=tag)](https://github.com/timwhitez/AutoRE-CLI/releases/latest)
-[![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-64748b)](#platforms)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE-MIT)
 
 **Bounded static reverse engineering for human analysts and AI agents.**
 
-AutoRE-CLI turns ELF, PE/COFF, Mach-O, object files, and explicitly identified
-raw input into traceable JSON, CFG/IL, readable pseudo output, language
-evidence, and bounded next actions. It does not execute target bytes.
+AutoRE-CLI turns ELF, PE/COFF, Mach-O, object files and explicitly identified
+raw input into traceable JSON, CFG/IL, readable pseudo output and language
+and protection evidence. It never executes target bytes.
 
-![AutoRE-CLI static analysis workflow](assets/overview.svg)
+![AI-generated concept illustration: binary inputs become structured static evidence and bounded next actions](assets/readme/agent-workflow-v1.png)
 
-[Download a release](https://github.com/timwhitez/AutoRE-CLI/releases/latest) ·
+*AI-generated concept illustration; not a product screenshot or security certification.
+See the [workflow diagram](assets/overview.svg) for the concrete evidence flow.*
+
+[Download](https://github.com/timwhitez/AutoRE-CLI/releases/latest) ·
 [Install](#install) · [Agent Quick Start](#agent-quick-start) ·
 [CLI Quick Start](#cli-quick-start) · [FAQ](FAQ.md)
 
-This repository distributes the binaries and open Agent Skill. The Rust engine
-source is maintained separately; the [public repository boundary](#public-repository-boundary)
-explains what is included.
-
-## Why AutoRE-CLI
-
-- **Evidence before confidence:** findings remain explicitly `validated`,
-  `inferred`, `unresolved`, or `not_claimed`.
-- **Agent-sized context:** bounded JSON, budgets, warnings, stop reasons,
-  verified bundles, and exact `next_actions[].argv` prevent output floods.
-- **Static-only boundary:** no target, recovered payload, shellcode, embedded
-  object, or target-derived artifact is executed.
-- **Layered inspection:** disassembly, CFG, LLIL, MLIL, HLIL, CUSTOM IL, pseudo
-  output, types, calls, data references, PE inventories, and Go/Rust evidence.
-- **Repeatable investigations:** archive, replay, semantic diff, and batch
-  comparison preserve the evidence path.
-- **Offline and traceable:** installation performs no network access; every
-  release binary has an exact target, byte count, source revision, signing
-  disposition, and SHA-256.
-
-### New In 0.1.11
-
-- `auto-re-cli describe --format json` lists commands without analyzing an
-  input; add `--command function` for one command's arguments and constraints.
-- `--diagnostic-format json` selects bounded machine-readable errors on stderr.
-  The default text diagnostics and successful outputs remain unchanged.
-- Eight selected commands offer `--result-contract kinds-v1`. The default
-  `legacy` roots remain available; the 0.1.11 Skill admits exact supported
-  kind/version pairs and rejects unknown or contradictory roots.
-- The Skill can read exact bounded object-key pages and Unicode string slices
-  from a hash-bound result, and detects identical no-progress requests.
-
-Use CLI and Skill 0.1.11 together for the new result roots. Run
-`skill_doctor.py` below to check the installed pair.
-
-### Where It Fits
-
-| Tool | Best fit | AutoRE-CLI difference |
-| --- | --- | --- |
-| Ghidra, Rizin, angr | Extensible interactive frameworks and custom analysis | AutoRE-CLI is a prebuilt, CLI-first bounded evidence surface for automation and agents |
-| Ghidra MCP integrations | Conversational control of an existing Ghidra environment | AutoRE-CLI needs no GUI or analysis server and keeps static-only limits in the output contract |
-| capa | Rule-based capability identification | AutoRE-CLI exposes functions, CFG/IL, pseudo output, references, language evidence, and comparison workflows |
-| General binary-analysis Skills | Methodology layered over separately installed tools | The included Skill and CLI share one verified action, artifact, and evidence contract |
-
-AutoRE-CLI is not a debugger, emulator, sandbox, or claim of perfect source
-recovery. Use the larger frameworks when you need plugins, interactive GUI
-workflows, symbolic execution, or dynamic observation.
+This is the **public binary distribution and open Agent Skill**. The engine's
+Rust implementation is maintained separately and is not published here.
 
 ## Install
 
-Requirements: Python 3.9 or newer and a supported host. No Rust toolchain or
-source checkout is required.
-
-### Platform Release
-
-Download the archive for your host from
-[GitHub Releases](https://github.com/timwhitez/AutoRE-CLI/releases/latest),
-then verify and install it:
+Requirements: Python 3.9 or newer and a [supported host](#platforms). No Rust
+toolchain or source checkout is needed. Download the matching **0.1.11**
+platform archive from [Releases](https://github.com/timwhitez/AutoRE-CLI/releases/latest):
 
 ```sh
-tar -xzf AutoRE-CLI-0.1.11-macos-arm64.tar.gz
-cd AutoRE-CLI-0.1.11-macos-arm64
+tar -xzf AutoRE-CLI-0.1.11-linux-x86_64.tar.gz
+cd AutoRE-CLI-0.1.11-linux-x86_64
 ./verify.sh
 ./install.sh
-auto-re-cli --version
 ```
 
-Replace `macos-arm64` with `macos-x86_64`, `linux-x86_64`, or `linux-arm64`.
-Windows users should extract `AutoRE-CLI-0.1.11-windows-x86_64.zip` and run:
+Replace `linux-x86_64` with `linux-arm64`, `macos-arm64` or `macos-x86_64`.
+On Windows, extract `AutoRE-CLI-0.1.11-windows-x86_64.zip`, open PowerShell
+in the extracted directory and run:
 
 ```powershell
 py -3 scripts/autore_distribution.py verify
 py -3 scripts/autore_distribution.py install
-auto-re-cli --version
 ```
 
-Each platform archive contains one binary, the Agent
-Skill, offline installers, provenance, checksums, and notices. You can also
-clone this repository to obtain the complete platform matrix:
-
-```sh
-git clone --depth 1 https://github.com/timwhitez/AutoRE-CLI.git
-cd AutoRE-CLI
-./verify.sh
-./install.sh
-```
-
-### Package Managers
-
-Package managers install the CLI only. Install the Agent Skill separately, or
-use the platform archive above for the complete verified distribution.
-
-```sh
-# Agent Skill for Codex, Claude Code, Cursor, and other supported clients
-npx skills add \
-  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.11/AutoRE-CLI-0.1.11-auto-re-skill.zip -g
-```
-
-```powershell
-# Scoop CLI on Windows
-scoop install https://raw.githubusercontent.com/timwhitez/AutoRE-CLI/main/packaging/scoop/autore-cli.json
-```
-
-The repository includes the versioned
-[Homebrew formula](https://github.com/timwhitez/AutoRE-CLI/blob/main/packaging/homebrew/autore-cli.rb)
-and
-[Scoop manifest](https://github.com/timwhitez/AutoRE-CLI/blob/main/packaging/scoop/autore-cli.json).
-The Homebrew formula is ready for a dedicated Tap; until that Tap is published,
-use the verified macOS or Linux platform archive. Package-manager availability
-can lag behind a GitHub Release.
-
-The default installation copies:
-
-- `auto-re-cli` (or `auto-re-cli.exe`) to
-  `${AUTORE_INSTALL_DIR:-$HOME/.local/bin}`;
-- the Skill to `${TRAE_HOME:-$HOME/.trae}/skills/auto-re`;
-- the Skill to `$HOME/.agents/skills/auto-re`.
-
-The installer verifies the complete extracted distribution, probes only the
-verified binary with `--version`, copies rather than symlinks, records managed
-markers, and refuses to overwrite unmanaged destinations unless
-`--replace-unmanaged` is explicit.
-
-Common options:
+The offline installer verifies the complete distribution, then copies the CLI
+and Skill with managed markers. Defaults are `$HOME/.local/bin`,
+`${TRAE_HOME:-$HOME/.trae}/skills/auto-re` and `$HOME/.agents/skills/auto-re`.
+Add the CLI directory to `PATH`, then check `auto-re-cli --version`.
+A repository clone also works: run `./verify.sh` and `./install.sh` from its root.
 
 ```sh
 ./install.sh --dry-run
 ./install.sh --cli-only
-./install.sh --skill-only --agents trae
 ./install.sh --skill-only --agents codex
+./install.sh --skill-only --agents trae
 ./install.sh --skill-only --agents both
 ./install.sh --install-dir "$HOME/bin"
 ./install.sh --skill-only --agents codex --codex-home "$HOME/.codex"
 ```
 
-`--codex-home` selects the legacy `<home>/skills` compatibility location. The
-current default is `$HOME/.agents/skills`.
+`--codex-home` selects the legacy `<home>/skills` location; the current default
+is `$HOME/.agents/skills`. Unmanaged destinations require an explicit
+`--replace-unmanaged`. Update by verifying and installing a newer distribution;
+managed drift, same-version binary repacks, downgrades and extra Skill files
+fail closed. Use `./uninstall.sh` to remove managed files;
+`--force-managed` only covers modified marker-listed files, never unrelated files.
+On Windows use `py -3 scripts/autore_distribution.py` with the same subcommand/options.
 
-### Update And Uninstall
+### Other Installation Routes
 
-Extract a newer release, then rerun `./verify.sh` and `./install.sh`. Managed
-drift, same-version binary repacks, downgrades, and extra Skill files fail
-closed.
+Package managers install the CLI only. The repository includes a versioned
+[Scoop manifest](https://github.com/timwhitez/AutoRE-CLI/blob/main/packaging/scoop/autore-cli.json) and
+[Homebrew formula](https://github.com/timwhitez/AutoRE-CLI/blob/main/packaging/homebrew/autore-cli.rb). Until a dedicated Homebrew
+Tap is published, use a verified platform archive. Availability may lag a release.
 
-```sh
-./uninstall.sh
-./uninstall.sh --force-managed
+```powershell
+scoop install https://raw.githubusercontent.com/timwhitez/AutoRE-CLI/main/packaging/scoop/autore-cli.json
 ```
 
-`--force-managed` applies only to marker-listed files whose content changed.
-It never authorizes removal of unrelated parent directories or extra user
-files.
+For the Skill alone in Codex, Claude Code, Cursor or another supported client:
+
+```sh
+npx skills add \
+  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.11/AutoRE-CLI-0.1.11-auto-re-skill.zip -g
+```
+
+Keep the installed CLI and Skill versions aligned; downloading or using a package
+manager is separate from the offline installer.
 
 ## Agent Quick Start
 
-For an open-ended investigation, use the current Skill launcher. Create the parent first and choose a new result directory:
-
-```sh
-mkdir -p ./analysis-results
-python3 skills/auto-re/scripts/start_analysis.py ./sample.exe \
-  --result-dir ./analysis-results/first-pass
-```
-
-Read the returned `result_path`, not just the launcher summary. Add `--addr` for a known function; use the CLI/Skill routes below for paging and references.
-
-
-Restart or refresh your agent after installation, then invoke:
+Refresh your agent after installation, then invoke the
+[`auto-re` Skill](skills/auto-re/SKILL.md):
 
 ```text
-Use $auto-re to statically inspect ./sample.exe and write bounded,
+Use $auto-re to statically inspect ./samples/sample.exe and write bounded,
 evidence-backed findings under ./analysis-results. Never execute the sample or
 any target-derived artifact.
 ```
 
-The Skill diagnoses CLI/Skill version agreement and duplicate registrations,
-routes explicit narrow questions directly, validates bundles into bounded
-receipts, separates evidence strength, follows one relevant static continuation
-at a time with bounded operational logs, and stops at explicit evidence or
-budget boundaries.
-
-Check the installed pair before analysis:
+For a direct first-evidence call, use the installed Skill. Put your input under
+`./samples/`; keep results outside the input's resolved parent and its descendants,
+and outside the Skill. The result parent must exist and the result directory must be new.
 
 ```sh
+mkdir -p ./analysis-results
 python3 "$HOME/.agents/skills/auto-re/scripts/skill_doctor.py"
+python3 "$HOME/.agents/skills/auto-re/scripts/start_analysis.py" \
+  ./samples/sample.exe --result-dir ./analysis-results/first-pass
 ```
 
-To prepare one emitted action without shell interpolation:
+Use `py -3` on Windows; see [platform invocation](skills/auto-re/references/platform-invocation.md).
+The launcher requires a ready installed CLI/Skill pair. An unmanaged checkout
+needs the explicit workflow in the [Skill](skills/auto-re/SKILL.md).
+
+Read the returned **`result_path`** and inspect warnings, budgets, completion
+and `next_actions[]`. The launcher summary and operational receipt are not
+findings. A zero process exit does not establish complete analysis.
+
+For a narrow question, choose one route rather than collecting a general report:
 
 ```sh
-python3 skills/auto-re/scripts/run_next_action.py \
-  ./analysis-results/sample.bundle/manifest.json \
-  --action-stage function.selected \
-  --output ./analysis-results/function-selected.json \
-  --receipt ./analysis-results/receipts/function-selected.json \
-  --dry-run
+# Exact function: --addr and --symbol are mutually exclusive
+python3 "$HOME/.agents/skills/auto-re/scripts/start_analysis.py" \
+  ./samples/sample.exe --addr 0x401000 --result-dir ./analysis-results/function-pass
+
+# PE string inventory; other supported inspections are listed in --help
+python3 "$HOME/.agents/skills/auto-re/scripts/start_analysis.py" \
+  ./samples/sample.exe --command pe-strings --result-dir ./analysis-results/strings-pass
 ```
 
-Review the exact argument vector before removing `--dry-run`. Actions that
-already own a bundle/spill sink reject an additional `--output`.
+Advanced paging, references and continuation use
+[command routing](skills/auto-re/references/command-routing.md).
+Name the unanswered question, validate any bundle/spill and follow one relevant
+static action at a time. Review emitted `argv[]` with `run_next_action.py --dry-run`;
+use a receipt and `--prior-receipt` for continuations. Stop on sufficient evidence,
+a budget, unsupported semantics or an identical request with no progress.
 
 ## CLI Quick Start
 
-Discover the installed command contract before choosing an analysis route:
+Discover commands without opening an input:
 
 ```sh
 auto-re-cli describe --format json
 auto-re-cli describe --format json --command function
 ```
 
-### Bounded Context Bundle
+Create a bounded report bundle, then validate its payloads:
 
 ```sh
-mkdir -p ./analysis-results
 mkdir -p ./analysis-results/receipts
-auto-re-cli report ./sample.exe \
-  --format json \
-  --json-profile ai \
-  --sections binary,summary,inspections,flow,functions,types \
-  --limit 8 \
+auto-re-cli report ./samples/sample.exe \
+  --format json --json-profile ai \
+  --sections binary,summary,inspections,flow,functions,types --limit 8 \
   --bundle-dir ./analysis-results/sample.bundle \
   --output ./analysis-results/sample.bundle/manifest.json
 
-python3 skills/auto-re/scripts/verify_bundle.py \
+python3 "$HOME/.agents/skills/auto-re/scripts/verify_bundle.py" \
   ./analysis-results/sample.bundle/manifest.json \
   --receipt ./analysis-results/receipts/bundle-verification.json
 ```
 
-The receipt points to stable read-only payload copies and records byte counts,
-SHA-256, warnings, budgets, completion state, and bounded next actions. After
-the final consumer, remove only the validator-owned temporary tree:
+Read the receipt's `files[].path` values: they refer to stable, hash-checked,
+read-only copies. After the final consumer, clean only the validator-owned tree:
 
 ```sh
-python3 skills/auto-re/scripts/verify_bundle.py \
+python3 "$HOME/.agents/skills/auto-re/scripts/verify_bundle.py" \
   --cleanup-receipt ./analysis-results/receipts/bundle-verification.json
 ```
 
-### Focused Function
+For a selected function and CUSTOM IL:
 
 ```sh
-auto-re-cli function ./sample.exe \
-  --addr 0x401000 \
-  --format json \
-  --output ./analysis-results/function-401000.json
-
-auto-re-cli dump-il ./sample.exe \
-  --level custom \
-  --addr 0x401000 \
-  --format json \
-  --output ./analysis-results/custom-il-401000.json
+auto-re-cli function ./samples/sample.exe --addr 0x401000 \
+  --format json --output ./analysis-results/function-401000.json
+auto-re-cli dump-il ./samples/sample.exe --level custom --addr 0x401000 \
+  --format json --output ./analysis-results/custom-il-401000.json
 ```
 
-### Reproduce The Safe Demo
+For raw shellcode, explicitly supply `--raw-shellcode --arch x86 --base-address 0x1000`
+and a known `--entry-address`; never infer architecture, base or entry from a filename.
+For a benign, independently authored object-file example, see the
+[controlled demo](https://github.com/timwhitez/AutoRE-CLI/blob/main/examples/controlled/README.md). Its recorded result is historical
+fixture evidence, not a current quality or whole-program coverage claim.
 
-[`examples/controlled/fixture.c`](examples/controlled/fixture.c) is a benign,
-independently authored fixture. Build it as a non-runnable object and follow
-the commands in
-[`examples/controlled/README.md`](examples/controlled/README.md). The checked
-demo found one AArch64 function, completed without truncation or warnings, and
-kept absent type evidence as `not_claimed`.
+## Analysis Surfaces And 0.1.11
 
-### Explicit Raw Shellcode
-
-```sh
-auto-re-cli report ./stage.bin \
-  --raw-shellcode \
-  --arch x86 \
-  --base-address 0x1000 \
-  --entry-address 0x1000 \
-  --format json \
-  --json-profile ai \
-  --sections summary,flow,functions \
-  --bundle-dir ./analysis-results/raw.bundle \
-  --output ./analysis-results/raw.bundle/manifest.json
-```
-
-Raw architecture, base, and entry are caller-provided facts. Never guess them
-from a filename.
-
-## Analysis Surfaces
-
-| Task | Command |
+| Task | Commands |
 | --- | --- |
-| Aggregate triage | `report`, `analyze`, `decompile` |
-| Function and local slices | `function`, `slice-function` |
-| Intermediate language and CFG | `dump-il`, `dump-cfg`, `inspect-passes` |
+| Triage and pseudo output | `report`, `analyze`, `decompile` |
+| Selected functions and slices | `function`, `function-bounds`, `slice-function` |
+| IL and CFG | `dump-il`, `dump-cfg`, `inspect-passes`; experimental `dump-llvm` |
 | Static relationships | `inspect-flow`, `call-graph`, `data-xrefs`, `aarch64-refs` |
 | PE inventories | `pe-resources`, `pe-strings` |
-| Language evidence | `inspect-go`, `inspect-rust`, `inspect-types` |
-| Protection evidence | `inspect-die`, `inspect-upx`, `inspect-vmp` |
-| Repeatable comparison | `batch`, `archive`, `replay`, `diff`, `batch-diff` |
+| Language and protection evidence | `inspect-go`, `inspect-rust`, `inspect-types`, `inspect-die`, `inspect-upx`, `inspect-vmp` |
+| Static byte recovery | `recover-bytes`, `fold-pair-bytes` (bounded data transforms, never target execution) |
+| Archives and comparison | `batch`, `archive`, `replay`, `batch-replay`, `diff`, `batch-diff`, `compare-functions` |
+| Measurement | `bench` (requires a recorded input and comparable measurements) |
 
-For machine-readable failures, place `--diagnostic-format json` before a
-subcommand. For `kinds-v1` output, add `--result-contract kinds-v1` to a command
-that advertises it in `describe`; keep `legacy` when using an older consumer.
+0.1.11 adds the metadata-only `describe`, global `--diagnostic-format json`
+for bounded stderr errors and opt-in `--result-contract kinds-v1` on eight
+selected commands. Default text errors and `legacy` result roots remain available.
+Use `describe` and `<command> --help` for supported options; use the matching
+0.1.11 Skill to consume the new roots. The Skill also supports exact bounded
+object-key pages, Unicode string slices and request identity/no-progress checks.
 
-Run `auto-re-cli <command> --help` for the exact options supported by the
-installed version.
+## Limits And Evidence
+
+- Supported analysis architectures are x86, x86-64 and AArch64; coverage varies
+  with container, metadata, instruction support and budgets.
+- Pseudo output and source-shaped Go/Rust hints are static evidence, not original
+  source. Complete source semantics, general language ABI recovery and whole-program
+  reachability are not claimed. Unsupported semantics remain explicit.
+- Detection of UPX/VMProtect is not complete unpacking or devirtualization.
+  Optional trusted static helpers require explicit opt-in; their output remains data.
+- A finished page, empty warnings or zero names/callers does not prove completeness
+  or unreachability. Check truncation, unresolved edges and stop reasons together.
+  `--limit` controls output rows; discovery and input budgets are separate and do
+  not cap peak memory. The default input snapshot budget is 256 MiB.
+- Strings, names and inferred roles do not prove runtime behavior, malicious intent
+  or authorship. Keep `validated`, `inferred`, `unresolved` and `not_claimed` distinct.
+
+AutoRE-CLI fits prebuilt CLI automation and bounded Agent evidence. Ghidra/Rizin
+serve interactive framework workflows; capa serves rule-based capability analysis;
+Ghidra MCP integrations operate an existing Ghidra environment. AutoRE-CLI does
+not provide a debugger, emulator, sandbox, symbolic execution or analysis server.
 
 ## Platforms
 
-| Host | Release target | Status |
+| Host | Release target | Signing |
 | --- | --- | --- |
-| macOS Apple Silicon | `macos-arm64` | Published; ad-hoc signed |
-| macOS Intel | `macos-x86_64` | Published; ad-hoc signed |
-| Linux x86-64 | `linux-x86_64` | Published |
-| Linux AArch64 | `linux-arm64` | Published |
-| Windows x86-64 | `windows-x86_64` | Published; unsigned |
+| macOS Apple Silicon | `macos-arm64` | Ad-hoc signed |
+| macOS Intel | `macos-x86_64` | Ad-hoc signed |
+| Linux x86-64 | `linux-x86_64` | Not applicable |
+| Linux AArch64 | `linux-arm64` | Not applicable |
+| Windows x86-64 (Windows 10+) | `windows-x86_64` | Unsigned |
 
-The macOS binaries are not Developer ID signed or notarized. The Windows
-binary supports Windows 10 or newer and is not Authenticode signed.
+macOS binaries have no Developer ID signature or notarization; Windows has no
+Authenticode signature. Linux releases use dynamically linked GNU targets.
+The host platform matrix is separate from the analyzed input architectures.
 
-## Integrity And Provenance
+## Integrity And Public Boundary
 
-Run `./verify.sh` before installation. It validates:
+Run `./verify.sh` (or the Windows Python equivalent) before installation.
+It checks the exact `SHA256SUMS` file set, binary target/size/hash, managed Skill
+inventory, publisher identity, license boundary and forbidden private content.
+[manifest/release.json](manifest/release.json) binds the binaries to their original
+source revision, toolchain, version and signing disposition. Checksums do not
+replace platform signing or establish that an analyzed input is safe.
 
-- every `SHA256SUMS` row and exact public file set;
-- every binary target/path/size/hash in `manifest/release.json`;
-- the exact managed Skill file set;
-- the MIT-only project license boundary;
-- the personal publisher and repository identity;
-- absence of source roots, Rust source, private paths, samples, internal
-  artifacts, and governed internal-account markers.
+This MIT-licensed distribution includes binaries, the open Skill/helpers,
+installers, verifier, automation, controlled demo source, artwork and documentation.
+The Rust engine implementation, private specifications, samples and analysis
+output are not published. “Open source” here applies to the public scripts,
+Skill, examples, automation and documentation.
 
-`manifest/release.json` records the publisher, repository URL, release version,
-distribution scope, source revision, toolchain, target matrix, and static
-safety flags. `THIRD_PARTY_LICENSES.md` and `licenses/third-party/` preserve
-dependency notices separately from the project license.
+## Maintenance And Support
 
-## Public Repository Boundary
+[FAQ](FAQ.md) · [Investigation workflows](skills/auto-re/references/investigation-workflows.md) ·
+[Release history](https://github.com/timwhitez/AutoRE-CLI/blob/main/CHANGELOG.md) · [Contribution guide](CONTRIBUTING.md) ·
+[Maintainer instructions](AGENTS.md) · [@timwhitez](https://github.com/timwhitez)
 
-This repository is the MIT-licensed **public binary distribution** of Auto-RE.
-It contains compiled binaries, the open Agent Skill and helpers, installers,
-verifier, release automation, controlled demo source, checksums, provenance,
-notices, and documentation.
-
-The engine's Rust implementation, private specifications, samples, and
-analysis output are not published here. “Open source” in this repository
-applies to the public scripts, Skill, examples, automation, and documentation;
-it does not imply that the binary engine implementation is available.
-
-## Repository Layout
-
-```text
-assets/                       public demo and social artwork
-bin/                          platform binaries
-examples/controlled/          benign reproducible demo source
-skills/auto-re/               Agent Skill and deterministic helpers
-scripts/autore_distribution.py
-scripts/build_release_assets.py
-manifest/release.json         machine-readable provenance
-licenses/third-party/         dependency notices
-SHA256SUMS                    outer integrity manifest
-install.sh / uninstall.sh     managed local installation
-verify.sh                     fail-closed distribution verifier
-```
-
-## Support
-
-- Maintainer guidance: [AGENTS.md](AGENTS.md)
-- Static investigation workflows: [Skill reference](skills/auto-re/references/investigation-workflows.md)
-- Bugs and documentation:
-  [issue tracker](https://github.com/timwhitez/AutoRE-CLI/issues)
-- Use cases and integration requests:
-  [public discussion](https://github.com/timwhitez/AutoRE-CLI/discussions/1)
-- Security:
-  [private vulnerability report](https://github.com/timwhitez/AutoRE-CLI/security/advisories/new)
-- Contribution boundary: [CONTRIBUTING.md](CONTRIBUTING.md)
-- Release history: [CHANGELOG.md](CHANGELOG.md)
-- Maintainer: [@timwhitez](https://github.com/timwhitez)
-
-Do not upload malware samples, recovered payloads, secrets, private paths, or
+Report bugs and documentation issues through [Issues](https://github.com/timwhitez/AutoRE-CLI/issues),
+use [Discussions](https://github.com/timwhitez/AutoRE-CLI/discussions/1) for use cases,
+and use [private vulnerability reporting](https://github.com/timwhitez/AutoRE-CLI/security/advisories/new)
+for security defects. Do not upload malware, payloads, secrets, private paths or
 proprietary analysis output.
 
-## License
-
-The public AutoRE-CLI distribution is licensed under the
-[MIT License](LICENSE-MIT). Third-party dependencies retain their own licenses,
-including Apache-licensed dependencies where applicable; see
-[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+The project uses the [MIT License](LICENSE-MIT). Dependencies retain their own
+licenses, including Apache where applicable; see [third-party notices](THIRD_PARTY_LICENSES.md).
