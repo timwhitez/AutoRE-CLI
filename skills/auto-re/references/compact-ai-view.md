@@ -14,10 +14,16 @@ Choose a fresh output file and retain the original. The input uses the existing
 stable-file, no-symlink, 64 MiB reader policy and its JSON shape limits. A changed
 hash stops with `source_changed`; unsupported versions/profiles/roots fail closed.
 The helper writes normalized JSON to stdout and never modifies its source.
+Source float numerals remain exact, including underflow and signed zero, in both
+compact and full fallback output. Float overflow follows the shared reader's
+existing `invalid_json_or_structure` rejection (for example, `1e400`).
 
 Compaction activates only when the complete new document, including its locator
 and catalog, saves at least 10% and 1 KiB against normalized original JSON.
-Otherwise it returns the complete normalized original, with every field intact.
+The completed candidate must also satisfy the shared reader's byte, depth,
+value-count, container-entry and string-byte limits. Otherwise it returns the
+complete normalized original, with every field intact. Reference insertion that
+would exceed the depth limit therefore falls back safely.
 This is a compatibility gate, not a model token claim. No CLI profile changes.
 
 A compact result has `kind=auto_re_compact_ai_view`, `schema_version=0.1.0` and

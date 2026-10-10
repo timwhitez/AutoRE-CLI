@@ -18,8 +18,28 @@ VERSION = 1
 FIELDS = ('variable_hints', 'semantic_summary', 'field_states')
 
 
-def encoded(value):
-    return json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(',', ':')).encode('utf-8')
+class ExactFloat(float):
+    """Keep the source token while retaining the shared reader's numeric admission."""
+    def __new__(cls, token):
+        value = super().__new__(cls, token)
+        value.token = token
+        return value
+
+    def __deepcopy__(self, memo):
+        return self
+
+
+def encoded(value, *, sort_keys=False):
+    def emit(item):
+        if isinstance(item, ExactFloat):
+            return item.token
+        if isinstance(item, dict):
+            keys = sorted(item) if sort_keys else item
+            return '{' + ','.join(emit(key) + ':' + emit(item[key]) for key in keys) + '}'
+        if isinstance(item, list):
+            return '[' + ','.join(emit(child) for child in item) + ']'
+        return json.dumps(item, ensure_ascii=False, allow_nan=False, separators=(',', ':'))
+    return emit(value).encode('utf-8')
 
 
 def project(full, source):
@@ -55,7 +75,7 @@ def project(full, source):
         reference = encoded({'$agent_ref': len(catalog)})
         if count > 1 and count * (len(blob) - len(reference)) > len(blob) + 1:
             indexes[blob] = len(catalog)
-            catalog.append(json.loads(blob))
+            catalog.append(json.loads(blob, parse_float=ExactFloat, parse_int=reader._bounded_int))
     view = walk(full, [], False)
     view.update(kind=KIND, compact_version=VERSION, catalog=catalog,
                 full_view={'artifact': source['path'], 'bytes': source['bytes'],
@@ -64,7 +84,14 @@ def project(full, source):
     # A new wrapper is emitted only when it clears the measured compatibility gate.
     if baseline - candidate < 1024 or (baseline - candidate) * 10 < baseline:
         return copy.deepcopy(full)
-    assert expand_view(view) == full
+    try:
+        reader.runner._validate_json_shape(view, reader.runner.ACTION_RESULT_POLICY)
+        if candidate > reader.runner.ACTION_RESULT_POLICY.max_encoded_bytes:
+            return copy.deepcopy(full)
+    except reader.runner.ActionError:
+        return copy.deepcopy(full)
+    # Compare canonical text containing original numerals, never rounded float equality.
+    assert encoded(expand_view(view), sort_keys=True) == encoded(full, sort_keys=True)
     return view
 
 
@@ -113,7 +140,7 @@ def main():
     parser.add_argument('--expected-sha256')
     args = parser.parse_args()
     try:
-        full, source = reader.read_source(args.path, args.expected_sha256)
+        full, source = reader.read_source(args.path, args.expected_sha256, parse_float=ExactFloat)
         sys.stdout.buffer.write(encoded(project(full, source)))
     except (ValueError, reader.runner.ActionError) as error:
         sys.stderr.buffer.write(encoded({'ok': False, 'kind': KIND, 'compact_version': VERSION,

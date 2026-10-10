@@ -1,5 +1,6 @@
 """Lossless opt-in context projection; original evidence remains authoritative."""
 import copy
+from decimal import Decimal
 import gzip
 import hashlib
 import importlib.util
@@ -80,7 +81,8 @@ class CompactResultTests(unittest.TestCase):
                 full = case['result']
                 self.assertEqual(hashlib.sha256(compact.encoded(full)).hexdigest(), case['normalized_sha256'])
                 compact.reader.runner.validate_result_contract(full)
-                view = compact.project(full, self.source(full))
+                exact = json.loads(compact.encoded(full), parse_float=compact.ExactFloat)
+                view = compact.project(exact, self.source(full))
                 self.assertEqual(view['kind'], compact.KIND)
                 self.assertEqual(compact.expand_view(view), full)
                 with self.assertRaisesRegex(compact.reader.runner.ActionError, '^unsupported_result_kind'):
@@ -92,6 +94,80 @@ class CompactResultTests(unittest.TestCase):
             with self.assertRaises(ValueError): compact.project({**full, **changed}, self.source(full))
         view = compact.project(full, self.source(full)); view['compact_version'] = 2
         with self.assertRaisesRegex(ValueError, 'unsupported_compact_version'): compact.expand_view(view)
+
+    def run_cli(self, raw, directory):
+        path = Path(directory)/'full.json'; path.write_bytes(raw)
+        result = subprocess.run([sys.executable, '-B', str(SCRIPT), str(path),
+                                 '--expected-sha256', hashlib.sha256(raw).hexdigest()],
+                                capture_output=True, timeout=15)
+        self.assertEqual(path.read_bytes(), raw)
+        return result
+
+    def test_cli_exact_numbers_compact_and_fallback(self):
+        numerals = ['9007199254740993.0', '1.0000000000000001', '1e-400', '-0.0', '1e300']
+        for mode in ('compact', 'fallback'):
+            full = self.result()
+            if mode == 'fallback': full['functions'] = full['functions'][:1]
+            full['exact_numbers'] = ['NUMERAL_'+str(i) for i in range(len(numerals))]
+            for function in full['functions']:
+                function['semantic_summary']['exact_numbers'] = full['exact_numbers']
+            raw = compact.encoded(full)
+            for i, numeral in enumerate(numerals):
+                raw = raw.replace(('"NUMERAL_'+str(i)+'"').encode(), numeral.encode())
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                result = self.run_cli(raw, directory)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                # Decimal parsing is independent of the helper's parser and encoder.
+                original = json.loads(raw, parse_float=Decimal)
+                view = json.loads(result.stdout, parse_float=Decimal)
+                restored = compact.expand_view(view) if mode == 'compact' else view
+                self.assertEqual(restored, original)
+                self.assertEqual([v.as_tuple() for v in restored['exact_numbers']],
+                                 [v.as_tuple() for v in original['exact_numbers']])
+                for numeral in numerals: self.assertIn(numeral.encode(), result.stdout)
+                output = Path(directory)/'view.json'; output.write_bytes(result.stdout)
+                compact.reader.read_source(output, None)
+
+    def test_cli_float_overflow_fails_closed(self):
+        full = self.result(); full['number'] = 'OVERFLOW'
+        for numeral in ('1e400', '-1e400', '1e999999999999999999999'):
+            with self.subTest(numeral=numeral), tempfile.TemporaryDirectory() as directory:
+                result = self.run_cli(compact.encoded(full).replace(b'"OVERFLOW"', numeral.encode()), directory)
+                self.assertEqual(result.returncode, 1)
+                self.assertFalse(result.stdout)
+                self.assertEqual(json.loads(result.stderr)['error'], 'invalid_json_or_structure')
+
+    def test_cli_reference_depth_boundaries(self):
+        policy = compact.reader.runner.ACTION_RESULT_POLICY
+        for depth in (policy.max_depth-1, policy.max_depth, policy.max_depth+1):
+            full = self.result()
+            for i, function in enumerate(full['functions']):
+                function = copy.deepcopy(function)
+                # Root/functions/function have depths 1/2/3; repeated scalar at depth N.
+                nested = {'field_states': 'repeated uncertainty '*80}
+                for _ in range(depth-5): nested = {'nested': nested}
+                function['deep_evidence'] = nested
+                full['functions'][i] = function
+            with self.subTest(depth=depth), tempfile.TemporaryDirectory() as directory:
+                result = self.run_cli(compact.encoded(full), directory)
+                if depth > policy.max_depth:
+                    self.assertEqual(result.returncode, 1)
+                    self.assertFalse(result.stdout)
+                    continue
+                self.assertEqual(result.returncode, 0, result.stderr)
+                view = json.loads(result.stdout)
+                output = Path(directory)/'view.json'; output.write_bytes(result.stdout)
+                compact.reader.runner._validate_json_shape(view, policy)
+                compact.reader.read_source(output, None)
+                if depth == policy.max_depth:
+                    self.assertEqual(view, full)
+                else:
+                    self.assertEqual(view['kind'], compact.KIND)
+                    read = subprocess.run([sys.executable, '-B', str(SCRIPT.with_name('read_result.py')),
+                                           str(output), '--pointer', '/catalog/0'],
+                                          capture_output=True, timeout=15)
+                    self.assertEqual(read.returncode, 0, read.stderr)
+                    self.assertEqual(compact.expand_view(view), full)
 
     def test_cli_hash_binding_and_read_only_input(self):
         full = self.result()
