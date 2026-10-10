@@ -4,371 +4,249 @@
 
 [![Validate Distribution](https://github.com/timwhitez/AutoRE-CLI/actions/workflows/validate.yml/badge.svg)](https://github.com/timwhitez/AutoRE-CLI/actions/workflows/validate.yml)
 [![Release](https://img.shields.io/github/v/release/timwhitez/AutoRE-CLI?display_name=tag)](https://github.com/timwhitez/AutoRE-CLI/releases/latest)
-[![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-64748b)](#支持平台)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE-MIT)
 
-**面向人类分析师与 AI Agent 的有界纯静态逆向工程工具。**
+**面向分析师与 AI Agent 的有界纯静态逆向工程工具。**
 
-AutoRE-CLI 把 ELF、PE/COFF、Mach-O、object file 和明确指定的 raw 输入
-转换为可追溯 JSON、CFG/IL、可读 pseudo、语言证据与有界的下一步动作，
-全程不执行目标字节。
+AutoRE-CLI 把 ELF、PE/COFF、Mach-O、目标文件及明确指定的 raw 输入转换为
+可追溯 JSON、CFG/IL、可读伪代码、语言与保护证据，全程不执行目标字节。
 
-![AutoRE-CLI 静态分析流程](assets/overview.svg)
+![AI 生成的概念插图：二进制输入转为结构化静态证据与有界下一步动作](assets/readme/agent-workflow-v1.png)
 
-[下载发行包](https://github.com/timwhitez/AutoRE-CLI/releases/latest) ·
+*AI 生成的概念插图，不是产品截图或安全认证。
+具体证据流程见[流程图](assets/overview.svg)。*
+
+[下载](https://github.com/timwhitez/AutoRE-CLI/releases/latest) ·
 [安装](#安装) · [Agent 快速开始](#agent-快速开始) ·
 [CLI 快速开始](#cli-快速开始) · [常见问题](FAQ_zh.md)
 
-本仓库分发二进制与开放的 Agent Skill；Rust 引擎源码单独维护。
-[公开仓库边界](#公开仓库边界)说明了这里实际包含的内容。
-
-## 为什么选择 AutoRE-CLI
-
-- **证据强于自信**：结论明确区分 `validated`、`inferred`、`unresolved` 与
-  `not_claimed`。
-- **适合 Agent 的上下文**：有界 JSON、预算、warning、stop reason、经过验证的
-  bundle 和精确 `next_actions[].argv`，避免输出失控。
-- **纯静态安全边界**：不执行目标、恢复 payload、shellcode、embedded object
-  或任何目标派生产物。
-- **分层检查能力**：反汇编、CFG、LLIL、MLIL、HLIL、CUSTOM IL、pseudo、
-  types、calls、data references、PE inventory 与 Go/Rust 证据。
-- **可重复调查**：archive、replay、semantic diff 和 batch comparison 保留完整
-  证据路径。
-- **离线且可追溯**：安装过程不访问网络；每个发行 binary 都有明确 target、
-  byte count、源码 revision、签名状态和 SHA-256。
-
-### 0.1.11 新增
-
-- `auto-re-cli describe --format json` 无需分析输入即可列出命令；增加
-  `--command function` 可查询一个命令的参数和约束。
-- `--diagnostic-format json` 可在 stderr 输出有界、机器可读的错误。默认文本错误和
-  成功输出保持不变。
-- 八个指定命令可选择 `--result-contract kinds-v1`。默认 `legacy` 根形状仍可用；
-  0.1.11 Skill 只接受明确支持的 kind/version 组合，拒绝未知或矛盾的根对象。
-- Skill 可按哈希绑定的结果精确分页读取对象键与 Unicode 字符串，并识别重复且
-  没有进展的请求。
-
-使用新结果根时，CLI 和 Skill 应同为 0.1.11。可运行下文的
-`skill_doctor.py` 检查实际安装配对。
-
-### 与其他工具的关系
-
-| 工具 | 最适合的场景 | AutoRE-CLI 的差异 |
-| --- | --- | --- |
-| Ghidra、Rizin、angr | 可扩展交互式框架与定制分析 | AutoRE-CLI 是预构建、CLI-first、适合自动化和 Agent 的有界证据接口 |
-| Ghidra MCP 集成 | 用自然语言操作现有 Ghidra 环境 | AutoRE-CLI 不需要 GUI 或分析服务，并把纯静态边界写入输出契约 |
-| capa | 基于规则识别 binary capability | AutoRE-CLI 还提供函数、CFG/IL、pseudo、引用、语言证据与对比工作流 |
-| 通用 binary-analysis Skill | 在独立工具之上提供分析方法 | 本项目的 Skill 与 CLI 共用同一套已验证 action、artifact 和 evidence contract |
-
-AutoRE-CLI 不是 debugger、emulator 或 sandbox，也不声称完美恢复源码。如果需要
-插件生态、交互式 GUI、符号执行或动态观测，应使用相应的大型框架。
+这里是**公开二进制发行仓与开放 Agent Skill**。引擎的 Rust 实现单独维护，
+没有在本仓公开。
 
 ## 安装
 
-要求是 Python 3.9 或更高版本以及受支持的主机；不需要 Rust toolchain 或源码
-checkout。
-
-### 单平台发行包
-
-从 [GitHub Releases](https://github.com/timwhitez/AutoRE-CLI/releases/latest)
-下载对应主机的压缩包，然后验证并安装：
+需要 Python 3.9 或更高版本及[受支持的主机](#支持平台)，无需 Rust toolchain
+或源码 checkout。从 [Releases](https://github.com/timwhitez/AutoRE-CLI/releases/latest)
+下载适合主机的 **0.1.11** 单平台包：
 
 ```sh
-tar -xzf AutoRE-CLI-0.1.11-macos-arm64.tar.gz
-cd AutoRE-CLI-0.1.11-macos-arm64
+tar -xzf AutoRE-CLI-0.1.11-linux-x86_64.tar.gz
+cd AutoRE-CLI-0.1.11-linux-x86_64
 ./verify.sh
 ./install.sh
-auto-re-cli --version
 ```
 
-可以把 `macos-arm64` 替换为 `macos-x86_64`、`linux-x86_64` 或
-`linux-arm64`。Windows 用户解压
-`AutoRE-CLI-0.1.11-windows-x86_64.zip` 后运行：
+可将 `linux-x86_64` 替换为 `linux-arm64`、`macos-arm64` 或 `macos-x86_64`。
+Windows 用户解压 `AutoRE-CLI-0.1.11-windows-x86_64.zip`，在解压目录打开
+PowerShell 后运行：
 
 ```powershell
 py -3 scripts/autore_distribution.py verify
 py -3 scripts/autore_distribution.py install
-auto-re-cli --version
 ```
 
-每个单平台包只包含一个 binary，以及 Agent Skill、离线安装器、
-provenance、checksums 与第三方 notice。也可以 clone 仓库获取完整平台矩阵：
-
-```sh
-git clone --depth 1 https://github.com/timwhitez/AutoRE-CLI.git
-cd AutoRE-CLI
-./verify.sh
-./install.sh
-```
-
-### 包管理器
-
-包管理器只安装 CLI。Agent Skill 需要单独安装；如果希望获得完整且经过验证的发行
-内容，请使用上面的单平台压缩包。
-
-```sh
-# 为 Codex、Claude Code、Cursor 等客户端安装 Agent Skill
-npx skills add \
-  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.11/AutoRE-CLI-0.1.11-auto-re-skill.zip -g
-```
-
-```powershell
-# 在 Windows 上通过 Scoop 安装 CLI
-scoop install https://raw.githubusercontent.com/timwhitez/AutoRE-CLI/main/packaging/scoop/autore-cli.json
-```
-
-仓库内包含版本化
-[Homebrew formula](https://github.com/timwhitez/AutoRE-CLI/blob/main/packaging/homebrew/autore-cli.rb)
-与
-[Scoop manifest](https://github.com/timwhitez/AutoRE-CLI/blob/main/packaging/scoop/autore-cli.json)。
-Homebrew formula 已为独立 Tap 准备好；在 Tap 发布前，请使用经过验证的 macOS
-或 Linux 单平台包。包管理器可用时间可能稍晚于 GitHub Release。
-
-默认安装位置：
-
-- CLI：`${AUTORE_INSTALL_DIR:-$HOME/.local/bin}/auto-re-cli`，Windows 为
-  `auto-re-cli.exe`；
-- Trae Skill：`${TRAE_HOME:-$HOME/.trae}/skills/auto-re`；
-- Agent Skill：`$HOME/.agents/skills/auto-re`。
-
-安装器会验证解压后的完整发行内容，只用 `--version` 探测已验证 binary，复制而非
-symlink，记录 managed marker，并拒绝覆盖 unmanaged destination，除非显式使用
-`--replace-unmanaged`。
-
-常用选项：
+离线安装器先验证完整发行内容，再复制 CLI 和 Skill 并记录 managed marker。
+默认目录是 `$HOME/.local/bin`、`${TRAE_HOME:-$HOME/.trae}/skills/auto-re` 和
+`$HOME/.agents/skills/auto-re`。将 CLI 目录加入 `PATH` 后检查
+`auto-re-cli --version`。也可 clone 本仓，在仓库根运行 `./verify.sh` 和 `./install.sh`。
 
 ```sh
 ./install.sh --dry-run
 ./install.sh --cli-only
-./install.sh --skill-only --agents trae
 ./install.sh --skill-only --agents codex
+./install.sh --skill-only --agents trae
 ./install.sh --skill-only --agents both
 ./install.sh --install-dir "$HOME/bin"
 ./install.sh --skill-only --agents codex --codex-home "$HOME/.codex"
 ```
 
-`--codex-home` 选择旧版 `<home>/skills` 兼容路径；当前默认路径是
-`$HOME/.agents/skills`。
+`--codex-home` 指向旧版 `<home>/skills` 兼容位置，当前默认是
+`$HOME/.agents/skills`。覆盖 unmanaged 目标须显式指定 `--replace-unmanaged`。
+更新时验证并安装新发行包；managed drift、同版本 binary repack、降级和额外
+Skill 文件会 fail closed。`./uninstall.sh` 删除托管文件；`--force-managed` 仅允许
+移除 marker 列出的已修改文件，不覆盖无关文件。
+Windows 使用 `py -3 scripts/autore_distribution.py` 加相同子命令和选项。
 
-### 更新与卸载
+### 其他安装入口
 
-解压新版本后重新运行 `./verify.sh` 和 `./install.sh`。managed drift、同版本
-binary repack、降级和额外 Skill 文件都会 fail closed。
+包管理器只安装 CLI。本仓包含版本化 [Scoop manifest](https://github.com/timwhitez/AutoRE-CLI/blob/main/packaging/scoop/autore-cli.json)
+和 [Homebrew formula](https://github.com/timwhitez/AutoRE-CLI/blob/main/packaging/homebrew/autore-cli.rb)。独立 Homebrew Tap 发布前，
+请使用已验证的单平台包；包管理器可用时间可能晚于发行时间。
 
-```sh
-./uninstall.sh
-./uninstall.sh --force-managed
+```powershell
+scoop install https://raw.githubusercontent.com/timwhitez/AutoRE-CLI/main/packaging/scoop/autore-cli.json
 ```
 
-`--force-managed` 只作用于 marker 列出的已修改文件，不会授权删除无关父目录或
-额外用户文件。
+仅安装 Skill 到 Codex、Claude Code、Cursor 等受支持客户端：
+
+```sh
+npx skills add \
+  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.11/AutoRE-CLI-0.1.11-auto-re-skill.zip -g
+```
+
+保持已安装 CLI 与 Skill 版本一致。下载或包管理器联网与离线安装器是不同步骤。
 
 ## Agent 快速开始
 
-对于开放式分析，优先使用当前 Skill 的单次入口。`./analysis-results` 父目录必须已存在，结果子目录必须是新的：
+安装后刷新 Agent，调用 [`auto-re` Skill](skills/auto-re/SKILL.md)：
+
+```text
+使用 $auto-re 对 ./samples/sample.exe 进行纯静态分析，将有界、可追溯的结论
+写入 ./analysis-results。不得执行样本或任何目标派生产物。
+```
+
+直接获取第一份证据时，使用已安装 Skill。输入放在 `./samples/`；结果必须在输入
+解析后父目录及其所有子目录之外，也必须在 Skill 目录之外。结果父目录须已存在，
+结果子目录须为新路径。
 
 ```sh
 mkdir -p ./analysis-results
-python3 skills/auto-re/scripts/start_analysis.py ./sample.exe \
-  --result-dir ./analysis-results/first-pass
-```
-
-阅读返回的 `result_path`，不要仅凭摘要判断行为。已知函数可添加 `--addr`；分页和引用查询按下方 CLI/Skill 流程继续。
-
-
-安装后重启或刷新 Agent，然后调用：
-
-```text
-使用 $auto-re 对 ./sample.exe 进行纯静态分析，把有界、可追溯的结论写入
-./analysis-results。不得执行样本或任何目标派生产物。
-```
-
-Skill 会先诊断 CLI/Skill 版本一致性和重复注册；对明确的窄问题直接选择最小命令；
-把 bundle 校验为有界 receipt 后再读取；分离不同证据强度；每次只跟随一个相关的
-静态 continuation，并将操作日志限制在有界 tail 中；最后在证据或预算边界处停止。
-
-分析前可检查已安装的 CLI/Skill 组合：
-
-```sh
 python3 "$HOME/.agents/skills/auto-re/scripts/skill_doctor.py"
+python3 "$HOME/.agents/skills/auto-re/scripts/start_analysis.py" \
+  ./samples/sample.exe --result-dir ./analysis-results/first-pass
 ```
 
-可用 helper 在不经过 shell interpolation 的情况下准备 emitted action：
+Windows 使用 `py -3`，参见[平台调用](skills/auto-re/references/platform-invocation.md)。
+启动器要求已安装 CLI/Skill 配对通过就绪检查；unmanaged checkout 使用
+[Skill](skills/auto-re/SKILL.md) 中的显式流程。
+
+阅读返回的 **`result_path`**，检查 warning、预算、completion 和 `next_actions[]`。
+启动器摘要与操作 receipt 不构成分析结论，进程退出码为零也不证明分析完整。
+
+窄问题直接选择一个入口，无需先跑总报告：
 
 ```sh
-python3 skills/auto-re/scripts/run_next_action.py \
-  ./analysis-results/sample.bundle/manifest.json \
-  --action-stage function.selected \
-  --output ./analysis-results/function-selected.json \
-  --receipt ./analysis-results/receipts/function-selected.json \
-  --dry-run
+# 精确函数：--addr 与 --symbol 互斥
+python3 "$HOME/.agents/skills/auto-re/scripts/start_analysis.py" \
+  ./samples/sample.exe --addr 0x401000 --result-dir ./analysis-results/function-pass
+
+# PE 字符串清单；其他支持的 inspection 见 --help
+python3 "$HOME/.agents/skills/auto-re/scripts/start_analysis.py" \
+  ./samples/sample.exe --command pe-strings --result-dir ./analysis-results/strings-pass
 ```
 
-检查准确 argument vector 后再移除 `--dry-run`。已经拥有 bundle/spill sink 的
-action 会拒绝额外 `--output`。
+高级分页、引用查询和续查见[命令路由](skills/auto-re/references/command-routing.md)。
+先明确尚未回答的问题，验证 bundle/spill，每次只跟进一个相关静态动作。
+用 `run_next_action.py --dry-run` 检查 emitted `argv[]`，续查保留 receipt 并传入
+`--prior-receipt`。证据足够、预算耗尽、语义不支持或相同请求没有进展时停止。
 
 ## CLI 快速开始
 
-先查询已安装 CLI 的命令契约，再选择分析路线：
+无需打开输入即可查询命令契约：
 
 ```sh
 auto-re-cli describe --format json
 auto-re-cli describe --format json --command function
 ```
 
-### 有界 Context Bundle
+创建有界报告 bundle 并验证 payload：
 
 ```sh
-mkdir -p ./analysis-results
 mkdir -p ./analysis-results/receipts
-auto-re-cli report ./sample.exe \
-  --format json \
-  --json-profile ai \
-  --sections binary,summary,inspections,flow,functions,types \
-  --limit 8 \
+auto-re-cli report ./samples/sample.exe \
+  --format json --json-profile ai \
+  --sections binary,summary,inspections,flow,functions,types --limit 8 \
   --bundle-dir ./analysis-results/sample.bundle \
   --output ./analysis-results/sample.bundle/manifest.json
 
-python3 skills/auto-re/scripts/verify_bundle.py \
+python3 "$HOME/.agents/skills/auto-re/scripts/verify_bundle.py" \
   ./analysis-results/sample.bundle/manifest.json \
   --receipt ./analysis-results/receipts/bundle-verification.json
 ```
 
-Receipt 会指向稳定的只读 payload 副本，并记录 byte count、SHA-256、warning、
-budget、completion state、current finding 和有界 next action。最后一个消费者结束后，
-只清理 validator 拥有的临时树：
+读取 receipt 的 `files[].path`：它们指向稳定、哈希已验证的只读副本。
+最后一个消费者结束后，只清理校验器拥有的临时树：
 
 ```sh
-python3 skills/auto-re/scripts/verify_bundle.py \
+python3 "$HOME/.agents/skills/auto-re/scripts/verify_bundle.py" \
   --cleanup-receipt ./analysis-results/receipts/bundle-verification.json
 ```
 
-### 聚焦函数
+聚焦函数及 CUSTOM IL：
 
 ```sh
-auto-re-cli function ./sample.exe \
-  --addr 0x401000 \
-  --format json \
-  --output ./analysis-results/function-401000.json
-
-auto-re-cli dump-il ./sample.exe \
-  --level custom \
-  --addr 0x401000 \
-  --format json \
-  --output ./analysis-results/custom-il-401000.json
+auto-re-cli function ./samples/sample.exe --addr 0x401000 \
+  --format json --output ./analysis-results/function-401000.json
+auto-re-cli dump-il ./samples/sample.exe --level custom --addr 0x401000 \
+  --format json --output ./analysis-results/custom-il-401000.json
 ```
 
-### 复现安全 Demo
+分析 raw shellcode 须显式传入 `--raw-shellcode --arch x86 --base-address 0x1000`
+及已知的 `--entry-address`，不能从文件名推断架构、基址或入口。
+独立编写的无害目标文件示例见[受控 Demo](https://github.com/timwhitez/AutoRE-CLI/blob/main/examples/controlled/README.md)。
+其记录属于历史 fixture 证据，不代表当前质量或全程序覆盖率。
 
-[`examples/controlled/fixture.c`](examples/controlled/fixture.c) 是独立编写的无害
-fixture。把它构建为不可运行的 object，然后执行
-[`examples/controlled/README.md`](examples/controlled/README.md) 中的命令。
-实测 Demo 找到一个 AArch64 函数，在没有 truncation 或 warning 的情况下完成，并把
-缺失的类型证据保留为 `not_claimed`。
-
-### 显式 Raw Shellcode
-
-```sh
-auto-re-cli report ./stage.bin \
-  --raw-shellcode \
-  --arch x86 \
-  --base-address 0x1000 \
-  --entry-address 0x1000 \
-  --format json \
-  --json-profile ai \
-  --sections summary,flow,functions \
-  --bundle-dir ./analysis-results/raw.bundle \
-  --output ./analysis-results/raw.bundle/manifest.json
-```
-
-raw architecture、base 和 entry 必须由调用者提供，不能从文件名猜测。
-
-## 分析能力
+## 分析入口与 0.1.11
 
 | 任务 | 命令 |
 | --- | --- |
-| Aggregate triage | `report`、`analyze`、`decompile` |
-| Function 与 local slice | `function`、`slice-function` |
-| IL 与 CFG | `dump-il`、`dump-cfg`、`inspect-passes` |
+| Triage 与伪代码 | `report`、`analyze`、`decompile` |
+| 精确函数与切片 | `function`、`function-bounds`、`slice-function` |
+| IL 与 CFG | `dump-il`、`dump-cfg`、`inspect-passes`；实验性 `dump-llvm` |
 | 静态关系 | `inspect-flow`、`call-graph`、`data-xrefs`、`aarch64-refs` |
-| PE inventory | `pe-resources`、`pe-strings` |
-| 语言证据 | `inspect-go`、`inspect-rust`、`inspect-types` |
-| Protection evidence | `inspect-die`、`inspect-upx`、`inspect-vmp` |
-| 可重复比较 | `batch`、`archive`、`replay`、`diff`、`batch-diff` |
+| PE 清单 | `pe-resources`、`pe-strings` |
+| 语言与保护证据 | `inspect-go`、`inspect-rust`、`inspect-types`、`inspect-die`、`inspect-upx`、`inspect-vmp` |
+| 静态字节恢复 | `recover-bytes`、`fold-pair-bytes`（有界数据变换，不执行目标） |
+| 归档与比较 | `batch`、`archive`、`replay`、`batch-replay`、`diff`、`batch-diff`、`compare-functions` |
+| 测量 | `bench`（需记录输入及可比测量） |
 
-使用 `auto-re-cli <command> --help` 查看当前安装版本的准确参数。
-如需机器可读错误，可在子命令前加 `--diagnostic-format json`。只有
-`describe` 标明支持的命令才可加 `--result-contract kinds-v1`；旧消费者继续使用
-`legacy`。
+0.1.11 新增 metadata-only `describe`、通过全局 `--diagnostic-format json` 选择
+有界 stderr 错误，以及八个指定命令可选的 `--result-contract kinds-v1`。
+默认文本错误和 `legacy` 结果根仍可使用。通过 `describe` 与 `<command> --help`
+查询支持的选项，使用配对的 0.1.11 Skill 消费新结果根。Skill 还支持精确有界的
+对象键分页、Unicode 字符串切片及请求身份/no-progress 检查。
+
+## 限制与证据
+
+- 分析架构为 x86、x86-64 和 AArch64；覆盖程度取决于容器、元数据、指令支持和预算。
+- 伪代码及 Go/Rust source-shape 提示属于静态证据，不是原始源码。不宣称完整源码
+  语义、通用语言 ABI 恢复或全程序可达性；不支持的语义保持显式。
+- UPX/VMProtect 检测不等于完整脱壳或去虚拟化。可信静态 helper 须显式 opt-in，
+  helper 产物仍是数据。
+- 完成一页、warning 为空或零名称/调用者都不能证明完整性或不可达。一起检查截断、
+  unresolved edge 与 stop reason。`--limit` 控制输出行，discovery 与输入预算另计，
+  不限制 peak memory；默认输入快照预算为 256 MiB。
+- 字符串、名称和推断角色不证明运行时行为、恶意意图或作者身份。区分
+  `validated`、`inferred`、`unresolved` 和 `not_claimed`。
+
+AutoRE-CLI 适用于预构建 CLI 自动化与有界 Agent 证据。Ghidra/Rizin 面向交互式
+框架工作流，capa 面向规则型能力分析，Ghidra MCP 集成操作现有 Ghidra 环境。
+AutoRE-CLI 不提供 debugger、emulator、sandbox、符号执行或分析服务。
 
 ## 支持平台
 
-| 主机 | 发行 target | 状态 |
+| 主机 | 发行 target | 签名 |
 | --- | --- | --- |
-| macOS Apple Silicon | `macos-arm64` | 已发布；ad-hoc signed |
-| macOS Intel | `macos-x86_64` | 已发布；ad-hoc signed |
-| Linux x86-64 | `linux-x86_64` | 已发布 |
-| Linux AArch64 | `linux-arm64` | 已发布 |
-| Windows x86-64 | `windows-x86_64` | 已发布；未签名 |
+| macOS Apple Silicon | `macos-arm64` | Ad-hoc signed |
+| macOS Intel | `macos-x86_64` | Ad-hoc signed |
+| Linux x86-64 | `linux-x86_64` | 不适用 |
+| Linux AArch64 | `linux-arm64` | 不适用 |
+| Windows x86-64（Windows 10+） | `windows-x86_64` | 未签名 |
 
-macOS binary 没有 Developer ID 签名，也没有 notarization。Windows binary 支持
-Windows 10 或更高版本，且没有 Authenticode 签名。
+macOS 没有 Developer ID 签名或 notarization；Windows 没有 Authenticode 签名。
+Linux 发行版使用动态链接 GNU target。主机平台矩阵与被分析输入架构不同。
 
-## 完整性与来源
+## 完整性与公开边界
 
-安装前运行 `./verify.sh`。它验证：
+安装前运行 `./verify.sh` 或 Windows Python 等价命令。它检查准确的 `SHA256SUMS`
+文件集合、binary target/size/hash、托管 Skill 清单、publisher 身份、许可边界及
+禁止的私有内容。[manifest/release.json](manifest/release.json) 将二进制绑定到原始
+源码 revision、toolchain、版本及签名状态。校验和不替代平台签名，也不证明输入安全。
 
-- 每一行 `SHA256SUMS` 和准确的公开文件集合；
-- `manifest/release.json` 中每个 binary 的 target/path/size/hash；
-- 精确的 managed Skill 文件集合；
-- MIT-only 项目许可证边界；
-- 个人 publisher 与 repository identity；
-- 不含源码根、Rust 源码、私有路径、样本、内部产物以及受管控内部账号标识。
+本 MIT 发行仓包含二进制、开放 Skill/helper、安装器、校验器、自动化、受控 Demo
+源码、图片和文档。Rust 引擎实现、私有规格、样本与分析输出没有公开。
+这里的“开源”适用于公开脚本、Skill、示例、自动化和文档。
 
-`manifest/release.json` 记录 publisher、repository URL、版本、distribution
-scope、源码 revision、toolchain、target matrix 和 static-safety flags。
-第三方许可独立保存在 `THIRD_PARTY_LICENSES.md` 与 `licenses/third-party/`。
+## 维护与支持
 
-## 公开仓库边界
+[FAQ](FAQ_zh.md) · [调查流程](skills/auto-re/references/investigation-workflows.md) ·
+[发行历史](https://github.com/timwhitez/AutoRE-CLI/blob/main/CHANGELOG.md) · [贡献指南](CONTRIBUTING.md) ·
+[维护说明](AGENTS.md) · [@timwhitez](https://github.com/timwhitez)
 
-本仓库是 Auto-RE 的 MIT 许可**公开二进制发行仓**，包含编译后二进制、开源 Agent
-Skill 与 helper、安装与校验脚本、Release 自动化、受控 Demo 源码、checksums、
-provenance、第三方 notice 和文档。
+通过 [Issues](https://github.com/timwhitez/AutoRE-CLI/issues) 报告 bug 或文档问题，
+通过 [Discussions](https://github.com/timwhitez/AutoRE-CLI/discussions/1) 讨论用例，
+安全缺陷使用[私密漏洞报告](https://github.com/timwhitez/AutoRE-CLI/security/advisories/new)。
+不要上传恶意样本、payload、secret、私有路径或 proprietary analysis output。
 
-引擎的 Rust 实现、私有规格、样本与分析输出没有在此公开。本仓库中的“开源”仅适用于
-公开脚本、Skill、example、自动化和文档，不代表 binary engine 的实现源码可用。
-
-## 仓库结构
-
-```text
-assets/                       Demo 与社交传播素材
-bin/                          多平台 binary
-examples/controlled/          无害且可复现的 Demo 源码
-skills/auto-re/               Agent Skill 与 deterministic helper
-scripts/autore_distribution.py
-scripts/build_release_assets.py
-manifest/release.json         机器可读来源
-licenses/third-party/         第三方许可
-SHA256SUMS                    外层完整性清单
-install.sh / uninstall.sh     managed 本地安装
-verify.sh                     fail-closed 发行校验器
-```
-
-## 支持
-
-- 维护指南：[AGENTS.md](AGENTS.md)
-- 静态调查流程：[Skill 参考](skills/auto-re/references/investigation-workflows.md)
-- Bug 与文档：[Issues](https://github.com/timwhitez/AutoRE-CLI/issues)
-- 用例与集成需求：[公开讨论](https://github.com/timwhitez/AutoRE-CLI/discussions/1)
-- 安全问题：[私密漏洞报告](https://github.com/timwhitez/AutoRE-CLI/security/advisories/new)
-- 贡献边界：[CONTRIBUTING.md](CONTRIBUTING.md)
-- 发行记录：[CHANGELOG.md](CHANGELOG.md)
-- 维护者：[@timwhitez](https://github.com/timwhitez)
-
-不要上传恶意样本、恢复 payload、secret、私有路径或 proprietary analysis output。
-
-## 许可证
-
-AutoRE-CLI 公开发行内容使用 [MIT License](LICENSE-MIT)。第三方依赖保留各自
-许可证，其中可能包含 Apache 许可依赖，详见
-[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)。
+项目采用 [MIT License](LICENSE-MIT)。第三方依赖保留各自许可，包括适用的
+Apache 许可，详见[第三方声明](THIRD_PARTY_LICENSES.md)。
