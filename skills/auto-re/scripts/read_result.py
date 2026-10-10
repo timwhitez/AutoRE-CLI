@@ -54,7 +54,7 @@ def _bounded_int(value):
     return int(value)
 
 
-def read_source(path, expected):
+def read_source(path, expected, *, parse_float=float):
     if expected is not None and not re.fullmatch(r'[0-9a-f]{64}', expected):
         raise ViewError('invalid_expected_sha256')
     path = pathlib.Path(path)
@@ -84,7 +84,7 @@ def read_source(path, expected):
         raise ViewError('source_changed')
     try:
         document = json.loads(data.decode('utf-8'), object_pairs_hook=_unique_object,
-                              parse_constant=_reject_constant, parse_int=_bounded_int)
+                              parse_constant=_reject_constant, parse_int=_bounded_int, parse_float=parse_float)
         runner._validate_json_shape(document, runner.ACTION_RESULT_POLICY)
         # The shared shape policy bounds size but does not reject lone surrogates or float overflow.
         stack = [document]
