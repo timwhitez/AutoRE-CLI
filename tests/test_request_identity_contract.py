@@ -16,7 +16,7 @@ SPEC = importlib.util.spec_from_file_location(
     "identity_runner", ROOT / "skills/auto-re/scripts/run_next_action.py")
 runner = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(runner)
-CONTRACT = json.loads((Path(__file__).parent / "fixtures/cli_identity_0_1_10.json").read_text())
+CONTRACT = json.loads((Path(__file__).parent / "fixtures/cli_identity_0_1_11.json").read_text())
 VERSION = "auto-re-cli " + CONTRACT["version"]
 
 
@@ -106,6 +106,42 @@ class RequestIdentityContractTests(unittest.TestCase):
         self.assertEqual(self.identity(["function", "--", str(self.input), "--output", "one.json"])[1], "unsupported_shape")
         self.assertEqual(self.identity(["function", "--symbol", "--output", str(self.input)])[1], "unsupported_shape")
 
+    def test_release_options_preserve_identity_and_no_progress(self):
+        selected = ("function", "dump-cfg", "slice-function", "inspect-flow",
+                    "dump-il", "inspect-passes", "decompile", "report")
+        for command in selected:
+            for prefix in (["--diagnostic-format", "json"], ["--diagnostic-format=json"]):
+                with self.subTest(command=command, prefix=prefix):
+                    args = [*prefix, "--output", "one.json", command,
+                            "--result-contract", "kinds-v1", "--", str(self.input)]
+                    identity, reason = self.identity(args)
+                    self.assertEqual(reason, "available")
+                    self.assertEqual(identity["analysis_argv"][:len(prefix)], prefix)
+                    self.assertIn("--result-contract", identity["analysis_argv"])
+                    self.assertIn("--", identity["analysis_argv"])
+                    args[args.index("one.json")] = "two.json"
+                    self.assertEqual(self.identity(args)[0], identity)
+                    prior = {"request_identity": identity, "execution_status": "completed"}
+                    with self.assertRaisesRegex(runner.ActionError, "no_progress"):
+                        runner.assess_continuation(prior, identity, 60)
+                    self.assertNotEqual(self.identity([a.replace("kinds-v1", "legacy") for a in args])[0], identity)
+                    self.assertNotEqual(self.identity([a.replace("json", "text") for a in args])[0], identity)
+            self.assertEqual(self.identity([command, "--diagnostic-format", "json",
+                                           "--result-contract=kinds-v1", str(self.input)])[1], "available")
+        for args in (["--diagnostic-format"], ["--diagnostic-format", "--output", "x"],
+                     ["analyze", "--result-contract", "kinds-v1", str(self.input)],
+                     ["function", "--", str(self.input), "--diagnostic-format=json"]):
+            with self.subTest(args=args), patch.object(runner.os, "open") as opened:
+                self.assertEqual(self.identity(args)[1], "unsupported_shape")
+                opened.assert_not_called()
+
+    def test_describe_never_hashes_input(self):
+        for args in (["describe", "--format", "json"],
+                     ["--diagnostic-format=json", "describe", "--format", "json", "--command", "function"]):
+            with self.subTest(args=args), patch.object(runner.os, "open") as opened:
+                self.assertEqual(self.identity(args)[1], "unsupported_command")
+                opened.assert_not_called()
+
     def test_unknown_incomplete_or_extra_arguments_fail_closed(self):
         for args in (["function"], ["function", "--symbol"], ["function", str(self.input), str(self.input)],
                      ["function", "--unknown", str(self.input)], ["function", "--flat=true", str(self.input)],
@@ -146,7 +182,7 @@ class RequestIdentityContractTests(unittest.TestCase):
         self.assertNotEqual(reordered, expected)
 
     def test_release_version_mismatch_does_not_hash_input(self):
-        for version in ("auto-re-cli 0.1.9", "auto-re-cli 0.1.11", "auto-re-cli 1.2.3", "", None):
+        for version in ("auto-re-cli 0.1.9", "auto-re-cli 0.1.10", "auto-re-cli 0.1.12", "auto-re-cli 1.2.3", "", None):
             with self.subTest(version=version), patch.object(runner.os, "open") as opened:
                 self.assertEqual(self.identity(["dump-il", str(self.input)], version)[1], "unsupported_command")
                 opened.assert_not_called()
@@ -173,7 +209,7 @@ class RequestIdentityContractTests(unittest.TestCase):
                     "argv": ["auto-re-cli", "dump-cfg", str(self.input), "--output", str(self.root / "out.json")]}
         empty = runner.CapturedStream(b"", 0, hashlib.sha256(b"").hexdigest())
         result = runner.process_control.ProcessResult(0, "completed", empty, empty, (), True)
-        with patch.object(runner, "probe_program_version", return_value="auto-re-cli 0.1.11"), \
+        with patch.object(runner, "probe_program_version", return_value="auto-re-cli 0.1.10"), \
              patch.object(runner.process_control, "run_process", return_value=result) as run:
             code, summary = runner.execute_prepared_with_receipt(prepared, Path(sys.executable), self.root / "receipt.json")
         self.assertEqual(code, 0)

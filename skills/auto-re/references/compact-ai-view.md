@@ -1,7 +1,7 @@
 # Optional compact AI evidence view v1
 
 Use `compact_result.py` only to reduce context from an existing report/decompile
-AI JSON file. This offline checkout helper performs no analysis, model call or
+AI JSON file. Shipped since 0.1.11, this offline helper performs no analysis, model call or
 CLI upgrade. Prefer existing sections, paging, selected scope, spill and bundles
 when they already answer the question.
 

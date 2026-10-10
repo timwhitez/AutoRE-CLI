@@ -2,8 +2,6 @@
 
 [English](README.md) | [简体中文](README_zh.md)
 
-维护指南：[AGENTS.md](AGENTS.md) · 排障：[FAQ_zh.md](FAQ_zh.md) · 静态调查流程：[Skill 工作流](skills/auto-re/references/investigation-workflows.md)
-
 [![Validate Distribution](https://github.com/timwhitez/AutoRE-CLI/actions/workflows/validate.yml/badge.svg)](https://github.com/timwhitez/AutoRE-CLI/actions/workflows/validate.yml)
 [![Release](https://img.shields.io/github/v/release/timwhitez/AutoRE-CLI?display_name=tag)](https://github.com/timwhitez/AutoRE-CLI/releases/latest)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-64748b)](#支持平台)
@@ -11,16 +9,18 @@
 
 **面向人类分析师与 AI Agent 的有界纯静态逆向工程工具。**
 
-AutoRE-CLI 把 ELF、PE/COFF、Mach-O、object file 和明确标识的 raw shellcode
-转换为可追溯 JSON、CFG/IL、可读 pseudo、语言证据与安全的下一步动作，全程不执行
-目标字节。
+AutoRE-CLI 把 ELF、PE/COFF、Mach-O、object file 和明确指定的 raw 输入
+转换为可追溯 JSON、CFG/IL、可读 pseudo、语言证据与有界的下一步动作，
+全程不执行目标字节。
 
-![AutoRE-CLI 受控静态分析演示](assets/demo.png)
+![AutoRE-CLI 静态分析流程](assets/overview.svg)
 
-[下载](https://github.com/timwhitez/AutoRE-CLI/releases/latest) ·
-[Agent 快速开始](#agent-快速开始) · [CLI 快速开始](#cli-快速开始) ·
-[为什么选择 AutoRE-CLI](#为什么选择-autore-cli) · [安全说明](SECURITY.md) ·
-[常见问题](FAQ_zh.md)
+[下载发行包](https://github.com/timwhitez/AutoRE-CLI/releases/latest) ·
+[安装](#安装) · [Agent 快速开始](#agent-快速开始) ·
+[CLI 快速开始](#cli-快速开始) · [常见问题](FAQ_zh.md)
+
+本仓库分发二进制与开放的 Agent Skill；Rust 引擎源码单独维护。
+[公开仓库边界](#公开仓库边界)说明了这里实际包含的内容。
 
 ## 为什么选择 AutoRE-CLI
 
@@ -36,6 +36,20 @@ AutoRE-CLI 把 ELF、PE/COFF、Mach-O、object file 和明确标识的 raw shell
   证据路径。
 - **离线且可追溯**：安装过程不访问网络；每个发行 binary 都有明确 target、
   byte count、源码 revision、签名状态和 SHA-256。
+
+### 0.1.11 新增
+
+- `auto-re-cli describe --format json` 无需分析输入即可列出命令；增加
+  `--command function` 可查询一个命令的参数和约束。
+- `--diagnostic-format json` 可在 stderr 输出有界、机器可读的错误。默认文本错误和
+  成功输出保持不变。
+- 八个指定命令可选择 `--result-contract kinds-v1`。默认 `legacy` 根形状仍可用；
+  0.1.11 Skill 只接受明确支持的 kind/version 组合，拒绝未知或矛盾的根对象。
+- Skill 可按哈希绑定的结果精确分页读取对象键与 Unicode 字符串，并识别重复且
+  没有进展的请求。
+
+使用新结果根时，CLI 和 Skill 应同为 0.1.11。可运行下文的
+`skill_doctor.py` 检查实际安装配对。
 
 ### 与其他工具的关系
 
@@ -60,8 +74,8 @@ checkout。
 下载对应主机的压缩包，然后验证并安装：
 
 ```sh
-tar -xzf AutoRE-CLI-0.1.10-macos-arm64.tar.gz
-cd AutoRE-CLI-0.1.10-macos-arm64
+tar -xzf AutoRE-CLI-0.1.11-macos-arm64.tar.gz
+cd AutoRE-CLI-0.1.11-macos-arm64
 ./verify.sh
 ./install.sh
 auto-re-cli --version
@@ -69,7 +83,7 @@ auto-re-cli --version
 
 可以把 `macos-arm64` 替换为 `macos-x86_64`、`linux-x86_64` 或
 `linux-arm64`。Windows 用户解压
-`AutoRE-CLI-0.1.10-windows-x86_64.zip` 后运行：
+`AutoRE-CLI-0.1.11-windows-x86_64.zip` 后运行：
 
 ```powershell
 py -3 scripts/autore_distribution.py verify
@@ -95,7 +109,7 @@ cd AutoRE-CLI
 ```sh
 # 为 Codex、Claude Code、Cursor 等客户端安装 Agent Skill
 npx skills add \
-  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.10/AutoRE-CLI-0.1.10-auto-re-skill.zip -g
+  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.11/AutoRE-CLI-0.1.11-auto-re-skill.zip -g
 ```
 
 ```powershell
@@ -195,6 +209,13 @@ action 会拒绝额外 `--output`。
 
 ## CLI 快速开始
 
+先查询已安装 CLI 的命令契约，再选择分析路线：
+
+```sh
+auto-re-cli describe --format json
+auto-re-cli describe --format json --command function
+```
+
 ### 有界 Context Bundle
 
 ```sh
@@ -276,6 +297,9 @@ raw architecture、base 和 entry 必须由调用者提供，不能从文件名�
 | 可重复比较 | `batch`、`archive`、`replay`、`diff`、`batch-diff` |
 
 使用 `auto-re-cli <command> --help` 查看当前安装版本的准确参数。
+如需机器可读错误，可在子命令前加 `--diagnostic-format json`。只有
+`describe` 标明支持的命令才可加 `--result-contract kinds-v1`；旧消费者继续使用
+`legacy`。
 
 ## 支持平台
 
@@ -332,6 +356,8 @@ verify.sh                     fail-closed 发行校验器
 
 ## 支持
 
+- 维护指南：[AGENTS.md](AGENTS.md)
+- 静态调查流程：[Skill 参考](skills/auto-re/references/investigation-workflows.md)
 - Bug 与文档：[Issues](https://github.com/timwhitez/AutoRE-CLI/issues)
 - 用例与集成需求：[公开讨论](https://github.com/timwhitez/AutoRE-CLI/discussions/1)
 - 安全问题：[私密漏洞报告](https://github.com/timwhitez/AutoRE-CLI/security/advisories/new)

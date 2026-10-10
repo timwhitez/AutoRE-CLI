@@ -1,0 +1,637 @@
+{
+  "version": "0.1.11",
+  "global_value_options": [
+    "--output",
+    "--diagnostic-format"
+  ],
+  "commands": {
+    "aarch64-refs": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--address",
+        "--arch",
+        "--base-address",
+        "--entry-address",
+        "--format",
+        "--function",
+        "--function-addr",
+        "--instruction-limit",
+        "--json-profile",
+        "--limit",
+        "--max-functions",
+        "--max-input-bytes",
+        "--max-instructions-per-function",
+        "--offset",
+        "--output",
+        "--spill-dir",
+        "--diagnostic-format"
+      ],
+      "switch_options": [
+        "--raw-shellcode"
+      ]
+    },
+    "analyze": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--arch",
+        "--base-address",
+        "--entry-address",
+        "--format",
+        "--max-functions",
+        "--max-input-bytes",
+        "--max-instructions-per-function",
+        "--output",
+        "--spill-dir",
+        "--style",
+        "--diagnostic-format"
+      ],
+      "switch_options": [
+        "--raw-shellcode"
+      ]
+    },
+    "archive": {
+      "classification": "archive_replay",
+      "aliases": []
+    },
+    "batch": {
+      "classification": "batch",
+      "aliases": []
+    },
+    "batch-diff": {
+      "classification": "batch",
+      "aliases": []
+    },
+    "batch-replay": {
+      "classification": "batch",
+      "aliases": []
+    },
+    "bench": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--arch",
+        "--base-address",
+        "--entry-address",
+        "--format",
+        "--iterations",
+        "--max-functions",
+        "--max-input-bytes",
+        "--max-instructions-per-function",
+        "--output",
+        "--spill-dir",
+        "--style",
+        "--diagnostic-format"
+      ],
+      "switch_options": [
+        "--raw-shellcode"
+      ]
+    },
+    "call-graph": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--addr",
+        "--arch",
+        "--base-address",
+        "--depth",
+        "--edge-limit",
+        "--entry-address",
+        "--format",
+        "--json-profile",
+        "--max-functions",
+        "--max-input-bytes",
+        "--max-instructions-per-function",
+        "--node-limit",
+        "--output",
+        "--spill-dir",
+        "--symbol",
+        "--diagnostic-format"
+      ],
+      "switch_options": [
+        "--raw-shellcode"
+      ]
+    },
+    "compare-functions": {
+      "classification": "multi_input",
+      "aliases": []
+    },
+    "data-xrefs": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--address",
+        "--address-end",
+        "--arch",
+        "--base-address",
+        "--direction",
+        "--entry-address",
+        "--format",
+        "--function",
+        "--function-addr",
+        "--global",
+        "--json-profile",
+        "--limit",
+        "--max-functions",
+        "--max-input-bytes",
+        "--max-instructions-per-function",
+        "--offset",
+        "--output",
+        "--provenance-limit",
+        "--spill-dir",
+        "--string",
+        "--diagnostic-format"
+      ],
+      "switch_options": [
+        "--raw-shellcode"
+      ]
+    },
+    "decompile": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--arch",
+        "--base-address",
+        "--entry-address",
+        "--format",
+        "--function-offset",
+        "--json-profile",
+        "--limit",
+        "--max-functions",
+        "--max-input-bytes",
+        "--max-instructions-per-function",
+        "--max-output-lines",
+        "--output",
+        "--spill-dir",
+        "--style",
+        "--diagnostic-format",
+        "--result-contract"
+      ],
+      "switch_options": [
+        "--flat",
+        "--include-noise",
+        "--raw-shellcode",
+        "--split-output"
+      ]
+    },
+    "describe": {
+      "classification": "metadata_no_input",
+      "aliases": []
+    },
+    "diff": {
+      "classification": "archive_replay",
+      "aliases": []
+    },
+    "dump-cfg": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--addr",
+        "--arch",
+        "--base-address",
+        "--entry-address",
+        "--format",
+        "--max-functions",
+        "--max-input-bytes",
+        "--max-instructions-per-function",
+        "--output",
+        "--spill-dir",
+        "--symbol",
+        "--diagnostic-format",
+        "--result-contract"
+      ],
+      "switch_options": [
+        "--raw-shellcode"
+      ]
+    },
+    "dump-il": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--addr",
+        "--arch",
+        "--base-address",
+        "--entry-address",
+        "--format",
+        "--level",
+        "--max-functions",
+        "--max-input-bytes",
+        "--max-instructions-per-function",
+        "--output",
+        "--spill-dir",
+        "--statement-address",
+        "--statement-contains",
+        "--statement-limit",
+        "--statement-offset",
+        "--symbol",
+        "--diagnostic-format",
+        "--result-contract"
+      ],
+      "switch_options": [
+        "--flat",
+        "--raw-shellcode"
+      ]
+    },
+    "dump-llvm": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--addr",
+        "--arch",
+        "--base-address",
+        "--entry-address",
+        "--max-functions",
+        "--max-input-bytes",
+        "--max-instructions-per-function",
+        "--output",
+        "--spill-dir",
+        "--symbol",
+        "--diagnostic-format"
+      ],
+      "switch_options": [
+        "--raw-shellcode"
+      ]
+    },
+    "fold-pair-bytes": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--output",
+        "--spill-dir",
+        "--diagnostic-format"
+      ],
+      "switch_options": []
+    },
+    "function": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--addr",
+        "--arch",
+        "--base-address",
+        "--entry-address",
+        "--format",
+        "--max-functions",
+        "--max-input-bytes",
+        "--max-instructions-per-function",
+        "--output",
+        "--spill-dir",
+        "--style",
+        "--symbol",
+        "--diagnostic-format",
+        "--result-contract"
+      ],
+      "switch_options": [
+        "--flat",
+        "--raw-shellcode"
+      ]
+    },
+    "function-bounds": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--addr",
+        "--format",
+        "--max-input-bytes",
+        "--output",
+        "--spill-dir",
+        "--diagnostic-format"
+      ],
+      "switch_options": []
+    },
+    "help": {
+      "classification": "metadata_no_input",
+      "aliases": []
+    },
+    "inspect-die": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--arch",
+        "--base-address",
+        "--entry-address",
+        "--format",
+        "--json-profile",
+        "--max-functions",
+        "--max-input-bytes",
+        "--max-instructions-per-function",
+        "--output",
+        "--spill-dir",
+        "--diagnostic-format"
+      ],
+      "switch_options": [
+        "--raw-shellcode"
+      ]
+    },
+    "inspect-flow": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--addr",
+        "--arch",
+        "--base-address",
+        "--depth",
+        "--entry-address",
+        "--format",
+        "--max-functions",
+        "--max-input-bytes",
+        "--max-instructions-per-function",
+        "--node-limit",
+        "--output",
+        "--per-node-limit",
+        "--spill-dir",
+        "--symbol",
+        "--diagnostic-format",
+        "--result-contract"
+      ],
+      "switch_options": [
+        "--raw-shellcode"
+      ]
+    },
+    "inspect-go": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--arch",
+        "--base-address",
+        "--entry-address",
+        "--format",
+        "--function-offset",
+        "--json-profile",
+        "--limit",
+        "--max-functions",
+        "--max-input-bytes",
+        "--max-instructions-per-function",
+        "--output",
+        "--spill-dir",
+        "--diagnostic-format"
+      ],
+      "switch_options": [
+        "--raw-shellcode"
+      ]
+    },
+    "inspect-passes": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--addr",
+        "--arch",
+        "--base-address",
+        "--entry-address",
+        "--format",
+        "--max-functions",
+        "--max-input-bytes",
+        "--max-instructions-per-function",
+        "--output",
+        "--spill-dir",
+        "--symbol",
+        "--diagnostic-format",
+        "--result-contract"
+      ],
+      "switch_options": [
+        "--raw-shellcode"
+      ]
+    },
+    "inspect-rust": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--arch",
+        "--base-address",
+        "--entry-address",
+        "--format",
+        "--function-offset",
+        "--json-profile",
+        "--limit",
+        "--max-functions",
+        "--max-input-bytes",
+        "--max-instructions-per-function",
+        "--output",
+        "--spill-dir",
+        "--diagnostic-format"
+      ],
+      "switch_options": [
+        "--raw-shellcode"
+      ]
+    },
+    "inspect-types": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--arch",
+        "--base-address",
+        "--entry-address",
+        "--format",
+        "--max-functions",
+        "--max-input-bytes",
+        "--max-instructions-per-function",
+        "--output",
+        "--scalar-evidence-limit",
+        "--scalar-evidence-offset",
+        "--spill-dir",
+        "--variable-function-limit",
+        "--variable-function-offset",
+        "--variable-hint-limit",
+        "--variable-hint-offset",
+        "--diagnostic-format"
+      ],
+      "switch_options": [
+        "--raw-shellcode"
+      ]
+    },
+    "inspect-upx": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--arch",
+        "--base-address",
+        "--entry-address",
+        "--format",
+        "--json-profile",
+        "--max-functions",
+        "--max-input-bytes",
+        "--max-instructions-per-function",
+        "--output",
+        "--spill-dir",
+        "--diagnostic-format"
+      ],
+      "switch_options": [
+        "--raw-shellcode"
+      ]
+    },
+    "inspect-vmp": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--arch",
+        "--base-address",
+        "--entry-address",
+        "--format",
+        "--json-profile",
+        "--max-functions",
+        "--max-input-bytes",
+        "--max-instructions-per-function",
+        "--output",
+        "--spill-dir",
+        "--diagnostic-format"
+      ],
+      "switch_options": [
+        "--raw-shellcode"
+      ]
+    },
+    "pe-resources": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--decoded-characters",
+        "--format",
+        "--json-profile",
+        "--limit",
+        "--max-input-bytes",
+        "--offset",
+        "--output",
+        "--reference-provenance",
+        "--resource-depth",
+        "--resource-entries",
+        "--resource-payload-bytes",
+        "--scan-bytes",
+        "--spill-dir",
+        "--diagnostic-format"
+      ],
+      "switch_options": []
+    },
+    "pe-strings": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--arch",
+        "--base-address",
+        "--decoded-characters",
+        "--entry-address",
+        "--format",
+        "--json-profile",
+        "--limit",
+        "--max-functions",
+        "--max-input-bytes",
+        "--max-instructions-per-function",
+        "--offset",
+        "--output",
+        "--reference-provenance",
+        "--resource-depth",
+        "--resource-entries",
+        "--resource-payload-bytes",
+        "--scan-bytes",
+        "--spill-dir",
+        "--diagnostic-format"
+      ],
+      "switch_options": [
+        "--raw-shellcode"
+      ]
+    },
+    "recover-bytes": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--addr",
+        "--max-functions",
+        "--max-input-bytes",
+        "--max-instructions-per-function",
+        "--output",
+        "--spill-dir",
+        "--diagnostic-format"
+      ],
+      "switch_options": []
+    },
+    "replay": {
+      "classification": "archive_replay",
+      "aliases": []
+    },
+    "report": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--arch",
+        "--base-address",
+        "--bundle-dir",
+        "--entry-address",
+        "--flow-depth",
+        "--flow-node-limit",
+        "--flow-per-node-limit",
+        "--format",
+        "--function-offset",
+        "--json-profile",
+        "--limit",
+        "--max-functions",
+        "--max-input-bytes",
+        "--max-instructions-per-function",
+        "--max-output-lines",
+        "--output",
+        "--sections",
+        "--spill-dir",
+        "--style",
+        "--diagnostic-format",
+        "--result-contract"
+      ],
+      "switch_options": [
+        "--flat",
+        "--include-noise",
+        "--raw-shellcode",
+        "--split-output"
+      ]
+    },
+    "slice-function": {
+      "classification": "single_input",
+      "aliases": [],
+      "input_position": 1,
+      "value_options": [
+        "--addr",
+        "--arch",
+        "--base-address",
+        "--contains-call",
+        "--contains-string",
+        "--entry-address",
+        "--format",
+        "--max-functions",
+        "--max-input-bytes",
+        "--max-instructions-per-function",
+        "--output",
+        "--slice-index",
+        "--slice-size",
+        "--slice-start",
+        "--spill-dir",
+        "--style",
+        "--symbol",
+        "--diagnostic-format",
+        "--result-contract"
+      ],
+      "switch_options": [
+        "--raw-shellcode"
+      ]
+    }
+  }
+}

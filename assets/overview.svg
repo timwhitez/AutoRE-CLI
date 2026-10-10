@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-labelledby="title desc">
+  <title id="title">Auto-RE static analysis workflow</title>
+  <desc id="desc">Input bytes move through static analysis into bounded evidence artifacts and verified agent actions. Target bytes are never executed.</desc>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0b1220"/><stop offset="1" stop-color="#17243a"/></linearGradient>
+    <linearGradient id="line" x2="1"><stop stop-color="#35c9d0"/><stop offset="1" stop-color="#8d9bff"/></linearGradient>
+  </defs>
+  <rect width="1200" height="520" rx="28" fill="url(#bg)"/>
+  <text x="64" y="85" fill="#f4f7fb" font-family="system-ui, sans-serif" font-size="36" font-weight="700">Auto-RE</text>
+  <text x="64" y="121" fill="#a9bbcf" font-family="system-ui, sans-serif" font-size="18">Static reverse engineering · bounded evidence · traceable actions</text>
+  <path d="M302 287H353M568 287H619M834 287H885" stroke="url(#line)" stroke-width="5" stroke-linecap="round"/>
+  <path d="m342 277 12 10-12 10m266-20 12 10-12 10m266-20 12 10-12 10" fill="none" stroke="#73dce1" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <g font-family="system-ui, sans-serif">
+    <rect x="64" y="195" width="238" height="184" rx="18" fill="#15263a" stroke="#426379"/>
+    <text x="88" y="238" fill="#71dce1" font-size="15" font-weight="700">01  INPUT</text>
+    <text x="88" y="286" fill="#f4f7fb" font-size="25" font-weight="650">Binary bytes</text>
+    <text x="88" y="320" fill="#afc0d0" font-size="16">ELF · PE · Mach-O</text>
+    <text x="88" y="347" fill="#afc0d0" font-size="16">object · explicit raw</text>
+    <rect x="353" y="195" width="215" height="184" rx="18" fill="#15263a" stroke="#426379"/>
+    <text x="377" y="238" fill="#71dce1" font-size="15" font-weight="700">02  ANALYZE</text>
+    <text x="377" y="286" fill="#f4f7fb" font-size="25" font-weight="650">Static engine</text>
+    <text x="377" y="320" fill="#afc0d0" font-size="16">CFG · LLIL · MLIL</text>
+    <text x="377" y="347" fill="#afc0d0" font-size="16">HLIL · CUSTOM IL</text>
+    <rect x="619" y="195" width="215" height="184" rx="18" fill="#15263a" stroke="#426379"/>
+    <text x="643" y="238" fill="#71dce1" font-size="15" font-weight="700">03  EVIDENCE</text>
+    <text x="643" y="286" fill="#f4f7fb" font-size="25" font-weight="650">Bounded JSON</text>
+    <text x="643" y="320" fill="#afc0d0" font-size="16">status · provenance</text>
+    <text x="643" y="347" fill="#afc0d0" font-size="16">budgets · stop reasons</text>
+    <rect x="885" y="195" width="251" height="184" rx="18" fill="#15263a" stroke="#426379"/>
+    <text x="909" y="238" fill="#71dce1" font-size="15" font-weight="700">04  CONTINUE</text>
+    <text x="909" y="286" fill="#f4f7fb" font-size="25" font-weight="650">Verified actions</text>
+    <text x="909" y="320" fill="#afc0d0" font-size="16">Skill checks artifacts</text>
+    <text x="909" y="347" fill="#afc0d0" font-size="16">and stops at boundaries</text>
+  </g>
+  <path d="M64 430H1136" stroke="#30465d"/>
+  <text x="64" y="466" fill="#a9bbcf" font-family="system-ui, sans-serif" font-size="17">Target bytes and target-derived artifacts are never executed.</text>
+</svg>

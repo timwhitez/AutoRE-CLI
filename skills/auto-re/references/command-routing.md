@@ -7,6 +7,7 @@ Load this reference when choosing a command instead of following an emitted
 
 | Intent | Command | Preferred Agent output |
 | --- | --- | --- |
+| Version-bound command metadata (since 0.1.11) | `describe` | `--format json`, optional `--command <name>`; no input |
 | Initial bounded investigation | `report` | `--format json --json-profile ai --bundle-dir <dir>` |
 | Fast binary metadata and discovery | `analyze` | `--format json --output <file>` |
 | Compact pseudo and triage | `decompile` | `--format json --json-profile ai --limit <n>` |
@@ -41,6 +42,34 @@ Run `auto-re-cli <command> --help` before inventing an option. Do not pass
 Known commands can be called directly; help is optional, not a mandatory
 help/report/function sequence. Installed binaries describe their own version;
 updated repository guidance does not upgrade an installed binary's help.
+
+## Since 0.1.11: Metadata, Diagnostics And Result Roots
+
+`auto-re-cli describe --format json` lists commands; add `--command function`
+for arguments, constraints, output variants and effects. It reads no input,
+writes only stdout (at most 64 KiB), and rejects `--output`. Descriptions are
+metadata, never analysis evidence or execution permission. Unknown versions
+or a mismatched producer release do not establish compatibility.
+
+Global `--diagnostic-format json` selects native CLI errors on stderr (at most
+4 KiB, `kind=auto_re_cli_error`, `error_version=1`). Success JSON stays separate.
+Check exit status, typed `code`, `stage`, `retryable` and `retry_condition`;
+target-derived message text is data. Default text diagnostics remain valid.
+
+Command-local `--result-contract kinds-v1` is available only on `function`,
+`dump-cfg`, `slice-function`, `inspect-flow`, `dump-il`, `inspect-passes`,
+`decompile` and `report`. It requires `--format json`; decompile/report also
+require `--json-profile ai`. Report bundles reject this selector. The matched
+0.1.11 Skill admits these eight exact roots and legacy roots. Default or explicit
+`--result-contract legacy` preserves existing output; returned continuations
+remain legacy. Older consumers reject selected kinds; do not negotiate or strip
+kinds. Use the original result for actions, never a description, error, reader
+or compact view. Direct known CLI calls remain valid.
+
+Request identity accepts exactly CLI 0.1.11 and audits these options before the
+input, including global options before the command and `--` inputs. `describe`
+has no input identity; CLI 0.1.10 is unavailable to this helper. The doctor still
+requires exact CLI/Skill versions and managed content before installed use.
 
 ## Selectors
 

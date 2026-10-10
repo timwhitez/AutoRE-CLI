@@ -60,9 +60,12 @@ synthetic data matching controlled static-analysis artifact shapes; generated
 analysis results and target binaries are not packaged. Direct host reads of a
 verified original artifact remain valid. Views cannot be action-runner roots.
 
-Request identity tests pin the CLI 0.1.10 command contract and option arities in
-`fixtures/cli_identity_0_1_10.json`. The table covers all subcommands, including
-explicit exclusions; unknown versions yield `unsupported_command`. This tests
+Request identity tests pin the CLI 0.1.11 command contract and option arities in
+`fixtures/cli_identity_0_1_11.json`. The table covers all subcommands, including
+metadata-only `describe`, global `--diagnostic-format`, and the eight local
+`--result-contract` selectors. Exact 0.1.11 pairing is required; older or
+unknown versions yield `unsupported_command`. The 0.1.10 fixture remains
+historical. This tests
 identity coverage, independently of execution admission. Source tests compare
 the fixture with the actual Clap model; public tests need no Rust toolchain.
 
@@ -70,10 +73,11 @@ Result admission fixtures in `fixtures/result_contract_0_1_10.json` contain real
 static CLI 0.1.10 DTOs from inert controlled inputs, with binary/input/stdout
 digests and exact argv. Selected kinds add only `kind` and are producer-verified by source #344
 against the frozen DTOs. The public 0.1.10 binary lacks the selector; these
-fixtures do not certify a release or installed pair. The suite checks P0/C1 and producer-verified
+fixtures alone do not certify a release or installed pair. The suite checks P0/C1 and producer-verified
 P1/C1, mutations, passive additive evidence and command-bound first evidence.
-C0/P1 selected forms are unsupported and fail closed. Installed release pairs
-remain NOT_VERIFIED; checkout tests do not certify an upgrade.
+C0/P1 selected forms are unsupported and fail closed. Consumer C and producer P
+are assigned to the matching 0.1.11 release. Installed-pair and upgrade evidence
+is recorded separately from checkout tests.
 
 Task outcomes are evaluated by the maintainer-only
 [`agent_evals/README.md`](agent_evals/README.md) contract. Seven independent

@@ -63,6 +63,12 @@ Narrow inspections keep their CLI's compact-AI default budgets. Advanced
 filters, pagination, CFG/IL, references and diff remain available through
 [command-routing.md](references/command-routing.md) and the matching CLI.
 
+Since 0.1.11, `auto-re-cli describe --format json [--command <name>]` provides
+metadata without input analysis; global `--diagnostic-format json` gives bounded
+native stderr errors. The matched Skill admits the eight opt-in
+`--result-contract kinds-v1` roots; see command routing for supported commands
+and profile limits. Known direct calls remain valid; no automatic negotiation.
+
 For explicitly identified raw bytes, add
 `--raw-shellcode --arch <arch> --base-address <address>` and preserve a supplied
 `--entry-address`. Never infer architecture, base or entry from a filename,
@@ -113,7 +119,9 @@ Follow up when it advances unresolved requested evidence, not to increase call
 counts. Stop at sufficient evidence, an explicit budget, unsupported input, or
 an unresolved boundary. Ask for input/context only when genuinely blocked.
 
-For optional context reduction of a retained report/decompile AI file, see
+Since 0.1.11, use `read_result.py --mode keys` or `--mode string` for bounded object-key or
+exact string pages of existing JSON; see [evidence-contract.md](references/evidence-contract.md).
+For optional `compact_result.py` context reduction of a retained report/decompile AI file, see
 [compact AI evidence view v1](references/compact-ai-view.md). Retain its hash-bound
 original; compact views are explicitly unsupported action-runner roots.
 

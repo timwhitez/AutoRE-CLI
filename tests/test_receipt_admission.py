@@ -133,10 +133,10 @@ class ReceiptAdmissionTests(unittest.TestCase):
                         tuple("capture_or_setup_failed: " + "\U0001f600" * 256 for _ in range(8)), code is not None)
                     program_sha = runner.sha256_file(Path(sys.executable).resolve())
                     plan = runner.receipt_budget_plan(prepared, root / "receipt.json.logs",
-                        executable=str(Path(sys.executable).resolve()), program_version="auto-re-cli 0.1.10",
+                        executable=str(Path(sys.executable).resolve()), program_version="auto-re-cli 0.1.11",
                         program_sha256=program_sha, identity=runner.request_identity(prepared["argv"], program_sha),
                         continuation_check="not_requested")
-                    with patch.object(runner, "probe_program_version", return_value="auto-re-cli 0.1.10"), \
+                    with patch.object(runner, "probe_program_version", return_value="auto-re-cli 0.1.11"), \
                          patch.object(control, "run_process", return_value=result):
                         runner.execute_prepared_with_receipt(prepared, Path(sys.executable), root / "receipt.json")
                     receipt = self.roundtrip(root / "receipt.json")
@@ -154,7 +154,7 @@ class ReceiptAdmissionTests(unittest.TestCase):
             def changed(*args, **kwargs):
                 source.write_bytes(b"after")
                 return runner.process_control.ProcessResult(0, "completed", empty, empty, (), True)
-            with patch.object(runner, "probe_program_version", return_value="auto-re-cli 0.1.10"), \
+            with patch.object(runner, "probe_program_version", return_value="auto-re-cli 0.1.11"), \
                  patch.object(runner.process_control, "run_process", side_effect=changed):
                 runner.execute_prepared_with_receipt(prepared, Path(sys.executable), root / "receipt.json")
             receipt = self.roundtrip(root / "receipt.json")

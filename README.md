@@ -2,8 +2,6 @@
 
 [English](README.md) | [简体中文](README_zh.md)
 
-Maintenance: [AGENTS.md](AGENTS.md) · Troubleshooting: [FAQ](FAQ.md) · [Static investigation workflows](skills/auto-re/references/investigation-workflows.md)
-
 [![Validate Distribution](https://github.com/timwhitez/AutoRE-CLI/actions/workflows/validate.yml/badge.svg)](https://github.com/timwhitez/AutoRE-CLI/actions/workflows/validate.yml)
 [![Release](https://img.shields.io/github/v/release/timwhitez/AutoRE-CLI?display_name=tag)](https://github.com/timwhitez/AutoRE-CLI/releases/latest)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-64748b)](#platforms)
@@ -12,14 +10,18 @@ Maintenance: [AGENTS.md](AGENTS.md) · Troubleshooting: [FAQ](FAQ.md) · [Static
 **Bounded static reverse engineering for human analysts and AI agents.**
 
 AutoRE-CLI turns ELF, PE/COFF, Mach-O, object files, and explicitly identified
-raw shellcode into traceable JSON, CFG/IL, readable pseudo output, language
-evidence, and safe next actions—without executing target bytes.
+raw input into traceable JSON, CFG/IL, readable pseudo output, language
+evidence, and bounded next actions. It does not execute target bytes.
 
-![AutoRE-CLI controlled static analysis demo](assets/demo.png)
+![AutoRE-CLI static analysis workflow](assets/overview.svg)
 
-[Download](https://github.com/timwhitez/AutoRE-CLI/releases/latest) ·
-[Agent Quick Start](#agent-quick-start) · [CLI Quick Start](#cli-quick-start) ·
-[Why AutoRE-CLI](#why-autore-cli) · [Security](SECURITY.md) · [FAQ](FAQ.md)
+[Download a release](https://github.com/timwhitez/AutoRE-CLI/releases/latest) ·
+[Install](#install) · [Agent Quick Start](#agent-quick-start) ·
+[CLI Quick Start](#cli-quick-start) · [FAQ](FAQ.md)
+
+This repository distributes the binaries and open Agent Skill. The Rust engine
+source is maintained separately; the [public repository boundary](#public-repository-boundary)
+explains what is included.
 
 ## Why AutoRE-CLI
 
@@ -36,6 +38,21 @@ evidence, and safe next actions—without executing target bytes.
 - **Offline and traceable:** installation performs no network access; every
   release binary has an exact target, byte count, source revision, signing
   disposition, and SHA-256.
+
+### New In 0.1.11
+
+- `auto-re-cli describe --format json` lists commands without analyzing an
+  input; add `--command function` for one command's arguments and constraints.
+- `--diagnostic-format json` selects bounded machine-readable errors on stderr.
+  The default text diagnostics and successful outputs remain unchanged.
+- Eight selected commands offer `--result-contract kinds-v1`. The default
+  `legacy` roots remain available; the 0.1.11 Skill admits exact supported
+  kind/version pairs and rejects unknown or contradictory roots.
+- The Skill can read exact bounded object-key pages and Unicode string slices
+  from a hash-bound result, and detects identical no-progress requests.
+
+Use CLI and Skill 0.1.11 together for the new result roots. Run
+`skill_doctor.py` below to check the installed pair.
 
 ### Where It Fits
 
@@ -62,15 +79,15 @@ Download the archive for your host from
 then verify and install it:
 
 ```sh
-tar -xzf AutoRE-CLI-0.1.10-macos-arm64.tar.gz
-cd AutoRE-CLI-0.1.10-macos-arm64
+tar -xzf AutoRE-CLI-0.1.11-macos-arm64.tar.gz
+cd AutoRE-CLI-0.1.11-macos-arm64
 ./verify.sh
 ./install.sh
 auto-re-cli --version
 ```
 
 Replace `macos-arm64` with `macos-x86_64`, `linux-x86_64`, or `linux-arm64`.
-Windows users should extract `AutoRE-CLI-0.1.10-windows-x86_64.zip` and run:
+Windows users should extract `AutoRE-CLI-0.1.11-windows-x86_64.zip` and run:
 
 ```powershell
 py -3 scripts/autore_distribution.py verify
@@ -97,7 +114,7 @@ use the platform archive above for the complete verified distribution.
 ```sh
 # Agent Skill for Codex, Claude Code, Cursor, and other supported clients
 npx skills add \
-  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.10/AutoRE-CLI-0.1.10-auto-re-skill.zip -g
+  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.11/AutoRE-CLI-0.1.11-auto-re-skill.zip -g
 ```
 
 ```powershell
@@ -204,6 +221,13 @@ already own a bundle/spill sink reject an additional `--output`.
 
 ## CLI Quick Start
 
+Discover the installed command contract before choosing an analysis route:
+
+```sh
+auto-re-cli describe --format json
+auto-re-cli describe --format json --command function
+```
+
 ### Bounded Context Bundle
 
 ```sh
@@ -286,6 +310,10 @@ from a filename.
 | Protection evidence | `inspect-die`, `inspect-upx`, `inspect-vmp` |
 | Repeatable comparison | `batch`, `archive`, `replay`, `diff`, `batch-diff` |
 
+For machine-readable failures, place `--diagnostic-format json` before a
+subcommand. For `kinds-v1` output, add `--result-contract kinds-v1` to a command
+that advertises it in `describe`; keep `legacy` when using an older consumer.
+
 Run `auto-re-cli <command> --help` for the exact options supported by the
 installed version.
 
@@ -349,6 +377,8 @@ verify.sh                     fail-closed distribution verifier
 
 ## Support
 
+- Maintainer guidance: [AGENTS.md](AGENTS.md)
+- Static investigation workflows: [Skill reference](skills/auto-re/references/investigation-workflows.md)
 - Bugs and documentation:
   [issue tracker](https://github.com/timwhitez/AutoRE-CLI/issues)
 - Use cases and integration requests:
