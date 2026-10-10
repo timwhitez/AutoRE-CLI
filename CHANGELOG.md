@@ -4,6 +4,10 @@ All notable changes to the public AutoRE-CLI distribution are recorded here.
 
 ## [Unreleased]
 
+- Add maintainer-only Agent task cases, hash-bound atomic-claim scoring and
+  static reference baselines for identity, retrieval and consumer compatibility.
+  Separate cold/retained costs; real-Agent runs remain separately authorized.
+
 - Reject verifier operational outputs at result admission and permit passive
   shared evidence such as function warnings without changing prepared actions.
 

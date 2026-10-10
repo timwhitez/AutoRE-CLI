@@ -113,6 +113,10 @@ Follow up when it advances unresolved requested evidence, not to increase call
 counts. Stop at sufficient evidence, an explicit budget, unsupported input, or
 an unresolved boundary. Ask for input/context only when genuinely blocked.
 
+For optional context reduction of a retained report/decompile AI file, see
+[compact AI evidence view v1](references/compact-ai-view.md). Retain its hash-bound
+original; compact views are explicitly unsupported action-runner roots.
+
 ## Larger Context and Follow-Ups
 
 The one-call launcher writes one bounded document. When separate report sections
