@@ -4,26 +4,39 @@ All notable changes to the public AutoRE-CLI distribution are recorded here.
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-10-11
+
+- Add parser-derived `describe --format json` command metadata and opt-in
+  bounded `--diagnostic-format json` errors in the CLI.
+- Add opt-in `kinds-v1` result roots for eight command families. Keep the
+  default legacy roots and require exact supported Skill consumer pairs.
+- Refresh English and Chinese installation guidance and the workflow graphic.
+- Rebuild five platform binaries and the Skill from the 0.1.11 source revision.
 - Add opt-in `AUTO_RE_TEST_TIMEOUT_SCALE` for offline test hang guards; preserve
   default bounds and production timeouts, and reject invalid scales explicitly.
-
 - Add maintainer-only Agent task cases, hash-bound atomic-claim scoring and
   static reference baselines for identity, retrieval and consumer compatibility.
   Separate cold/retained costs; real-Agent runs remain separately authorized.
-
 - Reject verifier operational outputs at result admission and permit passive
   shared evidence such as function warnings without changing prepared actions.
-
 - Admit exact legacy and reserved result-kind contracts in the Skill, bind first
   evidence to its command, and reject hybrid/control JSON before action selection.
-  Preserve labels and process receipts; no producer or release is enabled.
-
+  Preserve labels and process receipts.
 - Add optional bounded object-key and exact Unicode string recovery views to the
   Agent Skill reader; preserve default v1 output and hash-bound boundaries.
-- Fix Skill request-identity coverage with an explicit CLI 0.1.10 command/argv
+- Fix Skill request-identity coverage with an explicit CLI 0.1.11 command/argv
   contract, option-aware input discovery and release drift tests. Preserve
   execution admission and exact argument order; unaudited versions and excluded
   multi-input/batch/archive requests remain explicitly unavailable.
+
+## [0.1.10] - 2026-10-08
+
+- Share bounded producer, admission and reader rules for continuation receipts.
+- Clarify selected discovery-budget help and defer Symbol-only preparation for
+  Address focus without changing analysis output contracts.
+- Rebuild five platform binaries from source
+  `c96114e38ee63aad391136846fdcc7138668d772`.
+- See [release notes](release-notes/v0.1.10.md) for validation and upgrade limits.
 
 ## [0.1.9] - 2026-10-01
 

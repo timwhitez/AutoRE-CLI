@@ -27,8 +27,8 @@ target is not itself a string. Embedded object functions retain their own eviden
 
 ## Result Admission
 
-The continuation helper admits exact string schema version `0.1.0`, frozen
-legacy root families and their reserved explicit kinds. Unknown/present-null
+Since 0.1.11, the continuation helper admits exact string schema version `0.1.0`,
+frozen legacy root families and their explicit kinds. Unknown/present-null
 kinds, unsupported versions, wrong profiles, mixed family controls and malformed
 actions fail before selection. First evidence also binds the root to its actual
 command; an IL/pass result cannot stand in for a function, nor decompile for a
@@ -43,12 +43,12 @@ nested analysis semantics or replace path, hash, process, resource or receipt
 checks. Normalized labels remain compatibility labels, not command identities.
 The optional reader retains its separate non-admissible viewing role.
 
-The eight reserved kinds (`function_detail`, `function_cfg`, `function_slice`,
+The eight selected kinds (`function_detail`, `function_cfg`, `function_slice`,
 `function_flow_graph`, `function_il`, `function_passes`, `decompile_ai`,
-`report_ai`) are consumer contracts tested with spec-derived fixtures; CLI
-0.1.10 does not produce them. Older consumers reject these selected forms.
-No producer selector, release or installed upgrade is introduced here. The
-repository Skill stays 0.1.10; same-version managed repacks remain refused.
+`report_ai`) are produced by CLI 0.1.11 with command-local
+`--result-contract kinds-v1` on the commands listed in command routing.
+CLI 0.1.10 does not produce them; older consumers reject selected forms.
+Use the exact matched CLI/Skill pair; same-version managed repacks remain refused.
 
 ## Optional Existing-Result Views
 
@@ -64,7 +64,7 @@ For array pages, use the returned `selection.next_offset` (not requested limit)
 and `--expected-sha256 <source.sha256>`; positive offsets require that digest.
 The current-snapshot digest is a content identity, not source authentication.
 
-For an unfamiliar large object, `--mode keys --offset 0 --limit 32` returns a
+Since 0.1.11, for an unfamiliar large object, `--mode keys --offset 0 --limit 32` returns a
 v2 page of exact `name`, `value_type`, and escaped child `pointer` entries in
 JSON document order. Follow `selection.next_offset` with the same source hash.
 For an oversized string, `--mode string --start 0 --length 1024` returns a v2
@@ -95,7 +95,7 @@ results, or clean files. Existing explicit verifier cleanup remains unchanged.
 
 ## Retained scope: create, replay, bounded read
 
-For CLI and Skill 0.1.10, use explicit replay when the retained analysis already
+For CLI and Skill 0.1.11, use explicit replay when the retained analysis already
 contains the requested evidence. Check `auto-re-cli --version` and local
 `archive --help` / `replay --help`; these commands do not provide automatic reuse.
 Run one static analysis first and save its JSON outside the checkout. Record its

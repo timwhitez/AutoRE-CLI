@@ -37,15 +37,15 @@ SUPPORTED_PROFILES = frozenset({"ai"})
 SUPPORTED_MANIFEST_KINDS = frozenset({"context_bundle", "agent_spill_manifest"})
 # Audited CLI contract, not an execution authorization list. Keep the release
 # fixture and source Clap drift test in sync when auditing another version.
-IDENTITY_CONTRACT_VERSION = "0.1.10"
-IDENTITY_GLOBAL_VALUE_OPTIONS = ["--output"]
+IDENTITY_CONTRACT_VERSION = "0.1.11"
+IDENTITY_GLOBAL_VALUE_OPTIONS = ["--output", "--diagnostic-format"]
 IDENTITY_COMMAND_CONTRACT = {
     "aarch64-refs": {
         "classification": "single_input", "aliases": [], "input_position": 1,
         "value_options": (
             "--address --arch --base-address --entry-address --format --function --function-addr "
             "--instruction-limit --json-profile --limit --max-functions --max-input-bytes "
-            "--max-instructions-per-function --offset --output --spill-dir"
+            "--max-instructions-per-function --offset --output --spill-dir --diagnostic-format"
         ).split(),
         "switch_options": "--raw-shellcode".split(),
     },
@@ -53,7 +53,7 @@ IDENTITY_COMMAND_CONTRACT = {
         "classification": "single_input", "aliases": [], "input_position": 1,
         "value_options": (
             "--arch --base-address --entry-address --format --max-functions --max-input-bytes "
-            "--max-instructions-per-function --output --spill-dir --style"
+            "--max-instructions-per-function --output --spill-dir --style --diagnostic-format"
         ).split(),
         "switch_options": "--raw-shellcode".split(),
     },
@@ -65,7 +65,7 @@ IDENTITY_COMMAND_CONTRACT = {
         "classification": "single_input", "aliases": [], "input_position": 1,
         "value_options": (
             "--arch --base-address --entry-address --format --iterations --max-functions "
-            "--max-input-bytes --max-instructions-per-function --output --spill-dir --style"
+            "--max-input-bytes --max-instructions-per-function --output --spill-dir --style --diagnostic-format"
         ).split(),
         "switch_options": "--raw-shellcode".split(),
     },
@@ -74,7 +74,7 @@ IDENTITY_COMMAND_CONTRACT = {
         "value_options": (
             "--addr --arch --base-address --depth --edge-limit --entry-address --format "
             "--json-profile --max-functions --max-input-bytes --max-instructions-per-function "
-            "--node-limit --output --spill-dir --symbol"
+            "--node-limit --output --spill-dir --symbol --diagnostic-format"
         ).split(),
         "switch_options": "--raw-shellcode".split(),
     },
@@ -85,7 +85,7 @@ IDENTITY_COMMAND_CONTRACT = {
             "--address --address-end --arch --base-address --direction --entry-address --format "
             "--function --function-addr --global --json-profile --limit --max-functions "
             "--max-input-bytes --max-instructions-per-function --offset --output --provenance-limit "
-            "--spill-dir --string"
+            "--spill-dir --string --diagnostic-format"
         ).split(),
         "switch_options": "--raw-shellcode".split(),
     },
@@ -94,16 +94,17 @@ IDENTITY_COMMAND_CONTRACT = {
         "value_options": (
             "--arch --base-address --entry-address --format --function-offset --json-profile "
             "--limit --max-functions --max-input-bytes --max-instructions-per-function "
-            "--max-output-lines --output --spill-dir --style"
+            "--max-output-lines --output --spill-dir --style --diagnostic-format --result-contract"
         ).split(),
         "switch_options": "--flat --include-noise --raw-shellcode --split-output".split(),
     },
+    "describe": {"classification": "metadata_no_input", "aliases": []},
     "diff": {"classification": "archive_replay", "aliases": []},
     "dump-cfg": {
         "classification": "single_input", "aliases": [], "input_position": 1,
         "value_options": (
             "--addr --arch --base-address --entry-address --format --max-functions "
-            "--max-input-bytes --max-instructions-per-function --output --spill-dir --symbol"
+            "--max-input-bytes --max-instructions-per-function --output --spill-dir --symbol --diagnostic-format --result-contract"
         ).split(),
         "switch_options": "--raw-shellcode".split(),
     },
@@ -112,7 +113,7 @@ IDENTITY_COMMAND_CONTRACT = {
         "value_options": (
             "--addr --arch --base-address --entry-address --format --level --max-functions "
             "--max-input-bytes --max-instructions-per-function --output --spill-dir "
-            "--statement-address --statement-contains --statement-limit --statement-offset --symbol"
+            "--statement-address --statement-contains --statement-limit --statement-offset --symbol --diagnostic-format --result-contract"
         ).split(),
         "switch_options": "--flat --raw-shellcode".split(),
     },
@@ -120,13 +121,13 @@ IDENTITY_COMMAND_CONTRACT = {
         "classification": "single_input", "aliases": [], "input_position": 1,
         "value_options": (
             "--addr --arch --base-address --entry-address --max-functions --max-input-bytes "
-            "--max-instructions-per-function --output --spill-dir --symbol"
+            "--max-instructions-per-function --output --spill-dir --symbol --diagnostic-format"
         ).split(),
         "switch_options": "--raw-shellcode".split(),
     },
     "fold-pair-bytes": {
         "classification": "single_input", "aliases": [], "input_position": 1,
-        "value_options": "--output --spill-dir".split(),
+        "value_options": "--output --spill-dir --diagnostic-format".split(),
         "switch_options": "".split(),
     },
     "function": {
@@ -134,13 +135,13 @@ IDENTITY_COMMAND_CONTRACT = {
         "value_options": (
             "--addr --arch --base-address --entry-address --format --max-functions "
             "--max-input-bytes --max-instructions-per-function --output --spill-dir --style "
-            "--symbol"
+            "--symbol --diagnostic-format --result-contract"
         ).split(),
         "switch_options": "--flat --raw-shellcode".split(),
     },
     "function-bounds": {
         "classification": "single_input", "aliases": [], "input_position": 1,
-        "value_options": "--addr --format --max-input-bytes --output --spill-dir".split(),
+        "value_options": "--addr --format --max-input-bytes --output --spill-dir --diagnostic-format".split(),
         "switch_options": "".split(),
     },
     "help": {"classification": "metadata_no_input", "aliases": []},
@@ -148,7 +149,7 @@ IDENTITY_COMMAND_CONTRACT = {
         "classification": "single_input", "aliases": [], "input_position": 1,
         "value_options": (
             "--arch --base-address --entry-address --format --json-profile --max-functions "
-            "--max-input-bytes --max-instructions-per-function --output --spill-dir"
+            "--max-input-bytes --max-instructions-per-function --output --spill-dir --diagnostic-format"
         ).split(),
         "switch_options": "--raw-shellcode".split(),
     },
@@ -157,7 +158,7 @@ IDENTITY_COMMAND_CONTRACT = {
         "value_options": (
             "--addr --arch --base-address --depth --entry-address --format --max-functions "
             "--max-input-bytes --max-instructions-per-function --node-limit --output "
-            "--per-node-limit --spill-dir --symbol"
+            "--per-node-limit --spill-dir --symbol --diagnostic-format --result-contract"
         ).split(),
         "switch_options": "--raw-shellcode".split(),
     },
@@ -166,7 +167,7 @@ IDENTITY_COMMAND_CONTRACT = {
         "value_options": (
             "--arch --base-address --entry-address --format --function-offset --json-profile "
             "--limit --max-functions --max-input-bytes --max-instructions-per-function --output "
-            "--spill-dir"
+            "--spill-dir --diagnostic-format"
         ).split(),
         "switch_options": "--raw-shellcode".split(),
     },
@@ -174,7 +175,7 @@ IDENTITY_COMMAND_CONTRACT = {
         "classification": "single_input", "aliases": [], "input_position": 1,
         "value_options": (
             "--addr --arch --base-address --entry-address --format --max-functions "
-            "--max-input-bytes --max-instructions-per-function --output --spill-dir --symbol"
+            "--max-input-bytes --max-instructions-per-function --output --spill-dir --symbol --diagnostic-format --result-contract"
         ).split(),
         "switch_options": "--raw-shellcode".split(),
     },
@@ -183,7 +184,7 @@ IDENTITY_COMMAND_CONTRACT = {
         "value_options": (
             "--arch --base-address --entry-address --format --function-offset --json-profile "
             "--limit --max-functions --max-input-bytes --max-instructions-per-function --output "
-            "--spill-dir"
+            "--spill-dir --diagnostic-format"
         ).split(),
         "switch_options": "--raw-shellcode".split(),
     },
@@ -193,7 +194,7 @@ IDENTITY_COMMAND_CONTRACT = {
             "--arch --base-address --entry-address --format --max-functions --max-input-bytes "
             "--max-instructions-per-function --output --scalar-evidence-limit "
             "--scalar-evidence-offset --spill-dir --variable-function-limit "
-            "--variable-function-offset --variable-hint-limit --variable-hint-offset"
+            "--variable-function-offset --variable-hint-limit --variable-hint-offset --diagnostic-format"
         ).split(),
         "switch_options": "--raw-shellcode".split(),
     },
@@ -201,7 +202,7 @@ IDENTITY_COMMAND_CONTRACT = {
         "classification": "single_input", "aliases": [], "input_position": 1,
         "value_options": (
             "--arch --base-address --entry-address --format --json-profile --max-functions "
-            "--max-input-bytes --max-instructions-per-function --output --spill-dir"
+            "--max-input-bytes --max-instructions-per-function --output --spill-dir --diagnostic-format"
         ).split(),
         "switch_options": "--raw-shellcode".split(),
     },
@@ -209,7 +210,7 @@ IDENTITY_COMMAND_CONTRACT = {
         "classification": "single_input", "aliases": [], "input_position": 1,
         "value_options": (
             "--arch --base-address --entry-address --format --json-profile --max-functions "
-            "--max-input-bytes --max-instructions-per-function --output --spill-dir"
+            "--max-input-bytes --max-instructions-per-function --output --spill-dir --diagnostic-format"
         ).split(),
         "switch_options": "--raw-shellcode".split(),
     },
@@ -218,7 +219,7 @@ IDENTITY_COMMAND_CONTRACT = {
         "value_options": (
             "--decoded-characters --format --json-profile --limit --max-input-bytes --offset "
             "--output --reference-provenance --resource-depth --resource-entries "
-            "--resource-payload-bytes --scan-bytes --spill-dir"
+            "--resource-payload-bytes --scan-bytes --spill-dir --diagnostic-format"
         ).split(),
         "switch_options": "".split(),
     },
@@ -228,7 +229,7 @@ IDENTITY_COMMAND_CONTRACT = {
             "--arch --base-address --decoded-characters --entry-address --format --json-profile "
             "--limit --max-functions --max-input-bytes --max-instructions-per-function --offset "
             "--output --reference-provenance --resource-depth --resource-entries "
-            "--resource-payload-bytes --scan-bytes --spill-dir"
+            "--resource-payload-bytes --scan-bytes --spill-dir --diagnostic-format"
         ).split(),
         "switch_options": "--raw-shellcode".split(),
     },
@@ -236,7 +237,7 @@ IDENTITY_COMMAND_CONTRACT = {
         "classification": "single_input", "aliases": [], "input_position": 1,
         "value_options": (
             "--addr --max-functions --max-input-bytes --max-instructions-per-function --output "
-            "--spill-dir"
+            "--spill-dir --diagnostic-format"
         ).split(),
         "switch_options": "".split(),
     },
@@ -247,7 +248,7 @@ IDENTITY_COMMAND_CONTRACT = {
             "--arch --base-address --bundle-dir --entry-address --flow-depth --flow-node-limit "
             "--flow-per-node-limit --format --function-offset --json-profile --limit "
             "--max-functions --max-input-bytes --max-instructions-per-function --max-output-lines "
-            "--output --sections --spill-dir --style"
+            "--output --sections --spill-dir --style --diagnostic-format --result-contract"
         ).split(),
         "switch_options": "--flat --include-noise --raw-shellcode --split-output".split(),
     },
@@ -256,7 +257,7 @@ IDENTITY_COMMAND_CONTRACT = {
         "value_options": (
             "--addr --arch --base-address --contains-call --contains-string --entry-address "
             "--format --max-functions --max-input-bytes --max-instructions-per-function --output "
-            "--slice-index --slice-size --slice-start --spill-dir --style --symbol"
+            "--slice-index --slice-size --slice-start --spill-dir --style --symbol --diagnostic-format --result-contract"
         ).split(),
         "switch_options": "--raw-shellcode".split(),
     },
@@ -745,12 +746,14 @@ def _identity_argv_shape(argv: list[str]) -> tuple[int | None, set[int], str]:
         flag, equals, _value = argv[index].partition("=")
         if flag not in IDENTITY_GLOBAL_VALUE_OPTIONS:
             return None, sinks, "unsupported_shape"
-        sinks.add(index)
+        if flag == "--output":
+            sinks.add(index)
         if not equals:
             index += 1
             if index >= len(argv) or argv[index].startswith("-"):
                 return None, sinks, "unsupported_shape"
-            sinks.add(index)
+            if flag == "--output":
+                sinks.add(index)
         index += 1
     if index >= len(argv):
         return None, sinks, "unsupported_command"
