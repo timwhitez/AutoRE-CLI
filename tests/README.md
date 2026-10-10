@@ -7,6 +7,22 @@ or GitHub Actions are needed:
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
 ```
 
+For a slow or I/O-loaded host, opt in to longer test subprocess hang guards:
+
+```sh
+AUTO_RE_TEST_TIMEOUT_SCALE=4 python3 -B -m unittest discover -s tests -v
+```
+
+`AUTO_RE_TEST_TIMEOUT_SCALE` must be a finite number from 1 through 20,
+including fractional values. An unset value means 1: CI/default runs retain
+exactly 15 seconds for the usual guard and the existing 5/10/30/60-second
+bounds for other guards. Invalid, empty, nonfinite or out-of-range values fail
+test discovery loudly. The shared `subprocess_timeout.py` helper scales only
+test hang guards (including the controlled child-start deadline), never
+production helper timeouts or assertions about them. A scaled pass is
+correctness evidence, not performance evidence; do not use it to claim latency
+or compare benchmark performance.
+
 The suite uses temporary files, inert binary-shaped bytes, and controlled
 Python subprocesses only. It never executes analyzed samples. Archive tests
 exercise real ZIP/tar and checksum code with the canonical static distribution

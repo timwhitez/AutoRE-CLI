@@ -6,11 +6,14 @@ import json
 import os
 from pathlib import Path
 import stat
+import runpy
 import subprocess
 import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+
+subprocess_timeout = runpy.run_path(str(Path(__file__).with_name("subprocess_timeout.py")))["subprocess_timeout"]
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE = Path(os.environ.get("AUTORE_BUNDLE_HELPER", ROOT / "skills/auto-re/scripts/verify_bundle.py"))
@@ -171,7 +174,7 @@ class BundleBoundaryTests(unittest.TestCase):
         env = dict(os.environ, TMPDIR=str(temp_root), TEMP=str(temp_root), TMP=str(temp_root))
         verified = subprocess.run(
             [sys.executable, "-B", str(MODULE), str(manifest), "--receipt", str(self.output)],
-            env=env, capture_output=True, text=True, timeout=15)
+            env=env, capture_output=True, text=True, timeout=subprocess_timeout())
         self.assertEqual(verified.returncode, 0, verified.stderr)
         receipt = json.loads(self.output.read_text())
         verified_root = Path(receipt["verified_root"])
@@ -179,16 +182,16 @@ class BundleBoundaryTests(unittest.TestCase):
         self.assertEqual(verified_root.parent, temp_root)
         later_read = subprocess.run(
             [sys.executable, "-B", "-c", "import pathlib,sys; sys.stdout.buffer.write(pathlib.Path(sys.argv[1]).read_bytes())",
-             receipt["files"][0]["path"]], env=env, capture_output=True, timeout=15)
+             receipt["files"][0]["path"]], env=env, capture_output=True, timeout=subprocess_timeout())
         self.assertEqual(later_read.returncode, 0, later_read.stderr)
         self.assertEqual(later_read.stdout, content)
         cleanup = [sys.executable, "-B", str(MODULE), "--cleanup-receipt", str(self.output)]
         mismatch = subprocess.run(cleanup, env=dict(env, TMPDIR=str(other_root), TEMP=str(other_root), TMP=str(other_root)),
-                                  capture_output=True, text=True, timeout=15)
+                                  capture_output=True, text=True, timeout=subprocess_timeout())
         self.assertNotEqual(mismatch.returncode, 0)
         self.assertIn("outside temp root", json.loads(mismatch.stderr)["error"])
         self.assertTrue(verified_root.exists())
-        matched = subprocess.run(cleanup, env=env, capture_output=True, text=True, timeout=15)
+        matched = subprocess.run(cleanup, env=env, capture_output=True, text=True, timeout=subprocess_timeout())
         self.assertEqual(matched.returncode, 0, matched.stderr)
         self.assertTrue(json.loads(matched.stdout)["removed"])
         self.assertFalse(verified_root.exists())
@@ -204,7 +207,7 @@ class BundleBoundaryTests(unittest.TestCase):
         wrong.write_text('{"schema_version":"0.1.0","owner":"auto-re-cli","kind":[]}')
         for path in (missing, huge, wrong):
             with self.subTest(path=path.name):
-                result = subprocess.run([sys.executable, "-B", str(MODULE), str(path)], capture_output=True, text=True, timeout=10)
+                result = subprocess.run([sys.executable, "-B", str(MODULE), str(path)], capture_output=True, text=True, timeout=subprocess_timeout(10))
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(result.stdout, "")
                 self.assertNotIn("Traceback", result.stderr)

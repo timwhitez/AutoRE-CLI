@@ -8,10 +8,13 @@ import importlib.util
 import json
 from pathlib import Path
 import platform
+import runpy
 import subprocess
 import sys
 import tempfile
 import time
+
+subprocess_timeout = runpy.run_path(str(Path(__file__).resolve().parents[1] / "subprocess_timeout.py"))["subprocess_timeout"]
 
 sys.dont_write_bytecode = True
 HERE = Path(__file__).resolve().parent
@@ -41,7 +44,7 @@ def git(root, *args):
 
 def measured(argv, calls, role, request_id=None):
     start = time.monotonic()
-    process = subprocess.run([str(a) for a in argv], capture_output=True, timeout=60)
+    process = subprocess.run([str(a) for a in argv], capture_output=True, timeout=subprocess_timeout(60))
     calls.append({'argv': [str(a) for a in argv], 'role': role, 'valid': True,
                   'exit_code': process.returncode, 'stdout_bytes': len(process.stdout),
                   'stderr_bytes': len(process.stderr), 'latency_ms': round((time.monotonic() - start) * 1000, 3),

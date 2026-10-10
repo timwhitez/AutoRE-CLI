@@ -8,12 +8,15 @@ import json
 import os
 from pathlib import Path
 import signal
+import runpy
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
 from unittest.mock import patch
+
+subprocess_timeout = runpy.run_path(str(Path(__file__).with_name("subprocess_timeout.py")))["subprocess_timeout"]
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "skills/auto-re/scripts"
@@ -155,12 +158,12 @@ class ReceiptTests(unittest.TestCase):
                     str(parent), "--action-stage", "fixture", "--output", str(root / "analysis.json"),
                     "--receipt", str(root / "receipt.json")], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 try:
-                    deadline = time.monotonic()+10
+                    deadline = time.monotonic()+subprocess_timeout(10)
                     while not started.exists() and process.poll() is None and time.monotonic()<deadline:
                         time.sleep(0.01)
                     self.assertTrue(started.exists(), "controlled child did not start")
                     process.send_signal(number)
-                    out, err = process.communicate(timeout=10)
+                    out, err = process.communicate(timeout=subprocess_timeout(10))
                     self.assertEqual(process.returncode, 130, err.decode(errors="replace"))
                     self.assertEqual(json.loads(out)["execution_status"], "cancelled")
                     receipt = runner.validate_prior_receipt(runner.load_json_object(
@@ -171,7 +174,7 @@ class ReceiptTests(unittest.TestCase):
                 finally:
                     if process.poll() is None:
                         process.kill()
-                    process.communicate(timeout=10)
+                    process.communicate(timeout=subprocess_timeout(10))
                     if started.exists():
                         with contextlib.suppress(ProcessLookupError):
                             os.kill(int(started.read_text()), signal.SIGKILL)
@@ -208,7 +211,7 @@ class ProbeTests(unittest.TestCase):
             argv = [sys.executable, "-B", str(SCRIPTS / "process_control.py"), "--job-worker",
                     sys.executable, "-c", f"from pathlib import Path;Path({str(marker)!r}).write_text('ok')"]
             for gate, expected in ((b"", 125), (b"x", 125), (b"1", 0)):
-                result = subprocess.run(argv, input=gate, capture_output=True, timeout=10)
+                result = subprocess.run(argv, input=gate, capture_output=True, timeout=subprocess_timeout(10))
                 self.assertEqual(result.returncode, expected, result.stderr)
                 self.assertEqual(marker.exists(), gate == b"1")
                 marker.unlink(missing_ok=True)
@@ -220,7 +223,7 @@ class ProbeTests(unittest.TestCase):
                 (root/name).write_bytes((SCRIPTS/name).read_bytes())
             for name in ("run_next_action.py", "skill_doctor.py"):
                 result = subprocess.run([sys.executable, str(root/name), "--help"],
-                                        capture_output=True, timeout=10)
+                                        capture_output=True, timeout=subprocess_timeout(10))
                 self.assertEqual(result.returncode, 0, result.stderr)
             self.assertFalse((root/"__pycache__").exists())
 
