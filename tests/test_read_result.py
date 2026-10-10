@@ -5,11 +5,14 @@ import json
 import os
 import stat
 from pathlib import Path
+import runpy
 import subprocess
 import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+
+subprocess_timeout = runpy.run_path(str(Path(__file__).with_name("subprocess_timeout.py")))["subprocess_timeout"]
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / 'skills/auto-re/scripts/read_result.py'
@@ -31,7 +34,7 @@ class ReadResultTests(unittest.TestCase):
         before = sorted(str(p.relative_to(self.root)) for p in self.root.rglob('*'))
         original = self.path.read_bytes() if self.path.exists() and stat.S_ISREG(self.path.lstat().st_mode) else None
         p = subprocess.run([sys.executable, '-B', str(SCRIPT), str(self.path), '--pointer', pointer, *args],
-                           capture_output=True, cwd=self.root, timeout=5)
+                           capture_output=True, cwd=self.root, timeout=subprocess_timeout(5))
         self.assertEqual(p.returncode, 0 if ok else 1, p.stderr.decode(errors='replace'))
         self.assertFalse(p.stderr if ok else p.stdout)
         stream = p.stdout if ok else p.stderr
@@ -149,7 +152,7 @@ class ReadResultTests(unittest.TestCase):
         for path, code in [(self.root / 'link/../analysis.json', 1),
                            (self.root / 'real/deep/../analysis.json', 0)]:
             p = subprocess.run([sys.executable, '-B', str(SCRIPT), str(path), '--pointer', '/source'],
-                               capture_output=True, timeout=5)
+                               capture_output=True, timeout=subprocess_timeout(5))
             self.assertEqual(p.returncode, code)
             if not code:
                 self.assertEqual(json.loads(p.stdout)['data'], 'B')
@@ -159,7 +162,7 @@ class ReadResultTests(unittest.TestCase):
         self.run_helper('/' + '中' * 400, ok=False)
         with self.path.open('wb') as handle:
             handle.truncate(64 * 1024 * 1024 + 1)
-        p = subprocess.run([sys.executable, '-B', str(SCRIPT), str(self.path), '--pointer', ''], capture_output=True, timeout=5)
+        p = subprocess.run([sys.executable, '-B', str(SCRIPT), str(self.path), '--pointer', ''], capture_output=True, timeout=subprocess_timeout(5))
         self.assertEqual(json.loads(p.stderr)['error'], 'input_too_large')
         self.path.unlink()
         self.assertEqual(self.run_helper('', '--expected-sha256', 'bad', ok=False)['error'], 'invalid_expected_sha256')
@@ -167,7 +170,7 @@ class ReadResultTests(unittest.TestCase):
     def test_help_and_syntax_remain_argparse(self):
         for args, code in [(['--help'], 0), ([], 2), ([str(self.path)], 2),
                            ([str(self.path), '--pointer', '', '--output', 'new'], 2)]:
-            p = subprocess.run([sys.executable, '-B', str(SCRIPT), *args], capture_output=True, cwd=self.root, timeout=5)
+            p = subprocess.run([sys.executable, '-B', str(SCRIPT), *args], capture_output=True, cwd=self.root, timeout=subprocess_timeout(5))
             self.assertEqual(p.returncode, code)
         self.assertEqual(list(self.root.iterdir()), [])
 

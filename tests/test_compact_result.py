@@ -6,10 +6,13 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import runpy
 import subprocess
 import sys
 import tempfile
 import unittest
+
+subprocess_timeout = runpy.run_path(str(Path(__file__).with_name("subprocess_timeout.py")))["subprocess_timeout"]
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / 'skills/auto-re/scripts/compact_result.py'
@@ -99,7 +102,7 @@ class CompactResultTests(unittest.TestCase):
         path = Path(directory)/'full.json'; path.write_bytes(raw)
         result = subprocess.run([sys.executable, '-B', str(SCRIPT), str(path),
                                  '--expected-sha256', hashlib.sha256(raw).hexdigest()],
-                                capture_output=True, timeout=15)
+                                capture_output=True, timeout=subprocess_timeout())
         self.assertEqual(path.read_bytes(), raw)
         return result
 
@@ -165,7 +168,7 @@ class CompactResultTests(unittest.TestCase):
                     self.assertEqual(view['kind'], compact.KIND)
                     read = subprocess.run([sys.executable, '-B', str(SCRIPT.with_name('read_result.py')),
                                            str(output), '--pointer', '/catalog/0'],
-                                          capture_output=True, timeout=15)
+                                          capture_output=True, timeout=subprocess_timeout())
                     self.assertEqual(read.returncode, 0, read.stderr)
                     self.assertEqual(compact.expand_view(view), full)
 
@@ -174,13 +177,13 @@ class CompactResultTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)/'full.json'; raw=compact.encoded(full); path.write_bytes(raw)
             argv=[sys.executable, '-B', str(SCRIPT), str(path), '--expected-sha256', hashlib.sha256(raw).hexdigest()]
-            result=subprocess.run(argv, capture_output=True, timeout=15)
+            result=subprocess.run(argv, capture_output=True, timeout=subprocess_timeout())
             self.assertEqual(result.returncode, 0, result.stderr)
             view=json.loads(result.stdout)
             self.assertEqual(view['full_view']['sha256'], hashlib.sha256(raw).hexdigest())
             self.assertEqual(compact.expand_view(view), full)
             self.assertEqual(path.read_bytes(),raw)
-            wrong=subprocess.run([*argv[:-1], '0'*64], capture_output=True, timeout=15)
+            wrong=subprocess.run([*argv[:-1], '0'*64], capture_output=True, timeout=subprocess_timeout())
             self.assertEqual(wrong.returncode, 1)
             self.assertEqual(json.loads(wrong.stderr)['error'], 'source_changed')
             self.assertFalse(wrong.stdout)

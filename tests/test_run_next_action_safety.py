@@ -9,11 +9,14 @@ import json
 import os
 import pathlib
 import stat
+import runpy
 import subprocess
 import sys
 import tempfile
 import unittest
 from unittest import mock
+
+subprocess_timeout = runpy.run_path(str(pathlib.Path(__file__).with_name("subprocess_timeout.py")))["subprocess_timeout"]
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "skills/auto-re/scripts/run_next_action.py"
@@ -66,7 +69,7 @@ class RunNextActionSafetyTests(unittest.TestCase):
         return subprocess.run(
             [sys.executable, "-B", str(MODULE_PATH), str(result),
              "--action-stage", "function.selected", "--dry-run", *args],
-            capture_output=True, text=True, check=False, timeout=10,
+            capture_output=True, text=True, check=False, timeout=subprocess_timeout(10),
         )
 
     def test_existing_receipt_is_preserved(self) -> None:

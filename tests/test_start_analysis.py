@@ -11,10 +11,13 @@ import json
 import os
 from pathlib import Path
 import shutil
+import runpy
 import subprocess
 import sys
 import tempfile
 import unittest
+
+subprocess_timeout = runpy.run_path(str(Path(__file__).with_name("subprocess_timeout.py")))["subprocess_timeout"]
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL = ROOT / "skills" / "auto-re"
@@ -84,7 +87,7 @@ class StartAnalysisTests(unittest.TestCase):
         completed = subprocess.run(
             [sys.executable, str(self.launcher), str(target or self.target),
              "--result-dir", str(output or self.output), "--cli", str(cli or self.cli), *extra],
-            cwd=self.root, env=self.env, text=True, capture_output=True, timeout=15,
+            cwd=self.root, env=self.env, text=True, capture_output=True, timeout=subprocess_timeout(),
         )
         self.assertEqual(self.target.read_bytes(), self.original)
         self.assertFalse(self.marker.exists(), "target bytes executed")

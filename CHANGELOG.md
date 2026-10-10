@@ -4,6 +4,9 @@ All notable changes to the public AutoRE-CLI distribution are recorded here.
 
 ## [Unreleased]
 
+- Add opt-in `AUTO_RE_TEST_TIMEOUT_SCALE` for offline test hang guards; preserve
+  default bounds and production timeouts, and reject invalid scales explicitly.
+
 - Add maintainer-only Agent task cases, hash-bound atomic-claim scoring and
   static reference baselines for identity, retrieval and consumer compatibility.
   Separate cold/retained costs; real-Agent runs remain separately authorized.
