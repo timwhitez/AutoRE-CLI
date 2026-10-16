@@ -213,5 +213,156 @@ class BundleBoundaryTests(unittest.TestCase):
                 self.assertNotIn("Traceback", result.stderr)
                 self.assertFalse(json.loads(result.stderr)["ok"])
 
+
+class BundleReceiptBudgetTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="autore-receipt-budget-")
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name).resolve()
+        self.output = self.root / "receipt.json"
+        self.payload = self.root / "payload.json"
+        self.payload.write_bytes(b'{"inert":true}')
+        self.manifest = self.root / "manifest.json"
+        self.created_roots = []
+        self.addCleanup(self.remove_roots)
+        original = bundle.tempfile.mkdtemp
+        def track_root(*args, **kwargs):
+            path = original(*args, **kwargs)
+            self.created_roots.append(Path(path))
+            return path
+        self.patches = [patch.object(bundle.tempfile, "mkdtemp", side_effect=track_root),
+                        patch.object(bundle, "utc_now", return_value="2026-10-16T00:00:00Z")]
+        for item in self.patches:
+            item.start()
+            self.addCleanup(item.stop)
+
+    def remove_roots(self):
+        for root in self.created_roots:
+            if root.exists():
+                bundle.remove_verified_root(root)
+
+    def write_manifest(self, completion):
+        content = self.payload.read_bytes()
+        self.manifest.write_text(json.dumps({
+            "schema_version": "0.1.0", "owner": "auto-re-cli", "kind": "context_bundle",
+            "files": [{"path": self.payload.name, "ownership": "command", "bytes": len(content),
+                       "sha256": hashlib.sha256(content).hexdigest()}], "completion": completion}), encoding="utf-8")
+
+    def round_trip(self, completion):
+        self.write_manifest(completion)
+        before = self.manifest.read_bytes(), self.payload.read_bytes()
+        receipt, summary = bundle.validate_manifest_to_receipt(self.manifest, self.output)
+        self.assertTrue(summary["ok"])
+        _, loaded = bundle._read_verification_receipt(self.output)
+        self.assertEqual(loaded, receipt)
+        self.assertEqual(loaded["completion"], completion)
+        self.assertTrue(bundle.cleanup_verified_receipt(self.output)["removed"])
+        self.assertFalse(Path(receipt["verified_root"]).exists())
+        self.assertEqual((self.manifest.read_bytes(), self.payload.read_bytes()), before)
+        size = self.output.stat().st_size
+        self.output.unlink()
+        return receipt, size
+
+    def rejected(self, completion, pattern):
+        self.write_manifest(completion)
+        before = self.manifest.read_bytes(), self.payload.read_bytes()
+        with self.assertRaisesRegex(bundle.ValidationError, pattern):
+            bundle.validate_manifest_to_receipt(self.manifest, self.output)
+        self.assertFalse(self.output.exists())
+        self.assertFalse(any(root.exists() for root in self.created_roots))
+        self.assertEqual((self.manifest.read_bytes(), self.payload.read_bytes()), before)
+
+    @staticmethod
+    def count_values(value):
+        if isinstance(value, dict):
+            return 1 + sum(BundleReceiptBudgetTests.count_values(child) for child in value.values())
+        if isinstance(value, list):
+            return 1 + sum(BundleReceiptBudgetTests.count_values(child) for child in value)
+        return 1
+
+    def test_stop_reason_entries_writer_reader_cleanup(self):
+        for count in (0, 1, 2, 1024):
+            with self.subTest(count=count):
+                self.round_trip({"state": "truncated", "complete": False, "truncated": True,
+                                 "stop_reasons": ["function_limit"] * count})
+        self.rejected({"stop_reasons": ["function_limit"] * 1025},
+                      r"kind=bundle_verification_receipt dimension=container_entries limit=1024 observed_at_least=1025")
+
+    def test_whole_wrapper_values_budget(self):
+        baseline, _ = self.round_trip(None)
+        # Four short arrays isolate total values from the 1024-entry ceiling.
+        leaves = 4096 - self.count_values(baseline) - 4
+        completion = [[0] * 1024 for _ in range(3)] + [[0] * (leaves - 3072)]
+        receipt, _ = self.round_trip(completion)
+        self.assertEqual(self.count_values(receipt), 4096)
+        completion[-1].append(0)
+        self.rejected(completion, r"dimension=values limit=4096 observed_at_least=4097")
+
+    def test_depth_boundary_and_final_wrapper_gate(self):
+        completion = 0
+        for _ in range(62):
+            completion = [completion]
+        self.round_trip(completion)  # receipt root depth 1, completion depth 2, leaf depth 64
+        self.rejected([completion], r"kind=verified_bundle_manifest dimension=depth limit=64 observed_at_least=65")
+        self.assertEqual(len(self.created_roots), 1)  # input rejection did not materialize
+        original = bundle.build_verification_receipt
+        def deeper(result):
+            receipt = original(result)
+            receipt["completion"] = [completion]
+            return receipt
+        with patch.object(bundle, "build_verification_receipt", side_effect=deeper):
+            self.rejected(None, r"kind=bundle_verification_receipt dimension=depth limit=64 observed_at_least=65")
+
+    def test_encoded_boundary_includes_newline_unicode_and_escapes(self):
+        _, baseline = self.round_trip("")
+        prefix = "é漢😀\n\t\x00\"\\"
+        escaped_size = len(json.dumps(prefix).encode("utf-8")) - 2
+        completion = prefix + "x" * (bundle.VERIFICATION_RECEIPT_MAX_BYTES - baseline - escaped_size)
+        _, size = self.round_trip(completion)
+        self.assertEqual(size, bundle.VERIFICATION_RECEIPT_MAX_BYTES)
+        self.rejected(completion + "x", r"receipt output exceeds limit: limit=1048576 observed=1048577")
+
+    def test_decoded_utf8_string_and_key_limits_are_shared(self):
+        limit = bundle.VERIFICATION_RECEIPT_POLICY.max_string_bytes
+        for text in ("é" * (limit // 2), "😀" * (limit // 4)):
+            for key in (False, True):
+                with self.subTest(key=key, codepoint=ord(text[0])):
+                    value = {text: 0} if key else {"completion": text}
+                    # A decoded 1 MiB string cannot fit the complete encoded wrapper.
+                    bundle._validate_json_shape(value, bundle.VERIFICATION_RECEIPT_POLICY)
+                    too_long = text + "x"
+                    original = bundle.build_verification_receipt
+                    def oversized(result):
+                        receipt = original(result)
+                        receipt["completion"] = {too_long: 0} if key else too_long
+                        return receipt
+                    with patch.object(bundle, "build_verification_receipt", side_effect=oversized):
+                        self.rejected(None, r"kind=bundle_verification_receipt dimension=string_bytes limit=1048576 observed_at_least=1048577")
+
+    def test_admission_cleanup_failure_preserves_first_error_and_recovery_path(self):
+        self.write_manifest({"stop_reasons": ["function_limit"] * 1025})
+        with patch.object(bundle, "remove_verified_root", side_effect=OSError("cleanup denied")):
+            with self.assertRaises(bundle.ValidationError) as caught:
+                bundle.validate_manifest_to_receipt(self.manifest, self.output)
+        self.assertIn("cleanup denied", str(caught.exception))
+        self.assertIn("dimension=container_entries", str(caught.exception))
+        self.assertIn(f"retained recovery path: {self.created_roots[-1]}", str(caught.exception))
+        self.assertIn("dimension=container_entries", str(caught.exception.__cause__))
+        self.assertTrue(self.created_roots[-1].exists())
+        self.assertFalse(self.output.exists())
+
+    def test_stdout_only_keeps_manifest_completion_budget(self):
+        completion = {"stop_reasons": ["function_limit"] * 1025}
+        self.write_manifest(completion)
+        result = subprocess.run([sys.executable, "-B", str(MODULE), str(self.manifest)],
+                                capture_output=True, text=True, timeout=subprocess_timeout())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        document = json.loads(result.stdout)
+        verified = Path(document["verified_root"])
+        self.created_roots.append(verified)
+        self.assertEqual(document["completion"], completion)
+        self.assertTrue(verified.exists())
+        self.assertFalse(self.output.exists())
+
 if __name__ == "__main__":
     unittest.main()
