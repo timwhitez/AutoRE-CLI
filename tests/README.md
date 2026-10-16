@@ -43,6 +43,19 @@ formats and explicit 64-bit counter/duration/exit ranges. The final writer
 checks the same size, shape and identity contract; round-trip regressions use
 the real prior loader rather than plain JSON decoding.
 
+Bundle verification receipts have a separate shared writer/cleanup-reader
+budget: 1 MiB encoded including the final newline, depth 64, 4096 values,
+1024 entries per container and 1 MiB decoded UTF-8 bytes per string/key. The
+complete generated wrapper is checked before exclusive creation. Failure
+reclaims the new owned tree; cleanup failure reports the first error and exact
+recovery path. Evidence is never truncated. The no-receipt stdout route retains
+the manifest budget. Boundary tests round-trip the real writer, receipt reader
+and cleanup, including wrapper overhead, Unicode and JSON escapes. Depth 65
+and oversized decoded strings/keys are already refused by manifest admission;
+final-wrapper injection separately tests the output gate for those dimensions.
+A decoded 1 MiB string/key cannot fit the full encoded receipt, so its inclusive
+shape boundary is tested separately from encoded-byte admission.
+
 Release builds now require a **new output directory in an existing trusted
 parent**. Existing directories (including empty ones) are rejected rather than
 cleared. The default remains `release-assets`; choose a fresh name for another
