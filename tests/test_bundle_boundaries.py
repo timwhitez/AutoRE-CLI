@@ -260,6 +260,7 @@ class BundleReceiptBudgetTests(unittest.TestCase):
         self.assertFalse(Path(receipt["verified_root"]).exists())
         self.assertEqual((self.manifest.read_bytes(), self.payload.read_bytes()), before)
         size = self.output.stat().st_size
+        self.output.chmod(0o600)
         self.output.unlink()
         return receipt, size
 
