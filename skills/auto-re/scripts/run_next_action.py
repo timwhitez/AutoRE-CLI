@@ -420,11 +420,17 @@ def load_json_object(
     policy: ControlJsonPolicy = ACTION_RESULT_POLICY,
 ) -> dict[str, Any]:
     try:
-        with path.open("rb") as handle:
-            opened_size = os.fstat(handle.fileno()).st_size
-            if opened_size > policy.max_encoded_bytes:
-                raise _control_file_too_large(policy, opened_size)
-            data = _read_bounded_control_bytes(handle, policy)
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
+        try:
+            opened = os.fstat(fd)
+            if not stat.S_ISREG(opened.st_mode):
+                raise ActionError("invalid_result_boundary: control JSON must be a regular file")
+            if opened.st_size > policy.max_encoded_bytes:
+                raise _control_file_too_large(policy, opened.st_size)
+            with os.fdopen(fd, "rb", closefd=False) as handle:
+                data = _read_bounded_control_bytes(handle, policy)
+        finally:
+            os.close(fd)
         try:
             value = json.loads(data.decode("utf-8"), object_pairs_hook=_unique_json_members)
         except RecursionError as error:
