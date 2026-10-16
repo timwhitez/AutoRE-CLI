@@ -314,13 +314,15 @@ class BundleReceiptBudgetTests(unittest.TestCase):
             self.rejected(None, r"kind=bundle_verification_receipt dimension=depth limit=64 observed_at_least=65")
 
     def test_encoded_boundary_includes_newline_unicode_and_escapes(self):
-        _, baseline = self.round_trip("")
         prefix = "é漢😀\n\t\x00\"\\"
-        escaped_size = len(json.dumps(prefix).encode("utf-8")) - 2
-        completion = prefix + "x" * (bundle.VERIFICATION_RECEIPT_MAX_BYTES - baseline - escaped_size)
-        _, size = self.round_trip(completion)
-        self.assertEqual(size, bundle.VERIFICATION_RECEIPT_MAX_BYTES)
-        self.rejected(completion + "x", r"receipt output exceeds limit: limit=1048576 observed=1048577")
+        for key in (False, True):
+            with self.subTest(unicode_key=key):
+                wrap = (lambda text: {prefix: text}) if key else (lambda text: prefix + text)
+                _, baseline = self.round_trip(wrap(""))
+                padding = "x" * (bundle.VERIFICATION_RECEIPT_MAX_BYTES - baseline)
+                _, size = self.round_trip(wrap(padding))
+                self.assertEqual(size, bundle.VERIFICATION_RECEIPT_MAX_BYTES)
+                self.rejected(wrap(padding + "x"), r"receipt output exceeds limit: limit=1048576 observed=1048577")
 
     def test_decoded_utf8_string_and_key_limits_are_shared(self):
         limit = bundle.VERIFICATION_RECEIPT_POLICY.max_string_bytes
@@ -350,6 +352,49 @@ class BundleReceiptBudgetTests(unittest.TestCase):
         self.assertIn("dimension=container_entries", str(caught.exception.__cause__))
         self.assertTrue(self.created_roots[-1].exists())
         self.assertFalse(self.output.exists())
+
+    def test_cleanup_keeps_token_marker_and_stable_identity_checks(self):
+        self.write_manifest(None)
+        receipt, _ = bundle.validate_manifest_to_receipt(self.manifest, self.output)
+        root = Path(receipt["verified_root"])
+        marker_path = root / bundle.VERIFIED_ROOT_MARKER
+        marker = json.loads(marker_path.read_text())
+        for field, value, pattern in (("cleanup_token", "invalid", "cleanup_token is invalid"),
+                                      ("cleanup_token", "0" * 64, "marker identity does not match")):
+            changed = dict(receipt, **{field: value})
+            self.output.chmod(0o600)
+            self.output.write_text(json.dumps(changed))
+            with self.assertRaisesRegex(bundle.ValidationError, pattern):
+                bundle.cleanup_verified_receipt(self.output)
+            self.assertTrue(root.exists())
+        self.output.write_text(json.dumps(receipt))
+        for field, value, pattern in (("owner", "foreign", "marker identity does not match"),
+                                      ("root_identity", {"device": -1, "inode": -1}, "stable identity does not match")):
+            marker_path.chmod(0o600)
+            marker_path.write_text(json.dumps(dict(marker, **{field: value})))
+            with self.assertRaisesRegex(bundle.ValidationError, pattern):
+                bundle.cleanup_verified_receipt(self.output)
+            self.assertTrue(root.exists())
+        marker_path.write_text(json.dumps(marker))
+        self.assertTrue(bundle.cleanup_verified_receipt(self.output)["removed"])
+
+    def test_late_receipt_collision_reclaims_only_owned_root(self):
+        self.write_manifest(None)
+        original = bundle.resolve_new_output
+        calls = 0
+        def collide(path, label):
+            nonlocal calls
+            if label == "receipt":
+                calls += 1
+                if calls == 2:
+                    self.output.write_bytes(b"foreign receipt")
+            return original(path, label)
+        with patch.object(bundle, "resolve_new_output", side_effect=collide):
+            with self.assertRaisesRegex(bundle.ValidationError, "receipt output already exists"):
+                bundle.validate_manifest_to_receipt(self.manifest, self.output)
+        self.assertEqual(self.output.read_bytes(), b"foreign receipt")
+        self.assertEqual(calls, 2)
+        self.assertFalse(any(root.exists() for root in self.created_roots))
 
     def test_stdout_only_keeps_manifest_completion_budget(self):
         completion = {"stop_reasons": ["function_limit"] * 1025}

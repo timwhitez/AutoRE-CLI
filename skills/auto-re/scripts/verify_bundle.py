@@ -664,6 +664,7 @@ def validate_manifest_to_receipt(
     result = validate_manifest(manifest_path)
     try:
         receipt = build_verification_receipt(result)
+        _validate_json_shape(receipt, VERIFICATION_RECEIPT_POLICY)
         written = write_json_exclusive(
             receipt_target,
             receipt,
@@ -675,7 +676,7 @@ def validate_manifest_to_receipt(
             remove_verified_root(pathlib.Path(result["verified_root"]))
         except OSError as cleanup_error:
             raise ValidationError(
-                "verification receipt failed and verified-copy cleanup failed: "
+                f"verification receipt failed: {error}; verified-copy cleanup failed: "
                 f"{cleanup_error}; retained recovery path: {result['verified_root']}"
             ) from error
         raise
