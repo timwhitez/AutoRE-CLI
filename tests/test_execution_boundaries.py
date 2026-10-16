@@ -8,6 +8,8 @@ import io
 import json
 import os
 from pathlib import Path
+import runpy
+import shutil
 import signal
 import subprocess
 import sys
@@ -16,6 +18,8 @@ import threading
 import time
 import unittest
 from unittest.mock import patch
+
+subprocess_timeout = runpy.run_path(str(Path(__file__).with_name("subprocess_timeout.py")))["subprocess_timeout"]
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "skills/auto-re/scripts"
@@ -100,6 +104,180 @@ class JsonAndPreflightTests(unittest.TestCase):
             prepared = runner.prepare_action(result, "next", None)
             self.assertEqual(prepared["argv"], argv)
             self.assertEqual(runner._command_sink_values(argv), [Path("~/literal").resolve()])
+
+
+class ControlJsonFileTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="control-json-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.path = self.root / "control.json"
+
+    def test_regular_file_exact_limit_and_symlink(self):
+        policy = runner.RECEIPT_POLICY._replace(max_encoded_bytes=32)
+        self.path.write_bytes(b'{"n":1}' + b' ' * 25)
+        self.assertEqual(runner.load_json_object(self.path, policy=policy), {"n": 1})
+        if os.name == "posix":
+            link = self.root / "link.json"
+            link.symlink_to(self.path)
+            self.assertEqual(runner.load_json_object(link, policy=policy), {"n": 1})
+        self.path.write_bytes(self.path.read_bytes() + b' ')
+        with self.assertRaisesRegex(runner.ActionError, "control_file_too_large"):
+            runner.load_json_object(self.path, policy=policy)
+
+    def test_shape_nonobject_and_directory_are_domain_errors(self):
+        for data, message in ((b'[]', "root must be an object"),
+                              (b'{"a":[[[0]]]}', "control_file_structure_limit")):
+            self.path.write_bytes(data)
+            with self.subTest(data=data), self.assertRaisesRegex(runner.ActionError, message):
+                runner.load_json_object(self.path, policy=runner.RECEIPT_POLICY._replace(max_depth=2))
+        with self.assertRaises(runner.ActionError):
+            runner.load_json_object(self.root)
+
+    def test_descriptor_closed_on_success_and_each_io_failure(self):
+        self.path.write_bytes(b'{}')
+        real_open = os.open
+        for stage in (None, "fstat", "fdopen", "read"):
+            opened = []
+            def tracked_open(*args, **kwargs):
+                fd = real_open(*args, **kwargs)
+                opened.append(fd)
+                return fd
+            with self.subTest(stage=stage), patch.object(runner.os, "open", side_effect=tracked_open):
+                if stage is None:
+                    self.assertEqual(runner.load_json_object(self.path), {})
+                else:
+                    owner, name = ((runner, "_read_bounded_control_bytes") if stage == "read"
+                                   else (runner.os, stage))
+                    with patch.object(owner, name, side_effect=OSError("injected IO failure")):
+                        with self.assertRaisesRegex(runner.ActionError, "injected IO failure"):
+                            runner.load_json_object(self.path)
+            self.assertEqual(len(opened), 1)
+            with self.assertRaises(OSError):
+                os.fstat(opened[0])
+
+    def test_prior_rejection_follows_successful_version_and_hash_preflight(self):
+        parent = self.root / "parent.json"
+        parent.write_text(json.dumps(document(["auto-re-cli", "describe"])))
+        prepared = runner.prepare_action(parent, "next", self.root / "analysis.json")
+        executable = Path(sys.executable).resolve()
+        with patch.object(runner, "probe_program_version", return_value="auto-re-cli 0.1.11") as probe, \
+             patch.object(runner, "sha256_file", wraps=runner.sha256_file) as digest, \
+             patch.object(runner.process_control, "run_process") as analysis:
+            with self.assertRaises(runner.ActionError):
+                runner.execute_prepared_with_receipt(prepared, executable,
+                    self.root / "new-receipt.json", prior_receipt=self.root)
+            probe.assert_called_once_with(executable)
+            digest.assert_called_once_with(executable)
+            analysis.assert_not_called()
+        self.assert_no_analysis()
+
+    def test_stream_gate_handles_growth_and_short_reads(self):
+        policy = runner.RECEIPT_POLICY._replace(max_encoded_bytes=32)
+        self.path.write_bytes(b'{}')
+        original = runner._read_bounded_control_bytes
+        def grow(handle, policy):
+            with self.path.open("ab") as writer:
+                writer.write(b' ' * 31)
+            return original(handle, policy)
+        with patch.object(runner, "_read_bounded_control_bytes", side_effect=grow):
+            with self.assertRaisesRegex(runner.ActionError, "observed_at_least=33"):
+                runner.load_json_object(self.path, policy=policy)
+        class ShortReader(io.BytesIO):
+            def read(self, size):
+                return super().read(min(size, 2))
+        self.assertEqual(original(ShortReader(b'{}'), policy), b'{}')
+
+    def run_cli(self, *, prior=False, dry_run=False):
+        cli = self.root / "auto-re-cli"
+        cli.write_text(f"#!{sys.executable}\nimport pathlib,sys\n"
+                       f"root = pathlib.Path({str(self.root)!r})\n"
+                       "if '--version' in sys.argv:\n"
+                       " (root / 'version-probed').write_text('yes')\n"
+                       " print('auto-re-cli 0.1.11')\n"
+                       "else:\n"
+                       " (root / 'analysis-ran').write_text('yes')\n")
+        cli.chmod(0o700)
+        parent = self.path
+        if prior:
+            parent = self.root / "parent.json"
+            parent.write_text(json.dumps(document(["auto-re-cli", "describe"])))
+        argv = [sys.executable, "-B", str(SCRIPTS / "run_next_action.py"), str(parent),
+                "--action-stage", "next", "--output", str(self.root / "analysis.json"),
+                "--receipt", str(self.root / "new-receipt.json")]
+        if prior:
+            argv += ["--prior-receipt", str(self.path)]
+        if dry_run:
+            argv.append("--dry-run")
+        return subprocess.run(argv, capture_output=True, text=True,
+                              env={**os.environ, "PATH": str(self.root) + os.pathsep + os.environ.get("PATH", "")},
+                              timeout=subprocess_timeout(5))
+
+    @unittest.skipUnless(os.name == "posix" and hasattr(os, "mkfifo"), "requires POSIX FIFO")
+    def test_fifo_parent_normal_and_dry_run_rejected_without_writer(self):
+        os.mkfifo(self.path)
+        for dry_run in (False, True):
+            with self.subTest(dry_run=dry_run):
+                result = self.run_cli(dry_run=dry_run)
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn("regular file", json.loads(result.stderr)["error"])
+                self.assertFalse((self.root / "version-probed").exists())
+                self.assert_no_analysis()
+
+    @unittest.skipUnless(os.name == "posix" and hasattr(os, "mkfifo"), "requires POSIX FIFO")
+    def test_fifo_prior_after_version_probe_and_dry_run_without_read(self):
+        os.mkfifo(self.path)
+        result = self.run_cli(prior=True, dry_run=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["continuation_check"], "not_evaluated_dry_run")
+        self.assertFalse((self.root / "version-probed").exists())
+        self.assert_no_analysis()
+        result = self.run_cli(prior=True)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("regular file", json.loads(result.stderr)["error"])
+        self.assertTrue((self.root / "version-probed").exists())
+        self.assert_no_analysis()
+
+    @unittest.skipUnless(os.name == "posix" and hasattr(os, "mkfifo"), "requires POSIX FIFO")
+    def test_fifo_with_writer_held_open_rejected_before_read(self):
+        os.mkfifo(self.path)
+        reader = os.open(self.path, os.O_RDONLY | os.O_NONBLOCK)
+        self.addCleanup(os.close, reader)
+        writer = os.open(self.path, os.O_WRONLY | os.O_NONBLOCK)
+        self.addCleanup(os.close, writer)
+        os.write(writer, b'{}')
+        for prior in (False, True):
+            with self.subTest(prior=prior):
+                result = self.run_cli(prior=prior)
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn("regular file", json.loads(result.stderr)["error"])
+                self.assert_no_analysis()
+
+    @unittest.skipUnless(os.name == "posix", "trusted POSIX executable fixture")
+    def test_regular_parent_and_prior_reach_analysis(self):
+        self.path.write_text(json.dumps(document(["auto-re-cli", "describe"])))
+        result = self.run_cli(dry_run=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assert_no_analysis()
+        for prior in (False, True):
+            if prior:
+                self.path.write_text(json.dumps({"schema_version": 1, "owner": "auto-re-skill",
+                    "kind": "auto_re_action_execution_receipt"}))
+            before = self.path.read_bytes()
+            result = self.run_cli(prior=prior)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((self.root / "version-probed").exists())
+            self.assertTrue((self.root / "analysis-ran").exists())
+            self.assertEqual(self.path.read_bytes(), before)
+            receipt = self.root / "new-receipt.json"
+            receipt.chmod(0o600)
+            receipt.unlink()
+            shutil.rmtree(self.root / "new-receipt.json.logs")
+            (self.root / "analysis-ran").unlink()
+
+    def assert_no_analysis(self):
+        for name in ("analysis-ran", "analysis.json", "new-receipt.json", "new-receipt.json.logs"):
+            self.assertFalse((self.root / name).exists(), name)
 
 
 class ProcessControlTests(unittest.TestCase):
