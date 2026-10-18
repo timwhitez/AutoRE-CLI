@@ -27,17 +27,17 @@ AutoRE-CLI 把 ELF、PE/COFF、Mach-O、目标文件及明确指定的 raw 输�
 
 需要 Python 3.9 或更高版本及[受支持的主机](#支持平台)，无需 Rust toolchain
 或源码 checkout。从 [Releases](https://github.com/timwhitez/AutoRE-CLI/releases/latest)
-下载适合主机的 **0.1.11** 单平台包：
+下载适合主机的 **0.1.12** 单平台包：
 
 ```sh
-tar -xzf AutoRE-CLI-0.1.11-linux-x86_64.tar.gz
-cd AutoRE-CLI-0.1.11-linux-x86_64
+tar -xzf AutoRE-CLI-0.1.12-linux-x86_64.tar.gz
+cd AutoRE-CLI-0.1.12-linux-x86_64
 ./verify.sh
 ./install.sh
 ```
 
 可将 `linux-x86_64` 替换为 `linux-arm64`、`macos-arm64` 或 `macos-x86_64`。
-Windows 用户解压 `AutoRE-CLI-0.1.11-windows-x86_64.zip`，在解压目录打开
+Windows 用户解压 `AutoRE-CLI-0.1.12-windows-x86_64.zip`，在解压目录打开
 PowerShell 后运行：
 
 ```powershell
@@ -81,7 +81,7 @@ scoop install https://raw.githubusercontent.com/timwhitez/AutoRE-CLI/main/packag
 
 ```sh
 npx skills add \
-  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.11/AutoRE-CLI-0.1.11-auto-re-skill.zip -g
+  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.12/AutoRE-CLI-0.1.12-auto-re-skill.zip -g
 ```
 
 保持已安装 CLI 与 Skill 版本一致。下载或包管理器联网与离线安装器是不同步骤。
@@ -193,7 +193,7 @@ auto-re-cli dump-il ./samples/sample.exe --level custom --addr 0x401000 \
 0.1.11 新增 metadata-only `describe`、通过全局 `--diagnostic-format json` 选择
 有界 stderr 错误，以及八个指定命令可选的 `--result-contract kinds-v1`。
 默认文本错误和 `legacy` 结果根仍可使用。通过 `describe` 与 `<command> --help`
-查询支持的选项，使用配对的 0.1.11 Skill 消费新结果根。Skill 还支持精确有界的
+查询支持的选项，使用配对的 0.1.12 Skill 消费新结果根。Skill 还支持精确有界的
 对象键分页、Unicode 字符串切片及请求身份/no-progress 检查。
 
 ## 限制与证据

@@ -16,7 +16,7 @@ SPEC = importlib.util.spec_from_file_location(
     "identity_runner", ROOT / "skills/auto-re/scripts/run_next_action.py")
 runner = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(runner)
-CONTRACT = json.loads((Path(__file__).parent / "fixtures/cli_identity_0_1_11.json").read_text())
+CONTRACT = json.loads((Path(__file__).parent / "fixtures/cli_identity_0_1_12.json").read_text())
 VERSION = "auto-re-cli " + CONTRACT["version"]
 
 
@@ -182,7 +182,7 @@ class RequestIdentityContractTests(unittest.TestCase):
         self.assertNotEqual(reordered, expected)
 
     def test_release_version_mismatch_does_not_hash_input(self):
-        for version in ("auto-re-cli 0.1.9", "auto-re-cli 0.1.10", "auto-re-cli 0.1.12", "auto-re-cli 1.2.3", "", None):
+        for version in ("auto-re-cli 0.1.9", "auto-re-cli 0.1.10", "auto-re-cli 0.1.11", "auto-re-cli 0.1.13", "auto-re-cli 1.2.3", "", None):
             with self.subTest(version=version), patch.object(runner.os, "open") as opened:
                 self.assertEqual(self.identity(["dump-il", str(self.input)], version)[1], "unsupported_command")
                 opened.assert_not_called()

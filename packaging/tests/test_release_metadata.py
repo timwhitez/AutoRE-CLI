@@ -34,7 +34,9 @@ class MetadataTests(unittest.TestCase):
         for relative in checker.RECIPES:
             destination = self.root / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_bytes((ROOT / relative).read_bytes())
+            # Freeze the historical recipes with their release metadata across future releases.
+            suffix = Path(relative).suffix
+            destination.write_bytes((FIXTURE.parent / ("autore-cli-v0.1.11" + suffix)).read_bytes())
         self.release = json.loads(FIXTURE.read_text())
         self.sums()
 
@@ -63,7 +65,12 @@ class MetadataTests(unittest.TestCase):
         result = checker.check(self.root, self.release, copy.deepcopy(self.release))
         self.assertTrue(result["ok"])
         self.assertEqual(result["targets_checked"], list(checker.TARGETS))
-        checker.check(ROOT, self.release, self.release)
+
+    def test_current_recipes_match_distribution_version_and_checksums(self):
+        version, recipes = checker.read_recipes(ROOT)
+        self.assertEqual(version, (ROOT / "VERSION").read_text().strip())
+        self.assertEqual(set(recipes), set(checker.TARGETS))
+        checker.verify_recipe_checksums(ROOT)
 
     def test_each_old_recipe_hash_is_rejected(self):
         for target, old in OLD_HASHES.items():
@@ -148,7 +155,7 @@ class MetadataTests(unittest.TestCase):
                 self.rejected()
                 # Restore this target only, without undoing the original other URL.
                 path = self.root / checker.RECIPES[target == "windows-x86_64"]
-                path.write_bytes((ROOT / path.relative_to(self.root)).read_bytes())
+                path.write_bytes((FIXTURE.parent / ("autore-cli-v0.1.11" + path.suffix)).read_bytes())
                 self.sums()
         first, second = (self.asset(t)["digest"][7:] for t in checker.TARGETS[:2])
         path = self.root / checker.RECIPES[0]

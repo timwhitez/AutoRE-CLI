@@ -1,15 +1,15 @@
 {
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "Bounded static reverse engineering for analysts and AI agents",
   "homepage": "https://github.com/timwhitez/AutoRE-CLI",
   "license": "MIT",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.11/AutoRE-CLI-0.1.11-windows-x86_64.zip",
-      "hash": "37898096717e403ab3ce4363cbc935a77dbb818376c2b3abec888917582f3e81"
+      "url": "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.12/AutoRE-CLI-0.1.12-windows-x86_64.zip",
+      "hash": "c8965ba0cdb291921c7710bcb98fea7ca4326efd486a629d609f0a3b48a5768a"
     }
   },
-  "extract_dir": "AutoRE-CLI-0.1.11-windows-x86_64",
+  "extract_dir": "AutoRE-CLI-0.1.12-windows-x86_64",
   "bin": [
     [
       "bin\\windows-x86_64\\auto-re-cli.exe",
