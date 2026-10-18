@@ -1,0 +1,81 @@
+{
+  "id": 409071463,
+  "tag_name": "v0.1.11",
+  "draft": false,
+  "prerelease": false,
+  "updated_at": "2026-10-16T09:42:47Z",
+  "published_at": "2026-10-16T09:42:21Z",
+  "target_commitish": "a41c708b729813a2a73c33a75d7d40afd9b19042",
+  "assets": [
+    {
+      "id": 646861822,
+      "name": "AutoRE-CLI-0.1.11-auto-re-skill.zip",
+      "browser_download_url": "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.11/AutoRE-CLI-0.1.11-auto-re-skill.zip",
+      "digest": "sha256:bb51858a9d480561a95ee26de17cbd235584ca350af2a8c353bdb2db05e6fac3",
+      "size": 72855,
+      "state": "uploaded",
+      "created_at": "2026-10-16T09:42:05Z",
+      "updated_at": "2026-10-16T09:42:06Z"
+    },
+    {
+      "id": 646861843,
+      "name": "AutoRE-CLI-0.1.11-linux-arm64.tar.gz",
+      "browser_download_url": "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.11/AutoRE-CLI-0.1.11-linux-arm64.tar.gz",
+      "digest": "sha256:7aa16f0aa60e7fdce48a400b929d5ef7c9a05179d6cbcc4a398edb5a4a44028b",
+      "size": 9788498,
+      "state": "uploaded",
+      "created_at": "2026-10-16T09:42:06Z",
+      "updated_at": "2026-10-16T09:42:10Z"
+    },
+    {
+      "id": 646861829,
+      "name": "AutoRE-CLI-0.1.11-linux-x86_64.tar.gz",
+      "browser_download_url": "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.11/AutoRE-CLI-0.1.11-linux-x86_64.tar.gz",
+      "digest": "sha256:332cca05eee4ef6e5becc5c142340623ce708e00be40b03cf212b23f94acc752",
+      "size": 10337085,
+      "state": "uploaded",
+      "created_at": "2026-10-16T09:42:05Z",
+      "updated_at": "2026-10-16T09:42:11Z"
+    },
+    {
+      "id": 646861823,
+      "name": "AutoRE-CLI-0.1.11-macos-arm64.tar.gz",
+      "browser_download_url": "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.11/AutoRE-CLI-0.1.11-macos-arm64.tar.gz",
+      "digest": "sha256:cc79df734b5c3bba272638ba03539481b18996a245c67cbf981ec5de66993d97",
+      "size": 9704395,
+      "state": "uploaded",
+      "created_at": "2026-10-16T09:42:05Z",
+      "updated_at": "2026-10-16T09:42:12Z"
+    },
+    {
+      "id": 646861824,
+      "name": "AutoRE-CLI-0.1.11-macos-x86_64.tar.gz",
+      "browser_download_url": "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.11/AutoRE-CLI-0.1.11-macos-x86_64.tar.gz",
+      "digest": "sha256:36685c3e2614e2ba235b90808b71098e3a98b7745959e197c0d0b849061ffb03",
+      "size": 10309189,
+      "state": "uploaded",
+      "created_at": "2026-10-16T09:42:05Z",
+      "updated_at": "2026-10-16T09:42:13Z"
+    },
+    {
+      "id": 646861896,
+      "name": "AutoRE-CLI-0.1.11-windows-x86_64.zip",
+      "browser_download_url": "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.11/AutoRE-CLI-0.1.11-windows-x86_64.zip",
+      "digest": "sha256:37898096717e403ab3ce4363cbc935a77dbb818376c2b3abec888917582f3e81",
+      "size": 10356114,
+      "state": "uploaded",
+      "created_at": "2026-10-16T09:42:07Z",
+      "updated_at": "2026-10-16T09:42:12Z"
+    },
+    {
+      "id": 646862070,
+      "name": "SHA256SUMS.release",
+      "browser_download_url": "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.11/SHA256SUMS.release",
+      "digest": "sha256:6da7f1f1ca54082b528f10d0cf398829dec425c1d771061ae684cb61792ffda1",
+      "size": 619,
+      "state": "uploaded",
+      "created_at": "2026-10-16T09:42:12Z",
+      "updated_at": "2026-10-16T09:42:12Z"
+    }
+  ]
+}
