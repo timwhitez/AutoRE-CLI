@@ -95,7 +95,7 @@ results, or clean files. Existing explicit verifier cleanup remains unchanged.
 
 ## Retained scope: create, replay, bounded read
 
-For CLI and Skill 0.1.11, use explicit replay when the retained analysis already
+For CLI and Skill 0.1.12, use explicit replay when the retained analysis already
 contains the requested evidence. Check `auto-re-cli --version` and local
 `archive --help` / `replay --help`; these commands do not provide automatic reuse.
 Run one static analysis first and save its JSON outside the checkout. Record its

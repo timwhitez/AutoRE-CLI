@@ -161,7 +161,7 @@ class ControlJsonFileTests(unittest.TestCase):
         parent.write_text(json.dumps(document(["auto-re-cli", "describe"])))
         prepared = runner.prepare_action(parent, "next", self.root / "analysis.json")
         executable = Path(sys.executable).resolve()
-        with patch.object(runner, "probe_program_version", return_value="auto-re-cli 0.1.11") as probe, \
+        with patch.object(runner, "probe_program_version", return_value="auto-re-cli 0.1.12") as probe, \
              patch.object(runner, "sha256_file", wraps=runner.sha256_file) as digest, \
              patch.object(runner.process_control, "run_process") as analysis:
             with self.assertRaises(runner.ActionError):
@@ -194,7 +194,7 @@ class ControlJsonFileTests(unittest.TestCase):
                        f"root = pathlib.Path({str(self.root)!r})\n"
                        "if '--version' in sys.argv:\n"
                        " (root / 'version-probed').write_text('yes')\n"
-                       " print('auto-re-cli 0.1.11')\n"
+                       " print('auto-re-cli 0.1.12')\n"
                        "else:\n"
                        " (root / 'analysis-ran').write_text('yes')\n")
         cli.chmod(0o700)

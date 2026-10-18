@@ -60,13 +60,13 @@ Command-local `--result-contract kinds-v1` is available only on `function`,
 `dump-cfg`, `slice-function`, `inspect-flow`, `dump-il`, `inspect-passes`,
 `decompile` and `report`. It requires `--format json`; decompile/report also
 require `--json-profile ai`. Report bundles reject this selector. The matched
-0.1.11 Skill admits these eight exact roots and legacy roots. Default or explicit
+0.1.12 Skill admits these eight exact roots and legacy roots. Default or explicit
 `--result-contract legacy` preserves existing output; returned continuations
 remain legacy. Older consumers reject selected kinds; do not negotiate or strip
 kinds. Use the original result for actions, never a description, error, reader
 or compact view. Direct known CLI calls remain valid.
 
-Request identity accepts exactly CLI 0.1.11 and audits these options before the
+Request identity accepts exactly CLI 0.1.12 and audits these options before the
 input, including global options before the command and `--` inputs. `describe`
 has no input identity; CLI 0.1.10 is unavailable to this helper. The doctor still
 requires exact CLI/Skill versions and managed content before installed use.

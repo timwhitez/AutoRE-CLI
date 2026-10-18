@@ -37,7 +37,7 @@ SUPPORTED_PROFILES = frozenset({"ai"})
 SUPPORTED_MANIFEST_KINDS = frozenset({"context_bundle", "agent_spill_manifest"})
 # Audited CLI contract, not an execution authorization list. Keep the release
 # fixture and source Clap drift test in sync when auditing another version.
-IDENTITY_CONTRACT_VERSION = "0.1.11"
+IDENTITY_CONTRACT_VERSION = "0.1.12"
 IDENTITY_GLOBAL_VALUE_OPTIONS = ["--output", "--diagnostic-format"]
 IDENTITY_COMMAND_CONTRACT = {
     "aarch64-refs": {
