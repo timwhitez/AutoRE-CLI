@@ -177,6 +177,17 @@ class MetadataTests(unittest.TestCase):
             self.sums()
             self.rejected()
 
+    def test_dead_or_block_commented_selectors_are_rejected(self):
+        path = self.root / checker.RECIPES[0]
+        original = path.read_text()
+        start = original.index("  on_macos do")
+        stop = original.index("  def install")
+        for opening, closing in (("if false\n", "end\n"), ("=begin\n", "=end\n")):
+            with self.subTest(opening=opening):
+                path.write_text(original[:start] + opening + original[start:stop] + closing + original[stop:])
+                self.sums()
+                self.rejected()
+
     def test_recipe_repository_checksum_drift_is_rejected(self):
         self.replace('version "0.1.11"', 'version "0.1.11"  ')
         (self.root / "SHA256SUMS").write_text("0" * 64 + "  " + checker.RECIPES[0] + "\n")

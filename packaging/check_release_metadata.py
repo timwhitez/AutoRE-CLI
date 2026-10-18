@@ -87,6 +87,28 @@ def read_recipes(root):
             len(re.findall(r'^sha256 ', lines, re.M)) == 4 and
             len(re.findall(r'^on_(?:macos|linux) do$', lines, re.M)) == 2,
             "Homebrew must contain exactly four supported platform selectors")
+    # Match the complete supported formula, so dead/commented selectors cannot
+    # masquerade as four usable targets. This is a narrow metadata grammar,
+    # not a Ruby interpreter; future formula changes must update this contract.
+    prefix = (f'class AutoreCli < Formula\n'
+              f'desc "Bounded static reverse engineering for analysts and AI agents"\n'
+              f'homepage "{REPOSITORY}"\nversion "{version}"\nlicense "MIT"')
+    suffix = """def install
+binary = if OS.mac?
+Hardware::CPU.arm? ? "bin/macos-arm64/auto-re-cli" : "bin/macos-x86_64/auto-re-cli"
+elsif Hardware::CPU.arm?
+"bin/linux-arm64/auto-re-cli"
+else
+"bin/linux-x86_64/auto-re-cli"
+end
+bin.install binary => "auto-re-cli"
+end
+test do
+assert_equal "auto-re-cli #{version}", shell_output("#{bin}/auto-re-cli --version").strip
+end
+end"""
+    require(lines == prefix + "\n" + matches[0].group(0) + "\n" + suffix,
+            "unsupported Homebrew formula structure (selectors must be active)")
     values = matches[0].groups()
     recipes = {target: {"url": values[i * 2], "sha256": values[i * 2 + 1]}
                for i, target in enumerate(TARGETS[:4])}
