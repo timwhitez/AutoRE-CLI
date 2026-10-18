@@ -6,7 +6,7 @@
   "architecture": {
     "64bit": {
       "url": "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.12/AutoRE-CLI-0.1.12-windows-x86_64.zip",
-      "hash": "d2a514cdf06d47327ffe4d01d719ccafbe2d4489fa64c8a31510f6bd55010751"
+      "hash": "c8965ba0cdb291921c7710bcb98fea7ca4326efd486a629d609f0a3b48a5768a"
     }
   },
   "extract_dir": "AutoRE-CLI-0.1.12-windows-x86_64",

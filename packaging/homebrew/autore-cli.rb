@@ -7,20 +7,20 @@ class AutoreCli < Formula
   on_macos do
     if Hardware::CPU.arm?
       url "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.12/AutoRE-CLI-0.1.12-macos-arm64.tar.gz"
-      sha256 "3d3b95c33a7d716676d64657428ca5fc235373797dd3fc42fa3757fe5517daf9"
+      sha256 "bad5388a7d8386adec719f56a935543faa86e851724c7e4af76c4f8ecbf29697"
     else
       url "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.12/AutoRE-CLI-0.1.12-macos-x86_64.tar.gz"
-      sha256 "f39b7bd1e0b806da11bbd075644d13073c71c537f2782fc70d27bb0df295fca7"
+      sha256 "f368e36e3139b08134339bb5c69f206dc77864a6f7d6bf335bee3420239181e5"
     end
   end
 
   on_linux do
     if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
       url "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.12/AutoRE-CLI-0.1.12-linux-arm64.tar.gz"
-      sha256 "58a13f6eddee28698ca34745b84104b578c6f4b146774fc2833a3afc78313181"
+      sha256 "2c426b5adeeafcd6e971d5795f61c8c25f97e6ce80f19bc2d224a28c187c5894"
     elsif Hardware::CPU.intel? && Hardware::CPU.is_64_bit?
       url "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.12/AutoRE-CLI-0.1.12-linux-x86_64.tar.gz"
-      sha256 "b4528cc78600d852cf46342b1a9faef1009e1b957595eae117b14e7ceb53a740"
+      sha256 "8c784651a376d507a5a31b9a98a25e0fd32ec2806ad14a09fed9539910858d88"
     else
       odie "AutoRE-CLI has no release for this Linux architecture"
     end
