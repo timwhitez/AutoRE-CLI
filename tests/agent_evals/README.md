@@ -6,19 +6,114 @@ task-eval home. No Skill instruction, version or managed inventory changes.
 
 ## Reproduce
 
-From the public checkout (Python 3.10+, standard library only):
+The historical reference runner requires **CLI 0.1.10**, not the current 0.1.12
+release. Use two separate Git checkouts: the evaluator at
+`908bb8fc59517bac9aad12d4ca85d9bb947e45f3`, and the historical public distribution
+at `32703cd79c227b1ac88912c8aae00585c1641147`. Run the evaluator from its own
+checkout; the historical checkout need not contain the current evaluator.
+Python 3.10+ and Linux x86-64 are required for the reference run. Other hosts
+can run the unit tests and scorer. No compiler or model API is needed.
+
+Create these checkouts in an existing trusted parent, using fresh directory
+names. The following commands use full commits, rather than moving branches or
+a tag whose version alone cannot establish helper compatibility:
 
 ```sh
-python3 -B -m unittest discover -s tests -p test_agent_task_evals.py -v
-python3 -B tests/agent_evals/reference.py --public-root . --output /trusted/new-run
-python3 -B tests/agent_evals/scorer.py /trusted/new-run/records.json --evidence-root /trusted/new-run/evidence
+set -eu
+cd /trusted/reproduction
+
+git clone https://github.com/timwhitez/AutoRE-CLI.git evaluator
+git -C evaluator checkout --detach 908bb8fc59517bac9aad12d4ca85d9bb947e45f3
+git clone https://github.com/timwhitez/AutoRE-CLI.git public-0.1.10
+git -C public-0.1.10 checkout --detach 32703cd79c227b1ac88912c8aae00585c1641147
+
+EVALUATOR=$(cd evaluator && pwd -P)
+PUBLIC=$(cd public-0.1.10 && pwd -P)
+OUTPUT=/trusted/reproduction/new-reference-run
+export EVALUATOR PUBLIC OUTPUT
+
+# Preflight before the runner creates any output or probes the CLI version.
+python3 -B - <<'PY'
+import hashlib
+import os
+import platform
+from pathlib import Path
+import subprocess
+
+def git(root, *args):
+    return subprocess.check_output(['git', '-C', str(root), *args], text=True).strip()
+
+evaluator = Path(os.environ['EVALUATOR']).resolve()
+public = Path(os.environ['PUBLIC']).resolve()
+output = Path(os.environ['OUTPUT'])
+assert evaluator != public, 'use separate evaluator and historical public roots'
+for root, expected in (
+    (evaluator, '908bb8fc59517bac9aad12d4ca85d9bb947e45f3'),
+    (public, '32703cd79c227b1ac88912c8aae00585c1641147'),
+):
+    assert Path(git(root, 'rev-parse', '--show-toplevel')).resolve() == root, 'not an independent Git root'
+    assert git(root, 'rev-parse', 'HEAD') == expected, 'unexpected Git HEAD'
+    assert not git(root, 'status', '--porcelain'), 'checkout must be clean'
+    print(root.name, expected, git(root, 'rev-parse', 'HEAD^{tree}'))
+assert platform.system() == 'Linux' and platform.machine() == 'x86_64', 'Linux x86-64 required'
+assert not output.exists() and not output.is_symlink(), 'output must be new'
+assert output.parent.is_dir(), 'output parent must exist'
+rows = dict(line.split('  ', 1)[::-1] for line in (public / 'SHA256SUMS').read_text().splitlines())
+for relative in (
+    'bin/linux-x86_64/auto-re-cli',
+    'skills/auto-re/scripts/read_result.py',
+    'skills/auto-re/scripts/run_next_action.py',
+    'skills/auto-re/scripts/process_control.py',
+):
+    path = public / relative
+    assert path.is_file() and not path.is_symlink(), 'missing or linked input: ' + relative
+    actual = hashlib.sha256(path.read_bytes()).hexdigest()
+    assert rows.get(relative) == actual, 'checksum mismatch: ' + relative
+    # Also bind the bytes to the fixed Git tree, not just an editable checksum row.
+    committed = subprocess.check_output(['git', '-C', str(public), 'show', 'HEAD:' + relative])
+    assert hashlib.sha256(committed).hexdigest() == actual, 'input differs from fixed Git tree'
+    print(relative, actual)
+version = subprocess.check_output([str(public / 'bin/linux-x86_64/auto-re-cli'), '--version'], text=True).strip()
+assert version == 'auto-re-cli 0.1.10', 'unsupported CLI version: ' + version
+print(version)
+PY
+
+python3 -B -m unittest discover -s "$EVALUATOR/tests" -p test_agent_task_evals.py -v
+python3 -B "$EVALUATOR/tests/agent_evals/reference.py" --public-root "$PUBLIC" --output "$OUTPUT"
+python3 -B "$EVALUATOR/tests/agent_evals/scorer.py" "$OUTPUT/records.json" --evidence-root "$OUTPUT/evidence"
 ```
 
-The output directory must not exist. The reference runner verifies the Linux
-x86-64 binary against SHA256SUMS before any execution, creates controlled
-fixtures, and executes only the trusted CLI and checked-in Python helpers.
-It never executes the inert raw bytes. Other hosts can score records and run
-unit tests; the reference baseline requires Linux x86-64. No compiler is needed.
+This fixed pair was exercised on Linux x86-64: all seven reference cases
+completed, and the generated hash-bound records were rescored. The historical
+CLI SHA-256 was
+`bbb997472d1ae7d1abfec29fe1e1bd5c6599ffbcb1a4f5a3937d4f8ce410b0bd`.
+A separate fresh run with `--history-root "$PUBLIC"` also completed seven cases
+and six helper comparison rows. These are scripted reference results; real
+Agent/model runs remain **NOT_RUN**. This does not change `baseline.json`, its
+historical scores, or any release identity.
+
+`--history-root` is optional and is used only for immutable helper before/after
+comparisons. It does not replace `--public-root` or provide the reference CLI.
+Use another fresh output directory when adding it. Reusing an existing output
+is rejected; preserve accepted records and choose a new name.
+
+The preflight rejects a current 0.1.12 root, changed binary/checksum bytes,
+missing helpers, unsupported host, and a pure archive with no independent Git
+metadata. In particular, `git rev-parse HEAD` inside an archive nested in some
+other repository can report that parent's HEAD: require the exact top-level
+and historical HEAD above. Do not edit VERSION, replace the CLI, bypass the
+version check, or silently substitute an archive for Git provenance.
+
+The runner itself checks binary hash and version before `output.mkdir()`, then
+creates fixtures **before** querying the public Git HEAD. Therefore a Git
+failure may leave a newly created output/evidence directory. The preflight
+avoids that known failure path; it is not a zero-write guarantee under later
+mutation or failure. Existing output is never overwritten. An archive-only
+provenance mode would require a separate explicit design and is not supported.
+
+The runner executes only the checksum-verified trusted CLI and checked-in
+Python helpers. It never executes the inert fixture bytes. Synthetic artifacts
+test retrieval and consumer behavior, not engine semantics or model quality.
 
 `cases.json` has exact `kind=auto_re_agent_task_cases`, integer
 `schema_version=1`, fixture source/compile settings, seven task prompts,
