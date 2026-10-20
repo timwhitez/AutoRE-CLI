@@ -31,6 +31,13 @@ POSIX permission/replacement checks are skipped where unsupported; Windows ACLs
 and reparse behavior require native Windows testing. This is not the Rust
 workspace test suite.
 
+Bundle stable-open tests replace a prechecked regular file with a writerless
+FIFO at the actual open in manifest, payload, cleanup receipt and root marker
+paths. Available nonblocking flags allow handle `fstat` to reject the FIFO
+before reading, while preserving identity checks and cleanup ownership. The
+parent owns test directories across the subprocess hang guard; POSIX FIFO tests
+are skipped where unsupported. This does not bound all regular-file I/O.
+
 Receipts share producer, admission and prior-reader limits: 256 KiB including
 the final newline, depth 16, 10000 values, 1000 entries per container and 65536
 decoded UTF-8 bytes per string/key. Known metadata is rejected before version
