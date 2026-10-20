@@ -115,15 +115,22 @@ def copy_file(source: pathlib.Path, destination: pathlib.Path,
               source_mode: int | None = None) -> dict[str, Any]:
     """Copy one independent regular-file snapshot without following the leaf."""
     reject_link_components(source.absolute())
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+    flags = (os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+             | getattr(os, "O_BINARY", 0) | getattr(os, "O_NONBLOCK", 0))
     descriptor = os.open(source, flags)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    with os.fdopen(descriptor, "rb") as input_file:
-        before = os.fstat(input_file.fileno())
+    try:
+        before = os.fstat(descriptor)
         if not stat.S_ISREG(before.st_mode) or not before.st_ino:
             raise ReleaseAssetError(f"source is not a stable regular file: {source}")
         if getattr(before, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400):
             raise ReleaseAssetError(f"source is a reparse point: {source}")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        input_file = os.fdopen(descriptor, "rb")
+    except BaseException:
+        os.close(descriptor)
+        raise
+    # fdopen succeeded: the file object now owns the descriptor exclusively.
+    with input_file:
         if not os.path.samestat(before, source.lstat()):
             raise ReleaseAssetError(f"source changed before snapshot: {source}")
         digest = hashlib.sha256()
