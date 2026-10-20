@@ -1,7 +1,9 @@
 # Evidence And Artifact Contract
 
-Load this reference before reading spill/bundle payloads, following generated
-actions, or making a completeness claim.
+Load the relevant recovery section on timeout, cancellation, result-validation
+failure, or continuation of a recorded request. Read this contract before reading
+spill/bundle payloads, following generated actions, or making a completeness claim.
+Normal first-evidence launcher calls do not require this reference first.
 
 ## JSON Is The Automation Contract
 
@@ -24,6 +26,35 @@ without the original containing image. An empty `string_references` array is not
 proof of no references, including when computed targets lie outside the supplied
 slice. Keep recovered string facts separate from unresolved addresses; a numeric
 target is not itself a string. Embedded object functions retain their own evidence.
+
+## Timeout And Cancellation
+
+`start_analysis.py` and `run_next_action.py` accept `--timeout-seconds`
+(default 900); increase it for a legitimate long analysis within the task budget.
+A timeout or cancellation is not evidence that the binary is benign or analysis
+is complete. Preserve the receipt and partial results: `execution_status`,
+`diagnostics` and stream `capture_complete` describe operational completion.
+Exit codes 124, 130 and 125 indicate timeout, cancellation and operational failure
+respectively. Do not retry indefinitely or delete partial analyzer outputs.
+Before retrying a recorded request, apply
+[request identity and no progress](#request-identity-and-no-progress).
+
+Execution receipts and their bounded log tails are operational diagnostics,
+not target-analysis evidence. Report their paths and truncation flags; do not
+paste full logs or mix stderr into analysis JSON.
+
+## Result Validation
+
+`result_validation` distinguishes `passed`, `failed` and `not_attempted`.
+A zero process exit with missing, invalid or mismatched JSON is a launcher
+failure, not usable evidence. Its stderr JSON retains the result/receipt paths,
+`process_exit_code`, diagnostics and `failure_phase=result_validation`; summary
+`exit_code` is nonzero while the unchanged receipt records process completion.
+Read that failure before selecting a different query. Do not repeat an identical
+failed call without a changed input, selector, supported option or justified
+budget. A passed wrapper check still does not prove the analysis is complete.
+For timeout, cancellation or nonzero execution, validation is `not_attempted`;
+use the execution receipt rather than treating partial output as admitted JSON.
 
 ## Result Admission
 
@@ -183,6 +214,21 @@ neighborhood remain heuristic and need independent checks against known controls
 
 ## Bundles And Spills
 
+The first-evidence launcher writes one bounded document. When separate report
+sections or a larger context bundle are needed, use this workflow instead;
+do not rerun it automatically after a sufficient initial result. Keep a new
+result directory outside the input directory and Skill, with an existing parent:
+
+```bash
+auto-re-cli report <input> \
+  --format json \
+  --json-profile ai \
+  --sections binary,summary,inspections,flow,functions,types \
+  --limit 8 \
+  --bundle-dir <result-dir>/bundle \
+  --output <result-dir>/bundle/manifest.json
+```
+
 A report bundle or direct spill is a command-owned artifact set. Before reading
 payloads:
 
@@ -194,7 +240,7 @@ payloads:
 5. Reject absolute paths, `..`, symlinks, non-files, duplicate paths, and paths
    outside the manifest directory.
 6. Verify `bytes` and lowercase SHA-256.
-7. Read only the validated paths.
+7. Read only the receipt's validated private paths, as described below.
 
 Use the receipt route for this check:
 
@@ -203,13 +249,26 @@ python3 scripts/verify_bundle.py <manifest> \
   --receipt <receipts>/bundle-verification.json
 ```
 
-Stdout is a bounded summary. Read the receipt for validated private file paths.
+Stdout is a bounded summary. Read the verification receipt, then only its
+private, read-only `files[].path` values. The validator hashes and copies each
+payload from one stable opened file object; `files[].source_path` is provenance
+only and must not be reopened as validated evidence. Retain the returned
+`verified_root` until the last consumer finishes, then use
+[receipt-based cleanup](#verified-tree-cleanup).
+
 The validator rejects more than 64 payload rows or 64 MiB of aggregate declared
 payload bytes before it creates a verified tree. Do not infer trust from a
 directory name or raise these limits; narrow the requested sections or page.
 
 `spill_summary.manifest_path` is only a pointer. Validate the referenced
 manifest before loading the complete payload.
+
+Review the validated result's `current_findings[]`, `warnings[]`, `budget`,
+`completion` and `next_actions[]`. If evidence is still missing, follow
+[one relevant next action](#next-actions). Validate any new bundle/spill manifest
+before reading its payloads. Stop when the selected `stop_condition` is met,
+evidence is sufficient, the budget is exhausted, or the boundary is
+unsupported/unresolved.
 
 ### Stable Workspace Across Tool Calls
 
@@ -238,6 +297,10 @@ reading the original source payload. Workspace persistence remains a harness
 property and must be checked; these settings cannot prevent external deletion.
 
 ## Next Actions
+
+Select one action whose reason advances the user's unanswered question. Keep
+`--receipt`; before continuing the same investigation, apply
+[request identity and no progress](#request-identity-and-no-progress).
 
 Each action must include:
 
@@ -274,8 +337,9 @@ python3 scripts/run_next_action.py <result-json> \
   --dry-run
 ```
 
-Review the emitted `argv[]`, then remove `--dry-run` to launch the trusted
-`auto-re-cli` binary with `shell=False`. The helper rejects a non-Auto-RE
+Use a new output path. Review the exact validated `argv[]` and planned receipt/log
+paths, then remove `--dry-run` to launch the trusted `auto-re-cli` binary with
+`shell=False`. The helper rejects a non-Auto-RE
 program, `--execute`, inherited `--output`, parent-result overwrite, and a
 missing output parent. Actions that already include `--bundle-dir` or
 `--spill-dir` own their output sink and reject a caller-provided `--output`.
@@ -379,12 +443,14 @@ cannot bind the request. The receipt remains operational evidence, not a transfo
 Pass `--prior-receipt <previous.json>` together with `--receipt <new.json>` to
 `run_next_action.py` when continuing the same investigation. An identical
 identity stops before analysis with `no_progress`, even if the output filename
-changed. If the prior execution really timed out and its leader was reaped,
-strictly increasing `--timeout-seconds` permits one explicit continuation.
+changed. Only a prior `execution_status=timed_out` with `leader_reaped=true`
+and a strictly larger `--timeout-seconds` permits one explicit continuation.
 Completed exit code 124 does not count as a timeout. A dry-run labels the
-continuation check as untested because it performs no CLI probe or identity
-comparison. Compare the prior result's warnings and missing evidence before changing
-a selector or budget. Changed inputs, CLI builds or budgets produce a new identity.
+continuation check as untested because it performs no CLI probe, real identity
+comparison or prior-receipt check. Inspect `continuation_check` in the execution
+receipt for the actual decision. Compare the prior result's warnings and missing
+evidence before changing a selector or budget. Changed inputs, CLI builds or
+budgets produce a new identity.
 For durable output commitments and replay, use the existing `archive`/`replay`
 commands and validated bundles; a request identity alone does not authenticate
 old output bytes. Do not invent missing identities for historical scripts.
