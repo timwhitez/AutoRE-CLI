@@ -27,18 +27,18 @@ Rust implementation is maintained separately and is not published here.
 ## Install
 
 Requirements: Python 3.9 or newer and a [supported host](#platforms). No Rust
-toolchain or source checkout is needed. Download the matching **0.1.12**
+toolchain or source checkout is needed. Download the matching **0.1.13**
 platform archive from [Releases](https://github.com/timwhitez/AutoRE-CLI/releases/latest):
 
 ```sh
-tar -xzf AutoRE-CLI-0.1.12-linux-x86_64.tar.gz
-cd AutoRE-CLI-0.1.12-linux-x86_64
+tar -xzf AutoRE-CLI-0.1.13-linux-x86_64.tar.gz
+cd AutoRE-CLI-0.1.13-linux-x86_64
 ./verify.sh
 ./install.sh
 ```
 
 Replace `linux-x86_64` with `linux-arm64`, `macos-arm64` or `macos-x86_64`.
-On Windows, extract `AutoRE-CLI-0.1.12-windows-x86_64.zip`, open PowerShell
+On Windows, extract `AutoRE-CLI-0.1.13-windows-x86_64.zip`, open PowerShell
 in the extracted directory and run:
 
 ```powershell
@@ -85,7 +85,7 @@ For the Skill alone in Codex, Claude Code, Cursor or another supported client:
 
 ```sh
 npx skills add \
-  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.12/AutoRE-CLI-0.1.12-auto-re-skill.zip -g
+  https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.13/AutoRE-CLI-0.1.13-auto-re-skill.zip -g
 ```
 
 Keep the installed CLI and Skill versions aligned; downloading or using a package
@@ -205,7 +205,7 @@ fixture evidence, not a current quality or whole-program coverage claim.
 for bounded stderr errors and opt-in `--result-contract kinds-v1` on eight
 selected commands. Default text errors and `legacy` result roots remain available.
 Use `describe` and `<command> --help` for supported options; use the matching
-0.1.12 Skill to consume the new roots. The Skill also supports exact bounded
+0.1.13 Skill to consume the new roots. The Skill also supports exact bounded
 object-key pages, Unicode string slices and request identity/no-progress checks.
 
 ## Limits And Evidence
