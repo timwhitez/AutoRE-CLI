@@ -5,6 +5,10 @@ failure, or continuation of a recorded request. Read this contract before readin
 spill/bundle payloads, following generated actions, or making a completeness claim.
 Normal first-evidence launcher calls do not require this reference first.
 
+In helper commands, replace `<skill-dir>` with the absolute directory containing
+this Skill's `SKILL.md`; keep it quoted. On Windows use `py -3` for `python3`.
+Run from the analysis workspace; no change into the Skill directory is needed.
+
 ## JSON Is The Automation Contract
 
 Prefer JSON for machine use. Check:
@@ -84,7 +88,7 @@ Use the exact matched CLI/Skill pair; same-version managed repacks remain refuse
 ## Optional Existing-Result Views
 
 When existing JSON already contains the evidence, use your file tools or the
-optional `python3 scripts/read_result.py <analysis.json> --pointer /records`
+optional `python3 "<skill-dir>/scripts/read_result.py" <analysis.json> --pointer /records`
 instead of reanalysis. This read-only helper uses RFC 6901 string pointers,
 preserves complete values and ancestor/summary boundaries, and returns at most
 16 KiB including its envelope. Input is capped at 64 MiB; parsing can use more
@@ -141,10 +145,10 @@ auto-re-cli archive /evidence/sample.bin /evidence/analysis.json \
   --command 'auto-re-cli analyze /evidence/sample.bin --max-functions 1 --max-instructions-per-function 8 --format json --output /evidence/analysis.json' \
   --format json
 auto-re-cli replay /evidence/retained --format json --output /evidence/replayed.json
-python3 /path/to/auto-re/scripts/read_result.py /evidence/replayed.json --pointer /output_hash_verified
-python3 /path/to/auto-re/scripts/read_result.py /evidence/replayed.json --pointer /archive_members_verified
-python3 /path/to/auto-re/scripts/read_result.py /evidence/replayed.json --pointer /warnings
-python3 /path/to/auto-re/scripts/read_result.py /evidence/replayed.json \
+python3 "<skill-dir>/scripts/read_result.py" /evidence/replayed.json --pointer /output_hash_verified
+python3 "<skill-dir>/scripts/read_result.py" /evidence/replayed.json --pointer /archive_members_verified
+python3 "<skill-dir>/scripts/read_result.py" /evidence/replayed.json --pointer /warnings
+python3 "<skill-dir>/scripts/read_result.py" /evidence/replayed.json \
   --pointer /analysis/functions/0/instructions --limit 1
 ```
 
@@ -245,7 +249,7 @@ payloads:
 Use the receipt route for this check:
 
 ```bash
-python3 scripts/verify_bundle.py <manifest> \
+python3 "<skill-dir>/scripts/verify_bundle.py" <manifest> \
   --receipt <receipts>/bundle-verification.json
 ```
 
@@ -280,9 +284,9 @@ root for every verifier and cleanup invocation. POSIX example:
 
 ```sh
 mkdir -p ./analysis-results/verified-copies
-TMPDIR="$PWD/analysis-results/verified-copies" python3 scripts/verify_bundle.py \
+TMPDIR="$PWD/analysis-results/verified-copies" python3 "<skill-dir>/scripts/verify_bundle.py" \
   <manifest> --receipt <receipts>/bundle-verification.json
-TMPDIR="$PWD/analysis-results/verified-copies" python3 scripts/verify_bundle.py \
+TMPDIR="$PWD/analysis-results/verified-copies" python3 "<skill-dir>/scripts/verify_bundle.py" \
   --cleanup-receipt <receipts>/bundle-verification.json
 ```
 
@@ -327,22 +331,23 @@ concatenation. Review that the command remains `auto-re-cli`, static-only, and
 within the current user request. Preserve input, architecture, raw-shellcode
 context, and explicit analysis tuning.
 
-Prefer the deterministic helper:
+Prefer the deterministic helper. For actions without `--bundle-dir` or
+`--spill-dir`, supply a new `--output` path as below. For actions with either
+option, omit `--output` and preserve the emitted command-owned sink:
 
 ```bash
-python3 scripts/run_next_action.py <result-json> \
+python3 "<skill-dir>/scripts/run_next_action.py" <result-json> \
   --action-stage <stage> \
   --output <new-output.json> \
   --receipt <receipts>/<stage>.json \
   --dry-run
 ```
 
-Use a new output path. Review the exact validated `argv[]` and planned receipt/log
-paths, then remove `--dry-run` to launch the trusted `auto-re-cli` binary with
-`shell=False`. The helper rejects a non-Auto-RE
-program, `--execute`, inherited `--output`, parent-result overwrite, and a
-missing output parent. Actions that already include `--bundle-dir` or
-`--spill-dir` own their output sink and reject a caller-provided `--output`.
+Review the exact validated `argv[]` and planned receipt/log paths, then remove
+`--dry-run` to launch the trusted `auto-re-cli` binary with `shell=False`.
+The helper rejects a non-Auto-RE program, `--execute`, inherited `--output`,
+parent-result overwrite, a missing output parent, and an extra output override
+for a command-owned sink.
 
 With `--receipt`, execution keeps only the final 1 MiB of each stdout/stderr
 stream in separate read-only logs while hashing and counting the full streams.
@@ -405,7 +410,7 @@ After the final consumer, remove only the validator-owned tree named by its
 receipt:
 
 ```bash
-python3 scripts/verify_bundle.py \
+python3 "<skill-dir>/scripts/verify_bundle.py" \
   --cleanup-receipt <receipts>/bundle-verification.json
 ```
 

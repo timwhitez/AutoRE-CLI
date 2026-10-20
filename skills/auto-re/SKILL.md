@@ -114,8 +114,8 @@ Follow up when it advances unresolved requested evidence, not to increase call
 counts. Stop at sufficient evidence, no progress, an explicit budget, unsupported
 input, or an unresolved boundary. Ask for input/context only when genuinely blocked.
 
-Since 0.1.11, use `read_result.py --mode keys` or `--mode string` for bounded object-key or
-exact string pages of existing JSON; see [evidence-contract.md](references/evidence-contract.md).
+To page existing JSON without reanalysis, use the value, keys or string modes in
+[existing-result views](references/evidence-contract.md#optional-existing-result-views).
 For optional `compact_result.py` context reduction of a retained report/decompile AI file, see
 [compact AI evidence view v1](references/compact-ai-view.md). Retain its hash-bound
 original; compact views are explicitly unsupported action-runner roots.
