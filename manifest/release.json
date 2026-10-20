@@ -1,43 +1,43 @@
 {
   "artifacts": [
     {
-      "bytes": 17885008,
+      "bytes": 17969328,
       "file_identity": "Mach-O 64-bit arm64 executable, flags:<NOUNDEFS|DYLDLINK|TWOLEVEL|NO_REEXPORTED_DYLIBS|PIE|HAS_TLV_DESCRIPTORS>",
       "path": "bin/macos-arm64/auto-re-cli",
       "rust_target": "aarch64-apple-darwin",
-      "sha256": "575077f0e9a4c2145f76c933cf6b279006b824628e6eb2b34edeb6d7e1539f3b",
+      "sha256": "ed4217897be562c43abad51b088abc1653f37adce85220973376359e17824491",
       "signing": "adhoc",
       "target": "macos-arm64"
     },
     {
-      "bytes": 20136912,
+      "bytes": 20106352,
       "file_identity": "Mach-O 64-bit x86_64 executable, flags:<NOUNDEFS|DYLDLINK|TWOLEVEL|NO_REEXPORTED_DYLIBS|PIE|HAS_TLV_DESCRIPTORS>",
       "path": "bin/macos-x86_64/auto-re-cli",
       "rust_target": "x86_64-apple-darwin",
-      "sha256": "42da76077a163b164755eac86638e24d7729fc09cfb2025d96c6e4a1277267ce",
+      "sha256": "cdd3cc2321441fb7956a5d6b266187759d77461d22f817d98ae9ff4d33bdcae7",
       "signing": "adhoc",
       "target": "macos-x86_64"
     },
     {
-      "bytes": 21136464,
-      "file_identity": "ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=942eea4450be6fda1ce23bf6d2320cbe05260ae5, for GNU/Linux 3.2.0, stripped",
+      "bytes": 21107792,
+      "file_identity": "ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=40c1e1f7ed45cebcce07c16fa972a4038fbaa2a6, for GNU/Linux 3.2.0, stripped",
       "path": "bin/linux-x86_64/auto-re-cli",
       "rust_target": "x86_64-unknown-linux-gnu",
-      "sha256": "623825b0b1982a33c61ac4336e5e1c70bde44b1c375d08327756da6b6eda3b59",
+      "sha256": "d21ab1d8633d68cc867faae28be4fd75843b3c2bd9ead9a54b8d9b2fad877b7f",
       "signing": "not_applicable",
       "target": "linux-x86_64"
     },
     {
       "bytes": 17904568,
-      "file_identity": "ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, BuildID[sha1]=2a96906fbd0786fed5cb79fc951289d1416ec9f4, for GNU/Linux 3.7.0, stripped",
+      "file_identity": "ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, BuildID[sha1]=8b29a050d19f2452c9bffbea258528c078c5aa88, for GNU/Linux 3.7.0, stripped",
       "path": "bin/linux-arm64/auto-re-cli",
       "rust_target": "aarch64-unknown-linux-gnu",
-      "sha256": "27272cf8e8b7f5745b9e3040dd9a67a9249cbed70f6317b21fb503b9e54ace11",
+      "sha256": "c6bfe9c9bb0ad921a28703a8c880b9e0fbbf27cf5117808eb8b1a48fe5c933c3",
       "signing": "not_applicable",
       "target": "linux-arm64"
     },
     {
-      "bytes": 19704832,
+      "bytes": 19731456,
       "file_identity": "PE32+ executable (console) x86-64, for MS Windows, 6 sections",
       "path": "bin/windows-x86_64/auto-re-cli.exe",
       "pe": {
@@ -63,7 +63,7 @@
         "timestamp": 0
       },
       "rust_target": "x86_64-pc-windows-gnullvm",
-      "sha256": "aa161bcc22c649fd4bb14235d770e0a1581723eec96cc9f9ead2b846df174a98",
+      "sha256": "21a123dabfd1bdcf855e535bce5ef0a6c2f415a617b5a54ed7451cc2e1a42074",
       "signing": "not_applicable",
       "target": "windows-x86_64"
     }
@@ -104,10 +104,10 @@
     ],
     "name": "auto-re",
     "path": "skills/auto-re",
-    "version": "0.1.12"
+    "version": "0.1.13"
   },
   "source_repository": "auto-re_source",
-  "source_revision": "84744e58a58fab6f49369793757f6ccc2df8fe2c",
+  "source_revision": "ff8e115f05d0a437d83c8dcb24f85204c2b049d5",
   "third_party_dependency_count": 69,
   "toolchain": {
     "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
@@ -118,5 +118,5 @@
     "rust": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
     "zig_archive_sha256": "02aa270f183da276e5b5920b1dac44a63f1a49e55050ebde3aecc9eb82f93239"
   },
-  "version": "0.1.12"
+  "version": "0.1.13"
 }

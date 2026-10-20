@@ -6,7 +6,7 @@ task-eval home. No Skill instruction, version or managed inventory changes.
 
 ## Reproduce
 
-The historical reference runner requires **CLI 0.1.10**, not the current 0.1.12
+The historical reference runner requires **CLI 0.1.10**, not the current 0.1.13
 release. Use two separate Git checkouts: the evaluator at
 `908bb8fc59517bac9aad12d4ca85d9bb947e45f3`, and the historical public distribution
 at `32703cd79c227b1ac88912c8aae00585c1641147`. Run the evaluator from its own
@@ -97,7 +97,7 @@ comparisons. It does not replace `--public-root` or provide the reference CLI.
 Use another fresh output directory when adding it. Reusing an existing output
 is rejected; preserve accepted records and choose a new name.
 
-The preflight rejects a current 0.1.12 root, changed binary/checksum bytes,
+The preflight rejects a current 0.1.13 root, changed binary/checksum bytes,
 missing helpers, unsupported host, and a pure archive with no independent Git
 metadata. In particular, `git rev-parse HEAD` inside an archive nested in some
 other repository can report that parent's HEAD: require the exact top-level
