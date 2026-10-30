@@ -91,8 +91,10 @@ When existing JSON already contains the evidence, use your file tools or the
 optional `python3 "<skill-dir>/scripts/read_result.py" <analysis.json> --pointer /records`
 instead of reanalysis. This read-only helper uses RFC 6901 string pointers,
 preserves complete values and ancestor/summary boundaries, and returns at most
-16 KiB including its envelope. Input is capped at 64 MiB; parsing can use more
-memory. The view does not certify source semantics or analysis completeness.
+16 KiB including its envelope. Source number literals are re-emitted exactly
+(no binary64 rounding or underflow), and the byte budget counts those exact
+literals; float overflow is still rejected. Input is capped at 64 MiB; parsing
+can use more memory. The view does not certify source semantics or analysis completeness.
 
 Default `--mode value` preserves the original v1 view and complete values.
 For array pages, use the returned `selection.next_offset` (not requested limit)

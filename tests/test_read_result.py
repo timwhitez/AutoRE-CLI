@@ -1,4 +1,5 @@
 """Read-only views preserve exact JSON evidence and bounded, hash-bound pages."""
+from decimal import Decimal
 import hashlib
 import importlib.util
 import json
@@ -210,3 +211,53 @@ class ReadResultTests(unittest.TestCase):
         self.run_helper('/items')
         self.assertFalse(any(self.root.rglob('*.pyc')))
         self.assertFalse(any(SCRIPT.parent.rglob('*.pyc')))
+
+    def run_raw(self, raw, pointer, *args):
+        self.path.write_bytes(raw)
+        p = subprocess.run([sys.executable, '-B', str(SCRIPT), str(self.path), '--pointer', pointer,
+                            '--expected-sha256', hashlib.sha256(raw).hexdigest(), *args],
+                           capture_output=True, cwd=self.root, timeout=subprocess_timeout(5))
+        self.assertEqual(self.path.read_bytes(), raw)
+        return p
+
+    def test_source_numerals_are_emitted_exactly(self):
+        # Fixtures are raw numerals; Decimal is the oracle, never binary64 equality.
+        numerals = ['1e-400', '9007199254740993.0', '1.0000000000000001', '-0.0', '0.1',
+                    '1.5E+300', '12345678901234567890']
+        raw = ('{"status":%s,"scalar":%s,"object":{"n":%s},"items":[%s]}' % (
+            numerals[1], numerals[0], numerals[2], ','.join(numerals))).encode()
+        for pointer, expected in [('/scalar', numerals[0]), ('/object', '{"n":%s}' % numerals[2]),
+                                  ('/items', '[%s]' % ','.join(numerals))]:
+            with self.subTest(pointer=pointer):
+                p = self.run_raw(raw, pointer)
+                self.assertEqual(p.returncode, 0, p.stderr)
+                self.assertIn(('"data":' + expected).encode(), p.stdout)
+                view = json.loads(p.stdout, parse_float=Decimal)
+                original = json.loads(raw, parse_float=Decimal)
+                self.assertEqual(view['data'], original[pointer[1:]])
+                self.assertEqual(view['source_boundaries'], [{'pointer': '/status', 'value': Decimal(numerals[1])}])
+                self.assertIn(b'"value":9007199254740993.0', p.stdout)
+        p = self.run_raw(raw, '/items')
+        signed = json.loads(p.stdout, parse_float=Decimal)['data'][3]
+        self.assertEqual(signed.as_tuple(), Decimal('-0.0').as_tuple())
+
+    def test_exact_numerals_count_toward_page_budget(self):
+        numeral = '1.' + '0' * 1000 + '1'
+        raw = ('{"items":[%s]}' % ','.join([numeral] * 40)).encode()
+        p = self.run_raw(raw, '/items')
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertLessEqual(len(p.stdout), 16 * 1024)
+        first = json.loads(p.stdout, parse_float=Decimal)
+        self.assertTrue(first['selection']['has_more'])
+        returned = first['selection']['returned_items']
+        self.assertEqual(first['data'], [Decimal(numeral)] * returned)
+        p = self.run_raw(raw, '/items', '--offset', str(first['selection']['next_offset']))
+        self.assertEqual(p.returncode, 0, p.stderr)
+        second = json.loads(p.stdout, parse_float=Decimal)
+        self.assertEqual(second['selection']['offset'], returned)
+        self.assertEqual(second['data'][0], Decimal(numeral))
+        for numeral in ('1e400', '-1e400'):
+            with self.subTest(numeral=numeral):
+                p = self.run_raw(('{"n":%s}' % numeral).encode(), '/n')
+                self.assertEqual(p.returncode, 1)
+                self.assertEqual(json.loads(p.stderr)['error'], 'invalid_json_or_structure')

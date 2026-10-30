@@ -18,28 +18,8 @@ VERSION = 1
 FIELDS = ('variable_hints', 'semantic_summary', 'field_states')
 
 
-class ExactFloat(float):
-    """Keep the source token while retaining the shared reader's numeric admission."""
-    def __new__(cls, token):
-        value = super().__new__(cls, token)
-        value.token = token
-        return value
-
-    def __deepcopy__(self, memo):
-        return self
-
-
-def encoded(value, *, sort_keys=False):
-    def emit(item):
-        if isinstance(item, ExactFloat):
-            return item.token
-        if isinstance(item, dict):
-            keys = sorted(item) if sort_keys else item
-            return '{' + ','.join(emit(key) + ':' + emit(item[key]) for key in keys) + '}'
-        if isinstance(item, list):
-            return '[' + ','.join(emit(child) for child in item) + ']'
-        return json.dumps(item, ensure_ascii=False, allow_nan=False, separators=(',', ':'))
-    return emit(value).encode('utf-8')
+ExactFloat = reader.ExactFloat
+encoded = reader.exact_json
 
 
 def project(full, source):

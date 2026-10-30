@@ -130,6 +130,13 @@ class CompactResultTests(unittest.TestCase):
                 for numeral in numerals: self.assertIn(numeral.encode(), result.stdout)
                 output = Path(directory)/'view.json'; output.write_bytes(result.stdout)
                 compact.reader.read_source(output, None)
+                # The recommended follow-up read must not round the retained numerals.
+                pointer = '/catalog' if mode == 'compact' else '/exact_numbers'
+                read = subprocess.run([sys.executable, '-B', str(compact.reader.__file__), str(output),
+                                       '--pointer', pointer], capture_output=True,
+                                      timeout=subprocess_timeout())
+                self.assertEqual(read.returncode, 0, read.stderr)
+                for numeral in numerals: self.assertIn(numeral.encode(), read.stdout)
 
     def test_cli_float_overflow_fails_closed(self):
         full = self.result(); full['number'] = 'OVERFLOW'
