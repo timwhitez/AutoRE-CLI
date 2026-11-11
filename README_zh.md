@@ -2,7 +2,6 @@
 
 [English](README.md) | [简体中文](README_zh.md)
 
-[![Validate Distribution](https://github.com/timwhitez/AutoRE-CLI/actions/workflows/validate.yml/badge.svg)](https://github.com/timwhitez/AutoRE-CLI/actions/workflows/validate.yml)
 [![Release](https://img.shields.io/github/v/release/timwhitez/AutoRE-CLI?display_name=tag)](https://github.com/timwhitez/AutoRE-CLI/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE-MIT)
 
@@ -236,6 +235,29 @@ Linux 发行版使用动态链接 GNU target。主机平台矩阵与被分析输
 本 MIT 发行仓包含二进制、开放 Skill/helper、安装器、校验器、自动化、受控 Demo
 源码、图片和文档。Rust 引擎实现、私有规格、样本与分析输出没有公开。
 这里的“开源”适用于公开脚本、Skill、示例、自动化和文档。
+
+## 本地验证
+
+已停用 GitHub Actions。在仓库 checkout 中运行：
+
+```sh
+python3 -B scripts/local_ci.py
+```
+
+默认 `all` lane 校验分发与 Skill、运行完整 Python 回归套件，在临时目录中
+安装并探测可信的当前主机 CLI、检查已安装 Skill，在 Unix 上编译受控对象并
+仅作静态分析，随后卸载，并构建和验证临时发布包。成功或失败都会清理本轮
+临时目录。需要分别在目标主机运行原生检查；Linux 通过不能证明 Windows 或
+macOS 通过。Unix 原生检查需要 `cc`；Windows 使用 x86-64 CLI，不要求 C
+编译器。测试套件需要 Python 3.10 或更高版本。
+
+可用 `--lane checks`、`--lane native`、`--lane archives` 选择较小的检查范围。
+Windows 使用 `py -3 -B scripts/local_ci.py`。本地验证不会发布 release。
+需要保留发布包时，在各目标主机验收后另行运行
+`python3 scripts/build_release_assets.py --output <新目录>`。
+发布改为手动：确认已有 tag 等于 `v` 加 `VERSION`，构建包后，仅在明确要求
+发布时运行 `gh release create <tag> <asset-files> --verify-tag --notes-file
+release-notes/<tag>.md`。
 
 ## 维护与支持
 

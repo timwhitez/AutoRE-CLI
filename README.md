@@ -2,7 +2,6 @@
 
 [English](README.md) | [简体中文](README_zh.md)
 
-[![Validate Distribution](https://github.com/timwhitez/AutoRE-CLI/actions/workflows/validate.yml/badge.svg)](https://github.com/timwhitez/AutoRE-CLI/actions/workflows/validate.yml)
 [![Release](https://img.shields.io/github/v/release/timwhitez/AutoRE-CLI?display_name=tag)](https://github.com/timwhitez/AutoRE-CLI/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE-MIT)
 
@@ -257,6 +256,31 @@ installers, verifier, automation, controlled demo source, artwork and documentat
 The Rust engine implementation, private specifications, samples and analysis
 output are not published. “Open source” here applies to the public scripts,
 Skill, examples, automation and documentation.
+
+## Local Validation
+
+GitHub Actions is disabled. From a repository checkout, run the checks locally:
+
+```sh
+python3 -B scripts/local_ci.py
+```
+
+The default `all` lane verifies the distribution and Skill, runs the complete
+Python regression suite, installs into disposable directories, probes the
+trusted host CLI, checks the installed Skill, statically analyzes a controlled
+object on Unix, uninstalls, and builds/verifies temporary release archives.
+It removes all of its temporary trees on success or failure. Run native checks
+on each intended host; one Linux pass is not Windows or macOS acceptance.
+Unix native checks need `cc`; Windows native checks use the Windows x86-64 CLI
+without requiring a C compiler. Python 3.10 or newer is needed for the test suite.
+
+Use `--lane checks`, `--lane native`, or `--lane archives` for a focused run.
+On Windows, use `py -3 -B scripts/local_ci.py`. Local validation never publishes.
+To retain release assets, separately run `python3 scripts/build_release_assets.py
+--output <new-directory>` after acceptance on the intended hosts. Publishing is
+manual: verify that the existing tag equals `v` plus `VERSION`, build the assets,
+then use `gh release create <tag> <asset-files> --verify-tag --notes-file
+release-notes/<tag>.md` only when a release is explicitly requested.
 
 ## Maintenance And Support
 

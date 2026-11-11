@@ -30,6 +30,10 @@ not change. Preserve raw addresses and names alongside inferred labels.
 
 ## Validation And Handoff
 
+- CI runs locally with `python3 -B scripts/local_ci.py`; no GitHub Actions
+  workflows are active. Native checks apply only to the current host. The runner
+  owns and cleans temporary installs/builds; release publishing stays manual.
+
 - Run `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v`
   for public helper changes; run the focused relevant check during development.
 - Run `python3 scripts/quick_validate_skill.py skills/auto-re` for Skill changes.

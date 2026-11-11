@@ -34,7 +34,8 @@ Engine changes are reviewed in the private source repository by the maintainer.
 - Keep the change focused.
 - Preserve the static-only safety boundary.
 - Add or update a public regression when behavior changes.
-- Run `./verify.sh` and the relevant installer or Skill checks.
+- Run `python3 -B scripts/local_ci.py` locally; use the focused lane while iterating.
+- GitHub Actions is disabled; attach the local command/results and host to the PR.
 - Do not commit generated analysis results or untrusted samples.
 
 ## Documentation Changes
