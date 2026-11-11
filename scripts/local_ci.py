@@ -59,7 +59,7 @@ print(json.dumps(result));sys.exit(0 if result['ok'] else 1)
         result = work / "analysis.json"
         run_command([str(cli), "analyze", str(obj), "--format", "json", "--output", str(result)], env)
         payload = json.loads(result.read_text())
-        if not isinstance(payload.get("schema_version"), str) or payload.get("metadata", {}).get("format") not in {"elf", "coff", "macho"}:
+        if not isinstance(payload.get("schema_version"), str) or payload.get("metadata", {}).get("format") not in {"elf", "coff", "mach_o"}:
             raise ValueError("controlled-object analysis has an unexpected metadata contract")
     run_command([*manager, "uninstall", *destinations], env)
     if cli.exists() or skill.exists() or (trae / "skills/auto-re").exists():

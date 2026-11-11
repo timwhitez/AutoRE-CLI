@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import importlib.util
 import io
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -58,8 +59,12 @@ class LocalCiTests(unittest.TestCase):
         self.assertFalse(list(self.root.glob("autore-local-ci-*")))
 
     def test_native_host_smoke_uses_only_temporary_destinations(self):
-        for host in ("linux-x86_64", "windows-x86_64"):
-            with self.subTest(host=host), tempfile.TemporaryDirectory(dir=self.root) as td:
+        for host, object_format in (("linux-x86_64", "elf"),
+                                    ("macos-arm64", "mach_o"),
+                                    ("macos-x86_64", "mach_o"),
+                                    ("windows-x86_64", "coff"),
+                                    ("linux-x86_64", "invalid")):
+            with self.subTest(host=host, object_format=object_format), tempfile.TemporaryDirectory(dir=self.root) as td:
                 work = Path(td)
                 calls = []
                 def command(argv, env, capture=False):
@@ -72,9 +77,13 @@ class LocalCiTests(unittest.TestCase):
                     if "uninstall" in argv:
                         Path(argv[argv.index("--install-dir")+1], "auto-re-cli.exe" if host.startswith("windows") else "auto-re-cli").unlink()
                     if "analyze" in argv:
-                        Path(argv[argv.index("--output")+1]).write_text('{"schema_version":"0.1.0","metadata":{"format":"elf"}}')
+                        Path(argv[argv.index("--output")+1]).write_text(json.dumps({"schema_version": "0.1.0", "metadata": {"format": object_format}}))
                     return subprocess.CompletedProcess(argv, 0, "", "")
                 with mock.patch.object(ci, "ROOT", self.root), mock.patch.object(ci.distribution, "host_target", return_value=host), mock.patch.object(ci, "run_command", side_effect=command):
+                    if object_format == "invalid":
+                        with self.assertRaisesRegex(ValueError, "metadata contract"):
+                            ci.native_smoke(work, dict(os.environ))
+                        continue
                     ci.native_smoke(work, dict(os.environ))
                 install = next(c for c in calls if "install" in c)
                 for flag in ("--install-dir", "--codex-home", "--trae-home"):
