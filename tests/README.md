@@ -105,3 +105,12 @@ fixture cases, an atomic-claim/evidence scorer, safe-stop and negation failures,
 and scripted cold/retained baselines extend routing tests. The bounded baseline
 compares merged #40/#41/#42 with each first parent; response bytes are an explicit
 token proxy. No model calls or Skill instruction/version changes are included.
+
+## Local CI entrypoint
+
+`python3 -B scripts/local_ci.py` runs the complete local repository validation.
+Use `--lane checks` for verification plus this offline suite, `--lane native`
+for those checks plus isolated host install/static-analysis/uninstall, or
+`--lane archives` for checks plus disposable archive build/readback. No workflow
+runs on GitHub Actions and no lane publishes a release. Run native acceptance
+on each intended host; mocked platform tests do not certify that host.
