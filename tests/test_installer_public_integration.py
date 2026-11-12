@@ -2,14 +2,19 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
 from unittest import mock
+
+from tests import test_release_assets_safety as release_fixtures
+from tests.subprocess_timeout import subprocess_timeout
 
 
 ENTRY = Path(__file__).resolve().parents[1] / "scripts/autore_distribution.py"
@@ -18,6 +23,221 @@ assert SPEC is not None and SPEC.loader is not None
 installer = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = installer
 SPEC.loader.exec_module(installer)
+
+DOCTOR_SPEC = importlib.util.spec_from_file_location(
+    "installer_public_skill_doctor",
+    ENTRY.parents[1] / "skills/auto-re/scripts/skill_doctor.py",
+)
+assert DOCTOR_SPEC is not None and DOCTOR_SPEC.loader is not None
+doctor = importlib.util.module_from_spec(DOCTOR_SPEC)
+DOCTOR_SPEC.loader.exec_module(doctor)
+
+
+class InstallerSkillMarkerTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.home = self.root / "codex"
+        self.skill = self.home / "skills/auto-re"
+        self.skill.mkdir(parents=True)
+        (self.skill / "SKILL.md").write_bytes(b"controlled managed skill\n")
+        self.marker = {
+            "schema_version": 1, "product": "AutoRE-CLI", "kind": "skill-install",
+            "skill": "auto-re", "version": "0.1.7", "managed_files": ["SKILL.md"],
+            "sha256": self.expected_digest(self.skill, ["SKILL.md"]),
+        }
+        self.write_marker()
+        self.source = self.root / "source"
+        self.source.mkdir()
+        (self.source / "SKILL.md").write_bytes(b"new controlled managed skill\n")
+        self.candidate = {
+            **self.marker, "version": "0.1.13",
+            "sha256": self.expected_digest(self.source, ["SKILL.md"]),
+        }
+
+    @staticmethod
+    def expected_digest(root, files):
+        entries = b"".join(
+            relative.encode("utf-8") + b"\0"
+            + hashlib.sha256((root / relative).read_bytes()).digest()
+            for relative in sorted(files)
+        )
+        return hashlib.sha256(entries).hexdigest()
+
+    def write_marker(self):
+        (self.skill / installer.SKILL_MARKER).write_text(
+            json.dumps(self.marker), encoding="utf-8")
+
+    def add_extra(self, name):
+        extra = self.skill / "user-data" / name
+        extra.parent.mkdir()
+        extra.write_bytes(b"user sentinel must survive\x00\xff\n")
+        return extra
+
+    def snapshot(self):
+        return {
+            path.relative_to(self.root).as_posix():
+                path.read_bytes() if path.is_file() else None
+            for path in self.root.rglob("*")
+        }
+
+    def uninstall(self, *options):
+        return subprocess.run(
+            [sys.executable, "-B", str(ENTRY), "uninstall", "--skill-only",
+             "--agents", "codex", "--codex-home", str(self.home), *options],
+            capture_output=True, text=True, timeout=subprocess_timeout(10),
+        )
+
+    def assert_uninstall_preserves(self, name):
+        extra = self.add_extra(name)
+        original = extra.read_bytes()
+        relative = extra.relative_to(self.skill).as_posix()
+        before = self.snapshot()
+        plan = self.uninstall("--dry-run")
+        self.assertEqual(plan.returncode, 0, plan.stderr)
+        self.assertEqual(json.loads(plan.stdout)["operations"][0]["extra_files_preserved"],
+                         [relative])
+        self.assertEqual(self.snapshot(), before)
+        result = self.uninstall()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["operations"][0]["extra_files_preserved"],
+                         [relative])
+        self.assertEqual(extra.read_bytes(), original)
+        self.assertFalse((self.skill / "SKILL.md").exists())
+        self.assertFalse((self.skill / installer.SKILL_MARKER).exists())
+        self.assertEqual(sorted(path.name for path in self.skill.parent.iterdir()),
+                         ["auto-re"])
+
+    def test_uninstall_preserves_nested_marker_named_user_file(self):
+        self.assert_uninstall_preserves(".autore-managed.json")
+
+    def test_uninstall_preserves_nested_ordinary_user_file(self):
+        self.assert_uninstall_preserves("notes.txt")
+
+    def assert_update_refuses_extra(self, name):
+        self.add_extra(name)
+        before = self.snapshot()
+        with self.assertRaisesRegex(installer.DistributionError,
+                                    "managed skill file-set drift detected"):
+            installer.preflight_skill_install(
+                self.source, self.skill, self.candidate, replace_unmanaged=False)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_update_refuses_nested_marker_named_user_file(self):
+        self.assert_update_refuses_extra(".autore-managed.json")
+
+    def test_update_refuses_nested_ordinary_user_file(self):
+        self.assert_update_refuses_extra("notes.txt")
+
+    def test_root_marker_remains_exempt(self):
+        expected = hashlib.sha256(
+            b"SKILL.md\0"
+            + hashlib.sha256((self.skill / "SKILL.md").read_bytes()).digest()
+        ).hexdigest()
+        self.assertEqual(installer.skill_file_inventory(self.skill), ["SKILL.md"])
+        self.assertEqual(installer.installed_skill_digest(self.skill), expected)
+        self.assertEqual(installer.preflight_skill_install(
+            self.source, self.skill, self.candidate, replace_unmanaged=False), "update")
+        result = self.uninstall()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["operations"][0]["extra_files_preserved"],
+                         [])
+        self.assertFalse(self.skill.exists())
+
+    def test_nested_marker_changes_inventory_and_digest(self):
+        before = installer.installed_skill_digest(self.skill)
+        self.add_extra(".autore-managed.json")
+        files = ["SKILL.md", "user-data/.autore-managed.json"]
+        self.assertEqual(installer.skill_file_inventory(self.skill), files)
+        self.assertEqual(installer.installed_skill_digest(self.skill),
+                         self.expected_digest(self.skill, files))
+        self.assertNotEqual(installer.installed_skill_digest(self.skill), before)
+
+    def test_nested_marker_symlink_fails_closed(self):
+        target = self.root / "outside"
+        target.write_bytes(b"outside sentinel")
+        link = self.skill / "user-data/.autore-managed.json"
+        link.parent.mkdir()
+        try:
+            link.symlink_to(target)
+        except (OSError, NotImplementedError) as error:
+            self.skipTest(f"symlinks unavailable: {error}")
+        for operation in ("inventory", "update", "uninstall"):
+            with self.subTest(operation=operation):
+                if operation == "uninstall":
+                    result = self.uninstall("--dry-run")
+                    self.assertEqual(result.returncode, 1, result.stdout)
+                    self.assertIn("skill contains a symlink", result.stderr)
+                else:
+                    with self.assertRaisesRegex(installer.DistributionError,
+                                                "skill contains a symlink"):
+                        if operation == "inventory":
+                            installer.skill_file_inventory(self.skill)
+                        else:
+                            installer.preflight_skill_install(
+                                self.source, self.skill, self.candidate,
+                                replace_unmanaged=False)
+        self.assertTrue(link.is_symlink())
+        self.assertEqual(target.read_bytes(), b"outside sentinel")
+        self.assertTrue((self.skill / "SKILL.md").exists())
+        self.assertTrue((self.skill / installer.SKILL_MARKER).exists())
+
+    def test_doctor_detects_nested_marker_drift_without_mutation(self):
+        (self.skill / "SKILL.md").write_bytes(
+            b"---\nname: auto-re\ndescription: controlled fixture\n---\n")
+        (self.skill / "VERSION").write_bytes(b"0.1.7\n")
+        self.marker["managed_files"] = ["SKILL.md", "VERSION"]
+        self.marker["sha256"] = self.expected_digest(
+            self.skill, self.marker["managed_files"])
+        self.write_marker()
+        executable = self.root / "inert-cli"
+        executable.write_bytes(b"inert fixture, never executed")
+        with mock.patch.object(doctor, "probe_cli_version",
+                               return_value=("0.1.7", "auto-re-cli 0.1.7")):
+            before = self.snapshot()
+            clean = doctor.diagnose(self.skill, executable=executable,
+                                    candidate_roots=[self.skill])
+            self.assertTrue(clean["ok"], clean)
+            self.assertTrue(clean["managed_content_match"])
+            self.assertEqual(clean["warnings"], [])
+            self.assertEqual(self.snapshot(), before)
+            self.add_extra(".autore-managed.json")
+            before = self.snapshot()
+            drift = doctor.diagnose(self.skill, executable=executable,
+                                    candidate_roots=[self.skill])
+            self.assertFalse(drift["ok"], drift)
+            self.assertFalse(drift["managed_content_match"])
+            self.assertIn("managed Skill file inventory or content digest has drifted",
+                          drift["warnings"])
+            self.assertEqual(self.snapshot(), before)
+
+    def release_fixture(self):
+        fixture = release_fixtures.ReleaseAssetsSafetyTests()
+        self.addCleanup(fixture.doCleanups)
+        fixture.setUp()
+        return fixture
+
+    def test_release_verifier_rejects_unlisted_nested_marker(self):
+        fixture = self.release_fixture()
+        self.assertTrue(installer.verify_distribution(fixture.root)["ok"])
+        extra = fixture.root / "skills/auto-re/user-data/.autore-managed.json"
+        extra.parent.mkdir()
+        extra.write_bytes(b"unlisted nested marker")
+        with self.assertRaisesRegex(installer.DistributionError,
+                                    "checksum file set mismatch"):
+            installer.verify_distribution(fixture.root)
+
+    def test_release_verifier_checks_nested_marker_in_managed_inventory(self):
+        fixture = self.release_fixture()
+        self.assertTrue(installer.verify_distribution(fixture.root)["ok"])
+        extra = fixture.root / "skills/auto-re/user-data/.autore-managed.json"
+        extra.parent.mkdir()
+        extra.write_bytes(b"checksummed but not managed nested marker")
+        fixture.rebuild_checksums()
+        with self.assertRaisesRegex(installer.DistributionError,
+                                    "manifest managed skill file set does not match disk"):
+            installer.verify_distribution(fixture.root)
 
 
 class InstallerPublicIntegrationTests(unittest.TestCase):
