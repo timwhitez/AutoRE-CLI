@@ -4,6 +4,17 @@ All notable changes to the public AutoRE-CLI distribution are recorded here.
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-11-12
+
+- Rebuild the five supported platform binaries from the current source release and ship the matching 0.1.14 Agent Skill.
+- Add bounded embedded-header inspection and explicit, single-layer gzip extraction; recovered bytes are never executed.
+- Preserve control-flow edges and block coverage in HLIL, and correct signature-derived ABI parameter hints.
+- Keep function pagination stable across discovery-budget increases and reject non-regular batch inputs promptly.
+- Include the optional ELF x86-64 register-provenance surface with its explicit static-evidence limits.
+- Upgrade iced-x86 to 1.22.0 and include native Windows artifact/stack handling fixes.
+- Synchronize the Skill request-identity contract with the released CLI, retain strict continuation admission, and preserve installer/checksum safety fixes.
+- See [release notes](release-notes/v0.1.14.md) for provenance and validation limits.
+
 ## [0.1.11] - 2026-10-11
 
 - Add parser-derived `describe --format json` command metadata and opt-in

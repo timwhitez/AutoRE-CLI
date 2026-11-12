@@ -16,7 +16,7 @@ SPEC = importlib.util.spec_from_file_location(
     "identity_runner", ROOT / "skills/auto-re/scripts/run_next_action.py")
 runner = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(runner)
-CONTRACT = json.loads((Path(__file__).parent / "fixtures/cli_identity_0_1_13.json").read_text())
+CONTRACT = json.loads((Path(__file__).parent / "fixtures/cli_identity_0_1_14.json").read_text())
 VERSION = "auto-re-cli " + CONTRACT["version"]
 
 

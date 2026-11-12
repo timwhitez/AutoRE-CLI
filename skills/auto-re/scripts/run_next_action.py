@@ -37,7 +37,7 @@ SUPPORTED_PROFILES = frozenset({"ai"})
 SUPPORTED_MANIFEST_KINDS = frozenset({"context_bundle", "agent_spill_manifest"})
 # Audited CLI contract, not an execution authorization list. Keep the release
 # fixture and source Clap drift test in sync when auditing another version.
-IDENTITY_CONTRACT_VERSION = "0.1.13"
+IDENTITY_CONTRACT_VERSION = "0.1.14"
 IDENTITY_GLOBAL_VALUE_OPTIONS = ["--output", "--diagnostic-format"]
 IDENTITY_COMMAND_CONTRACT = {
     "aarch64-refs": {
@@ -94,7 +94,7 @@ IDENTITY_COMMAND_CONTRACT = {
         "value_options": (
             "--arch --base-address --entry-address --format --function-offset --json-profile "
             "--limit --max-functions --max-input-bytes --max-instructions-per-function "
-            "--max-output-lines --output --spill-dir --style --diagnostic-format --result-contract"
+            "--max-output-lines --output --spill-dir --style --diagnostic-format --result-contract --function-page-start-cap"
         ).split(),
         "switch_options": "--flat --include-noise --raw-shellcode --split-output".split(),
     },
@@ -113,7 +113,7 @@ IDENTITY_COMMAND_CONTRACT = {
         "value_options": (
             "--addr --arch --base-address --entry-address --format --level --max-functions "
             "--max-input-bytes --max-instructions-per-function --output --spill-dir "
-            "--statement-address --statement-contains --statement-limit --statement-offset --symbol --diagnostic-format --result-contract"
+            "--statement-address --statement-contains --statement-limit --statement-offset --symbol --diagnostic-format --result-contract --register-provenance"
         ).split(),
         "switch_options": "--flat --raw-shellcode".split(),
     },
@@ -124,6 +124,14 @@ IDENTITY_COMMAND_CONTRACT = {
             "--max-instructions-per-function --output --spill-dir --symbol --diagnostic-format"
         ).split(),
         "switch_options": "--raw-shellcode".split(),
+    },
+    "extract-embedded": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--format --max-input-bytes --max-input-span --max-output-bytes --max-ratio "
+            "--offset --output --spill-dir --diagnostic-format"
+        ).split(),
+        "switch_options": "".split(),
     },
     "fold-pair-bytes": {
         "classification": "single_input", "aliases": [], "input_position": 1,
@@ -152,6 +160,14 @@ IDENTITY_COMMAND_CONTRACT = {
             "--max-input-bytes --max-instructions-per-function --output --spill-dir --diagnostic-format"
         ).split(),
         "switch_options": "--raw-shellcode".split(),
+    },
+    "inspect-embedded": {
+        "classification": "single_input", "aliases": [], "input_position": 1,
+        "value_options": (
+            "--format --max-findings --max-input-bytes --offset --output --scan-bytes "
+            "--spill-dir --diagnostic-format"
+        ).split(),
+        "switch_options": "".split(),
     },
     "inspect-flow": {
         "classification": "single_input", "aliases": [], "input_position": 1,
@@ -248,7 +264,7 @@ IDENTITY_COMMAND_CONTRACT = {
             "--arch --base-address --bundle-dir --entry-address --flow-depth --flow-node-limit "
             "--flow-per-node-limit --format --function-offset --json-profile --limit "
             "--max-functions --max-input-bytes --max-instructions-per-function --max-output-lines "
-            "--output --sections --spill-dir --style --diagnostic-format --result-contract"
+            "--output --sections --spill-dir --style --diagnostic-format --result-contract --function-page-start-cap"
         ).split(),
         "switch_options": "--flat --include-noise --raw-shellcode --split-output".split(),
     },

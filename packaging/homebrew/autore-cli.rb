@@ -1,26 +1,26 @@
 class AutoreCli < Formula
   desc "Bounded static reverse engineering for analysts and AI agents"
   homepage "https://github.com/timwhitez/AutoRE-CLI"
-  version "0.1.13"
+  version "0.1.14"
   license "MIT"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.13/AutoRE-CLI-0.1.13-macos-arm64.tar.gz"
-      sha256 "e0cd60f3ae2981cbaed1948ec2394b4481c847b27e0db9f5a1d92335ff6efc35"
+      url "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.14/AutoRE-CLI-0.1.14-macos-arm64.tar.gz"
+      sha256 "d956f62ad7469fecfde378377d2cce9bbba51afbbc427a58773fc4a4e80ab833"
     else
-      url "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.13/AutoRE-CLI-0.1.13-macos-x86_64.tar.gz"
-      sha256 "5e07fd2e2ce948c90b9c992256ba31e8d6a67b8ffb183e9f6cb03bd8d4ab5fd7"
+      url "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.14/AutoRE-CLI-0.1.14-macos-x86_64.tar.gz"
+      sha256 "ca93bb86864b5d219e5c8fbd5d4926e7cf04b46068250c105f82f6c2db6e817d"
     end
   end
 
   on_linux do
     if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
-      url "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.13/AutoRE-CLI-0.1.13-linux-arm64.tar.gz"
-      sha256 "b39d1dd0466321bc1935aff82d01f71e6c3ae220942fe832f5269e8b655f1df9"
+      url "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.14/AutoRE-CLI-0.1.14-linux-arm64.tar.gz"
+      sha256 "05ebf0c08e3bfa944b0f2f63fe45d763cef379d9107064764bae43c49c201272"
     elsif Hardware::CPU.intel? && Hardware::CPU.is_64_bit?
-      url "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.13/AutoRE-CLI-0.1.13-linux-x86_64.tar.gz"
-      sha256 "c431780a41f080bfdd2e4ade6da449c1005ba506e94158923e262464be286faf"
+      url "https://github.com/timwhitez/AutoRE-CLI/releases/download/v0.1.14/AutoRE-CLI-0.1.14-linux-x86_64.tar.gz"
+      sha256 "f581473a5037e7911c35b27b37f16e959f3312e5608955e25606d1c1cb553b6d"
     else
       odie "AutoRE-CLI has no release for this Linux architecture"
     end

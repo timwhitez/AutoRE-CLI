@@ -24,7 +24,7 @@ class LocalCiTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         (self.root / "scripts").mkdir()
         (self.root / "scripts/build_release_assets.py").write_text("# controlled placeholder\n")
-        (self.root / "VERSION").write_text("0.1.13\n")
+        (self.root / "VERSION").write_text("0.1.14\n")
 
     def test_real_command_failure_is_not_reported_as_success(self):
         with mock.patch.object(ci, "ROOT", self.root), contextlib.redirect_stdout(io.StringIO()), self.assertRaises(subprocess.CalledProcessError):
@@ -70,7 +70,7 @@ class LocalCiTests(unittest.TestCase):
                 def command(argv, env, capture=False):
                     argv = list(map(str, argv));calls.append(argv)
                     if "--version" in argv:
-                        return subprocess.CompletedProcess(argv, 0, "auto-re-cli 0.1.13\n", "")
+                        return subprocess.CompletedProcess(argv, 0, "auto-re-cli 0.1.14\n", "")
                     if "install" in argv:
                         dest = Path(argv[argv.index("--install-dir")+1]);dest.mkdir()
                         (dest / ("auto-re-cli.exe" if host.startswith("windows") else "auto-re-cli")).write_text("trusted fixture")
