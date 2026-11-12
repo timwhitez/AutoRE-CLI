@@ -152,7 +152,7 @@ class ReleaseAssetsSafetyTests(unittest.TestCase):
     def rebuild_checksums(self) -> None:
         rows = []
         for path in sorted(self.root.rglob("*")):
-            if not path.is_file() or path.name == "SHA256SUMS":
+            if not path.is_file() or path.relative_to(self.root).as_posix() == "SHA256SUMS":
                 continue
             rows.append(
                 f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.relative_to(self.root).as_posix()}\n"
@@ -637,6 +637,132 @@ class ReleaseAssetsSafetyTests(unittest.TestCase):
         (self.root / "local-notes.txt").write_text("scratch\n", encoding="utf-8")
         with self.assertRaises(builder.ReleaseAssetError):
             builder.build_assets(self.output)
+        self.assertFalse(self.output.exists())
+
+    def test_verifier_exempts_only_root_checksum_manifest(self) -> None:
+        result = installer.verify_distribution(self.root)
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["checksummed_file_count"], 14)
+        self.assertNotIn("SHA256SUMS", installer.parse_checksums(self.root))
+
+    def test_verifier_rejects_unlisted_nested_checksum_manifest(self) -> None:
+        nested = self.root / "assets/SHA256SUMS"
+        nested.parent.mkdir()
+        for content in (b"unlisted payload version A\n", b"unlisted payload version B\n"):
+            with self.subTest(content=content):
+                nested.write_bytes(content)
+                with self.assertRaisesRegex(
+                    installer.DistributionError,
+                    r"checksum file set mismatch: missing=\['assets/SHA256SUMS'\] extra=\[\]",
+                ):
+                    installer.verify_distribution(self.root)
+
+    def test_verifier_rejects_ordinary_unlisted_file(self) -> None:
+        extra = self.root / "assets/unlisted.txt"
+        extra.parent.mkdir()
+        extra.write_bytes(b"ordinary unlisted payload\n")
+        with self.assertRaisesRegex(
+            installer.DistributionError,
+            r"checksum file set mismatch: missing=\['assets/unlisted\.txt'\] extra=\[\]",
+        ):
+            installer.verify_distribution(self.root)
+
+    def test_verifier_checks_listed_nested_checksum_manifest(self) -> None:
+        baseline = installer.verify_distribution(self.root)["checksummed_file_count"]
+        nested = self.root / "assets/SHA256SUMS"
+        nested.parent.mkdir()
+        nested.write_bytes(b"listed nested payload\n")
+        self.rebuild_checksums()
+        checksums = installer.parse_checksums(self.root)
+        self.assertEqual(
+            checksums["assets/SHA256SUMS"], hashlib.sha256(nested.read_bytes()).hexdigest()
+        )
+        result = installer.verify_distribution(self.root)
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["checksummed_file_count"], baseline + 1)
+        nested.write_bytes(b"modified nested payload\n")
+        with self.assertRaisesRegex(
+            installer.DistributionError, "checksum mismatch for assets/SHA256SUMS:"
+        ):
+            installer.verify_distribution(self.root)
+
+    def test_builder_rejects_unlisted_nested_checksum_manifest_before_packaging(self) -> None:
+        nested = self.root / "assets/SHA256SUMS"
+        nested.parent.mkdir()
+        nested.write_bytes(b"unlisted nested payload\n")
+        with self.assertRaisesRegex(
+            builder.ReleaseAssetError, "failed verification before packaging"
+        ):
+            builder.build_assets(self.output)
+        self.assertFalse(self.output.exists())
+        self.assertEqual(nested.read_bytes(), b"unlisted nested payload\n")
+
+    def test_builder_packages_listed_nested_checksum_manifest(self) -> None:
+        content = b"listed nested payload\n"
+        nested = self.root / "assets/SHA256SUMS"
+        nested.parent.mkdir()
+        nested.write_bytes(content)
+        self.rebuild_checksums()
+        result = builder.build_assets(self.output)
+        self.assertTrue(result["ok"])
+        archive = next(self.output.glob("*linux-x86_64.tar.gz"))
+        prefix = "AutoRE-CLI-0.1.3-linux-x86_64/"
+        with tarfile.open(archive) as handle:
+            members = {
+                member.name.removeprefix(prefix): handle.extractfile(member).read()
+                for member in handle.getmembers() if member.isfile()
+            }
+            modes = {
+                member.name.removeprefix(prefix): member.mode
+                for member in handle.getmembers() if member.isfile()
+            }
+        self.assertEqual(members["assets/SHA256SUMS"], content)
+        checksum_rows = dict(
+            (name, digest)
+            for digest, name in (
+                line.split("  ", 1) for line in members["SHA256SUMS"].decode().splitlines()
+            )
+        )
+        self.assertEqual(checksum_rows["assets/SHA256SUMS"], hashlib.sha256(content).hexdigest())
+        package = self.work / "extracted-package"
+        for name, payload in members.items():
+            path = package / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(payload)
+            path.chmod(modes[name])
+        builder.verify_package(package, "linux-x86_64")
+        self.assertTrue(installer.verify_distribution(package)["ok"])
+
+    def test_builder_rejects_modified_listed_nested_checksum_manifest(self) -> None:
+        nested = self.root / "assets/SHA256SUMS"
+        nested.parent.mkdir()
+        nested.write_bytes(b"listed nested payload\n")
+        self.rebuild_checksums()
+        nested.write_bytes(b"modified nested payload\n")
+        with self.assertRaisesRegex(
+            builder.ReleaseAssetError, "failed verification before packaging"
+        ):
+            builder.build_assets(self.output)
+        self.assertFalse(self.output.exists())
+
+    def test_builder_rejects_nested_checksum_manifest_added_during_snapshot(self) -> None:
+        original_copy = builder.copy_file
+        nested = self.root / "assets/SHA256SUMS"
+
+        def copy_then_add(source, destination, **kwargs):
+            result = original_copy(source, destination, **kwargs)
+            if source == self.root / "README.md":
+                nested.parent.mkdir()
+                nested.write_bytes(b"unlisted payload added during snapshot\n")
+            return result
+
+        with mock.patch.object(builder, "copy_file", side_effect=copy_then_add):
+            with self.assertRaisesRegex(
+                builder.ReleaseAssetError,
+                "failed verification before packaging: source file set changed during snapshot",
+            ):
+                builder.build_assets(self.output)
+        self.assertTrue(nested.exists())
         self.assertFalse(self.output.exists())
 
     def test_pycache_residue_is_rejected_rather_than_packaged(self) -> None:
