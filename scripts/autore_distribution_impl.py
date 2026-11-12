@@ -524,10 +524,11 @@ def validate_manifest(
         expected_skill_files.add(normalized)
         if checksums.get(normalized) != sha256_file(root.joinpath(*relative.parts)):
             raise DistributionError(f"managed skill checksum mismatch: {normalized}")
+    skill_root = root.joinpath(*skill_path.parts)
     actual_skill_files = {
         path.relative_to(root).as_posix()
-        for path in (root.joinpath(*skill_path.parts)).rglob("*")
-        if path.is_file() and path.name != SKILL_MARKER
+        for path in skill_root.rglob("*")
+        if path.is_file() and path != skill_root / SKILL_MARKER
     }
     if actual_skill_files != expected_skill_files:
         raise DistributionError("manifest managed skill file set does not match disk")
@@ -807,8 +808,9 @@ def compare_install_versions(current: Any, candidate: Any) -> int:
 
 def skill_file_inventory(path: pathlib.Path) -> list[str]:
     files: list[str] = []
+    root_marker = path / SKILL_MARKER
     for item in sorted(path.rglob("*")):
-        if item.name == SKILL_MARKER:
+        if item == root_marker:
             continue
         if item.is_symlink():
             raise DistributionError(f"skill contains a symlink: {item}")

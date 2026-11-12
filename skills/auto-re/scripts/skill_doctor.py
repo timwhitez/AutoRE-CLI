@@ -138,12 +138,13 @@ def read_managed_marker(skill_root: pathlib.Path) -> Optional[dict[str, Any]]:
 
 def skill_file_inventory(skill_root: pathlib.Path) -> list[str]:
     files: list[str] = []
+    root_marker = skill_root / ".autore-managed.json"
     try:
         items = sorted(skill_root.rglob("*"))
     except OSError as error:
         raise DoctorError(f"cannot inventory managed Skill: {error}") from error
     for item in items:
-        if item.name == ".autore-managed.json":
+        if item == root_marker:
             continue
         if item.is_symlink():
             raise DoctorError(f"managed Skill contains a symlink: {item}")
