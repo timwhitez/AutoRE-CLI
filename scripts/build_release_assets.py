@@ -79,8 +79,7 @@ def verify_input_distribution(snapshot: pathlib.Path) -> tuple[dict[str, str], d
         copy_file(ROOT / "SHA256SUMS", snapshot / "SHA256SUMS")
         inventory = _impl.parse_checksums(snapshot)
         source_files = list(_impl.iter_public_files(ROOT))
-        actual = {path.relative_to(ROOT).as_posix() for path in source_files
-                  if path.name != "SHA256SUMS"}
+        actual = {path.relative_to(ROOT).as_posix() for path in source_files} - {_impl.CHECKSUM_FILE}
         if actual != set(inventory):
             raise ReleaseAssetError("source file set differs from fixed checksum inventory")
         members = {}
@@ -90,8 +89,7 @@ def verify_input_distribution(snapshot: pathlib.Path) -> tuple[dict[str, str], d
                 ROOT.joinpath(*relative.parts), snapshot.joinpath(*relative.parts),
                 expected_sha256=digest,
             )
-        after = {path.relative_to(ROOT).as_posix() for path in _impl.iter_public_files(ROOT)
-                 if path.name != "SHA256SUMS"}
+        after = {path.relative_to(ROOT).as_posix() for path in _impl.iter_public_files(ROOT)} - {_impl.CHECKSUM_FILE}
         if after != actual:
             raise ReleaseAssetError("source file set changed during snapshot")
         _impl.verify_distribution(snapshot)

@@ -565,8 +565,7 @@ def verify_distribution(root: pathlib.Path) -> dict[str, Any]:
     actual_paths = {
         path.relative_to(root).as_posix()
         for path in files
-        if path.name != CHECKSUM_FILE
-    }
+    } - {CHECKSUM_FILE}
     if set(checksums) != actual_paths:
         missing = sorted(actual_paths - set(checksums))
         extra = sorted(set(checksums) - actual_paths)
