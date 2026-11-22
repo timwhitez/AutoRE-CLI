@@ -53,6 +53,29 @@ class CompactResultTests(unittest.TestCase):
             full['functions'][0]['pseudo'] = text
             self.assertEqual(compact.project(full, self.source(full)), full)
 
+    def test_summary_only_reports_with_nullable_functions_use_full_fallback(self):
+        for kind in (None, 'report_ai'):
+            full = self.result()
+            full['sections'] = ['summary']
+            for field in ('binary', 'inspections', 'flow', 'recovered_types', 'functions'):
+                full[field] = None
+            if kind is not None:
+                full['kind'] = kind
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:
+                raw = compact.encoded(full)
+                result = self.run_cli(raw, directory)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, raw)
+                self.assertNotIn('compact_version', json.loads(result.stdout))
+
+    def test_nullable_functions_do_not_admit_other_roots(self):
+        fixture = json.loads((ROOT/'tests/fixtures/result_contract_0_1_10.json').read_bytes())
+        full = copy.deepcopy(next(c['result'] for c in fixture['cases']
+                                  if c['command'] == 'decompile' and 'derived_from' not in c))
+        full['functions'] = None
+        with self.assertRaisesRegex(ValueError, 'invalid_result_fields'):
+            compact.project(full, self.source(full))
+
     def test_nested_hint_uncertainty_and_unknown_pass_status_survive(self):
         full = self.result()
         states = [{'field': 'source_semantics', 'state': 'unresolved', 'unresolved_reason': 'hint_not_source_ast'}]*8
@@ -146,6 +169,24 @@ class CompactResultTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 1)
                 self.assertFalse(result.stdout)
                 self.assertEqual(json.loads(result.stderr)['error'], 'invalid_json_or_structure')
+
+    def test_cli_integer_negative_zero_survives_compact_and_fallback(self):
+        for mode in ('compact', 'fallback'):
+            full = self.result()
+            if mode == 'fallback':
+                full['functions'] = full['functions'][:1]
+            full['protection_playbook_count'] = 'NEGATIVE_ZERO'
+            for function in full['functions']:
+                function['semantic_summary']['integer_zero'] = 'NEGATIVE_ZERO'
+            raw = compact.encoded(full).replace(b'"NEGATIVE_ZERO"', b'-0')
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                result = self.run_cli(raw, directory)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(b'"protection_playbook_count":-0', result.stdout)
+                self.assertIn(b'"integer_zero":-0', result.stdout)
+                view = json.loads(result.stdout)
+                restored = compact.expand_view(view) if mode == 'compact' else view
+                self.assertEqual(restored, json.loads(raw))
 
     def test_cli_reference_depth_boundaries(self):
         policy = compact.reader.runner.ACTION_RESULT_POLICY

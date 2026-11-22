@@ -33,9 +33,11 @@ The public repository is intentionally a binary distribution: the Agent Skill,
 installer, verifier, release automation, controlled demo, and docs are
 MIT-licensed, while the Rust engine implementation is not published.
 
-There are approximately 7–8 MB packages for macOS arm64/x86-64, Linux
-arm64/x86-64, and Windows x86-64. I would especially value feedback on the
-evidence contract, static-only safety boundary, and integration ergonomics.
+There are packages for macOS arm64/x86-64, Linux arm64/x86-64, and Windows
+x86-64. Current download sizes are listed with the release assets:
+https://github.com/timwhitez/AutoRE-CLI/releases/latest
+I would especially value feedback on the evidence contract, static-only safety
+boundary, and integration ergonomics.
 
 Repository: https://github.com/timwhitez/AutoRE-CLI
 ```
@@ -103,8 +105,11 @@ follow-up actions.
 It supports ELF, PE/COFF, Mach-O, object files, and explicitly identified raw
 shellcode, while preserving a strict static-only boundary.
 
-The repository includes a reproducible benign demo and 7–8 MB packages for five
-host targets:
+The repository includes a reproducible benign demo and packages for five host
+targets. See the release assets for current download sizes:
+https://github.com/timwhitez/AutoRE-CLI/releases/latest
+
+Repository:
 https://github.com/timwhitez/AutoRE-CLI
 ```
 
@@ -119,8 +124,11 @@ https://github.com/timwhitez/AutoRE-CLI
 与把大段反编译结果直接塞给 Agent 不同，AutoRE-CLI 会明确区分 validated、
 inferred、unresolved 和 not_claimed，并且绝不执行目标或目标派生产物。
 
-仓库提供可复现无害 Demo，以及 macOS、Linux、Windows 五个平台的 7–8 MB
-独立发行包：
+仓库提供可复现无害 Demo，以及 macOS、Linux、Windows 五个平台的独立发行包。
+最新下载大小请查看所选 Release 的资产列表：
+https://github.com/timwhitez/AutoRE-CLI/releases/latest
+
+仓库：
 https://github.com/timwhitez/AutoRE-CLI
 ```
 

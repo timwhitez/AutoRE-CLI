@@ -51,7 +51,18 @@ def _reject_constant(value):
 def _bounded_int(value):
     if len(value.lstrip('-')) > 4300:
         raise ViewError('integer_too_large')
-    return int(value)
+    return ExactInt(value) if value == '-0' else int(value)
+
+
+class ExactInt(int):
+    """Retain the integer spelling that Python's int would normalize."""
+    def __new__(cls, token):
+        value = super().__new__(cls, token)
+        value.token = token
+        return value
+
+    def __deepcopy__(self, memo):
+        return self
 
 
 class ExactFloat(float):
@@ -66,9 +77,9 @@ class ExactFloat(float):
 
 
 def exact_json(value, *, sort_keys=False):
-    """Compact JSON bytes that re-emit ExactFloat source tokens unchanged."""
+    """Compact JSON bytes that re-emit retained source number tokens unchanged."""
     def emit(item):
-        if isinstance(item, ExactFloat):
+        if isinstance(item, (ExactInt, ExactFloat)):
             return item.token
         if isinstance(item, dict):
             keys = sorted(item) if sort_keys else item
@@ -211,6 +222,19 @@ def build_view(document, source, pointer, tokens, offset, limit):
         selection.update(total_items=len(value), returned_items=0)
         if offset < len(value):
             selection.update(has_more=True, next_offset=offset + 1)
+        if len(value) - offset <= limit:
+            # Removing continuation metadata can make the terminal page smaller
+            # than a prefix. Check it before applying the monotone prefix budget.
+            result['data'] = value[offset:]
+            selection.update(returned_items=len(value) - offset, has_more=False)
+            selection.pop('next_offset', None)
+            terminal = _encoded(result)
+            if len(terminal) <= MAX_OUTPUT_BYTES:
+                return terminal
+            result.pop('data')
+            selection.update(returned_items=0)
+            if offset < len(value):
+                selection.update(has_more=True, next_offset=offset + 1)
     if len(_encoded(result)) > MAX_OUTPUT_BYTES:
         raise ViewError('boundary_too_large')
     if not is_array:

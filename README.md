@@ -64,7 +64,7 @@ A repository clone also works: run `./verify.sh` and `./install.sh` from its roo
 `--codex-home` selects the legacy `<home>/skills` location; the current default
 is `$HOME/.agents/skills`. Unmanaged destinations require an explicit
 `--replace-unmanaged`. Update by verifying and installing a newer distribution;
-managed drift, same-version binary repacks, downgrades and extra Skill files
+managed drift, same-version binary repacks, downgrades and extra Skill files or directories
 fail closed. Use `./uninstall.sh` to remove managed files;
 `--force-managed` only covers modified marker-listed files, never unrelated files.
 On Windows use `py -3 scripts/autore_distribution.py` with the same subcommand/options.

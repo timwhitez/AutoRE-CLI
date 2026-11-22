@@ -34,10 +34,13 @@ CLI-first、有边界的 JSON 契约，让人类分析师和 AI Agent 在不启�
 公开发行支持 ELF、PE/COFF、Mach-O、universal Mach-O、object file 和明确标识
 的 raw shellcode。使用 `auto-re-cli <command> --help` 查看当前版本的准确参数。
 
-## 为什么 raw shellcode 必须提供 architecture 和 base address？
+## raw shellcode 需要提供哪些输入上下文？
 
-它们是调用者提供的事实，不能从文件名安全推断。AutoRE-CLI 要求显式提供，并在
-后续 action 中保留这些参数。
+原生 CLI 使用 `--raw-shellcode` 时要求提供 `--arch`；省略 `--base-address`
+时基址默认为零。Skill 的 `start_analysis.py` 启动器要求显式提供架构和基址。
+实际调查时应提供已知架构与基址，仅在已知时添加 `--entry-address`，并在后续
+action 中保留这些上下文。它们是调用者提供的事实，不能从文件名推断。详见
+[输入上下文](skills/auto-re/references/command-routing.md#input-context)。
 
 ## 可以分析恶意样本吗？
 

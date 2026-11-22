@@ -39,11 +39,14 @@ The public release supports ELF, PE/COFF, Mach-O, universal Mach-O, object
 files, and explicitly identified raw shellcode for supported architectures.
 Run `auto-re-cli <command> --help` for the exact command options.
 
-## Why must raw shellcode include architecture and base address?
+## Which raw shellcode context must I supply?
 
-Those are caller-provided facts that cannot be safely inferred from a
-filename. AutoRE-CLI requires them explicitly and preserves them in follow-up
-actions.
+The native CLI requires `--arch` with `--raw-shellcode`; an omitted
+`--base-address` defaults to zero. The Skill's `start_analysis.py` launcher
+requires both architecture and base address explicitly. For an investigation,
+supply the known architecture and base, add `--entry-address` only when known,
+and preserve this context in follow-up actions. These are caller-provided facts
+that must not be inferred from a filename. See [input context](skills/auto-re/references/command-routing.md#input-context).
 
 ## Can I analyze malware?
 
