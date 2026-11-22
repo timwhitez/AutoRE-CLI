@@ -120,6 +120,31 @@ class ReadResultTests(unittest.TestCase):
             self.assertEqual(result['error'], expected)
             self.assertNotIn('next_offset', result)
 
+    def test_terminal_array_page_uses_inclusive_complete_envelope_budget(self):
+        def encoded(value):
+            return json.dumps(value, separators=(',', ':')).encode() + b'\n'
+
+        for delta in (-1, 0, 1):
+            with self.subTest(bytes=16 * 1024 + delta):
+                self.path.write_bytes(encoded({'items': ['a', 0]}))
+                expected = self.run_helper('/items')
+                length = 15800
+                for _ in range(6):
+                    expected['data'][0] = 'a' * length
+                    raw = encoded({'items': expected['data']})
+                    self.path.write_bytes(raw)
+                    expected['source'].update(bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest())
+                    length += 16 * 1024 + delta - len(encoded(expected))
+                self.assertEqual(len(encoded(expected)), 16 * 1024 + delta)
+                result = self.run_helper('/items', ok=delta <= 0)
+                if delta <= 0:
+                    self.assertEqual(result, expected)
+                    self.assertEqual(result['selection']['returned_items'], 2)
+                    self.assertFalse(result['selection']['has_more'])
+                    self.assertNotIn('next_offset', result['selection'])
+                else:
+                    self.assertEqual(result['error'], 'value_too_large')
+
     def test_malformed_json_is_bounded_domain_error(self):
         for data in [b'{"a":1,"a":2}', b'{"a":NaN}', b'{"a":Infinity}', b'{"a":1e999}',
                      b'{"a":"\\ud800"}', b'{"\\udfff":1}', b'{"a":' + b'9' * 5000 + b'}',
@@ -223,7 +248,7 @@ class ReadResultTests(unittest.TestCase):
     def test_source_numerals_are_emitted_exactly(self):
         # Fixtures are raw numerals; Decimal is the oracle, never binary64 equality.
         numerals = ['1e-400', '9007199254740993.0', '1.0000000000000001', '-0.0', '0.1',
-                    '1.5E+300', '12345678901234567890']
+                    '1.5E+300', '12345678901234567890', '-0', '-0e0', '0']
         raw = ('{"status":%s,"scalar":%s,"object":{"n":%s},"items":[%s]}' % (
             numerals[1], numerals[0], numerals[2], ','.join(numerals))).encode()
         for pointer, expected in [('/scalar', numerals[0]), ('/object', '{"n":%s}' % numerals[2]),
@@ -240,6 +265,15 @@ class ReadResultTests(unittest.TestCase):
         p = self.run_raw(raw, '/items')
         signed = json.loads(p.stdout, parse_float=Decimal)['data'][3]
         self.assertEqual(signed.as_tuple(), Decimal('-0.0').as_tuple())
+
+    def test_integer_negative_zero_is_retained_in_scalars_objects_and_boundaries(self):
+        raw = b'{"status":-0,"scalar":-0,"object":{"n":-0}}'
+        for pointer, expected in (('/scalar', b'-0'), ('/object', b'{"n":-0}')):
+            with self.subTest(pointer=pointer):
+                result = self.run_raw(raw, pointer)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(b'"data":' + expected, result.stdout)
+                self.assertIn(b'"pointer":"/status","value":-0', result.stdout)
 
     def test_exact_numerals_count_toward_page_budget(self):
         numeral = '1.' + '0' * 1000 + '1'

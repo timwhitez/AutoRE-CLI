@@ -867,8 +867,11 @@ def preflight_binary_install(
             raise DistributionError(
                 f"refusing same-version binary repack at {destination}"
             )
-        return "noop"
-    return "update"
+    if os.name != "nt" and not os.access(destination, os.X_OK):
+        raise DistributionError(
+            f"managed binary execute permission drift detected: {destination}"
+        )
+    return "noop" if version_order == 0 else "update"
 
 
 def preflight_skill_install(
@@ -921,6 +924,23 @@ def preflight_skill_install(
                 f"refusing same-version skill repack at {destination}"
             )
         return "noop"
+    managed_directories = {
+        parent.as_posix()
+        for relative_text in marker_files
+        for parent in pathlib.PurePosixPath(relative_text).parents
+        if parent.parts
+    }
+    extra_directories = [
+        item.relative_to(destination).as_posix()
+        for item in sorted(destination.rglob("*"))
+        if item.is_dir()
+        and item.relative_to(destination).as_posix() not in managed_directories
+    ]
+    if extra_directories:
+        raise DistributionError(
+            "refusing to replace unmanaged skill directories during update: "
+            f"{destination}: {extra_directories!r}"
+        )
     return "update"
 
 

@@ -25,6 +25,7 @@ REQUIRED_FILES = {
     "references/safety-and-claims.md",
     "scripts/run_next_action.py",
     "scripts/skill_doctor.py",
+    "scripts/start_analysis.py",
     "scripts/verify_bundle.py",
 }
 VERSION_PATTERN = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
@@ -51,16 +52,28 @@ def parse_frontmatter(text: str) -> dict[str, str]:
 
 
 def quoted_interface_value(text: str, key: str) -> str:
-    match = re.search(
-        rf'^\s{{2}}{re.escape(key)}:\s*"([^"\n]+)"\s*$',
-        text,
-        re.MULTILINE,
+    # This quick check accepts the distribution's simple mapping/quoted-scalar
+    # format. Scope fields to their actual parent instead of matching identical
+    # indented keys anywhere in the YAML document.
+    lines = text.splitlines()
+    starts = [index for index, line in enumerate(lines)
+              if re.fullmatch(r"interface:[ \t]*", line)]
+    if len(starts) != 1:
+        raise SkillValidationError("agents/openai.yaml must contain one interface mapping")
+    interface = []
+    for line in lines[starts[0] + 1:]:
+        if line.strip() and not line[0].isspace() and not line.startswith("#"):
+            break
+        interface.append(line)
+    matches = re.findall(
+        rf'^ {{2}}{re.escape(key)}:[ \t]*"([^"\n]+)"[ \t]*$',
+        "\n".join(interface), re.MULTILINE,
     )
-    if match is None:
+    if len(matches) != 1:
         raise SkillValidationError(
             f"agents/openai.yaml must contain quoted interface.{key}"
         )
-    return match.group(1)
+    return matches[0]
 
 
 def validate_trigger_cases(skill_dir: pathlib.Path) -> tuple[int, int, int]:
@@ -77,7 +90,9 @@ def validate_trigger_cases(skill_dir: pathlib.Path) -> tuple[int, int, int]:
     # interpreter's integer string conversion limit raised by json.loads().
     except (ValueError, RecursionError) as error:
         raise SkillValidationError(f"cannot parse trigger cases: {error}") from error
-    if not isinstance(value, dict) or value.get("schema_version") != 1:
+    if (not isinstance(value, dict)
+            or type(value.get("schema_version")) is not int
+            or value["schema_version"] != 1):
         raise SkillValidationError("trigger cases have an unsupported schema")
     if value.get("kind") != "auto_re_skill_trigger_cases":
         raise SkillValidationError("trigger cases have an unexpected kind")
@@ -87,6 +102,12 @@ def validate_trigger_cases(skill_dir: pathlib.Path) -> tuple[int, int, int]:
     command_routing = (skill_dir / "references/command-routing.md").read_text(
         encoding="utf-8"
     )
+    # Route names belong to the Command column, not to option examples or prose.
+    documented_routes = set()
+    for line in command_routing.splitlines():
+        columns = line.split("|")
+        if line.startswith("|") and len(columns) >= 4:
+            documented_routes.update(re.findall(r"`([a-z][a-z0-9-]*)`", columns[2]))
     seen: set[str] = set()
     positive = 0
     negative = 0
@@ -112,7 +133,7 @@ def validate_trigger_cases(skill_dir: pathlib.Path) -> tuple[int, int, int]:
             )
         if should_trigger:
             positive += 1
-            if not isinstance(route, str) or f"`{route}`" not in command_routing:
+            if not isinstance(route, str) or route not in documented_routes:
                 raise SkillValidationError(
                     f"trigger cases[{index}].expected_route is not documented"
                 )

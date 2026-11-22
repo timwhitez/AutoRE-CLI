@@ -62,7 +62,7 @@ py -3 scripts/autore_distribution.py install
 `--codex-home` 指向旧版 `<home>/skills` 兼容位置，当前默认是
 `$HOME/.agents/skills`。覆盖 unmanaged 目标须显式指定 `--replace-unmanaged`。
 更新时验证并安装新发行包；managed drift、同版本 binary repack、降级和额外
-Skill 文件会 fail closed。`./uninstall.sh` 删除托管文件；`--force-managed` 仅允许
+Skill 文件或目录会 fail closed。`./uninstall.sh` 删除托管文件；`--force-managed` 仅允许
 移除 marker 列出的已修改文件，不覆盖无关文件。
 Windows 使用 `py -3 scripts/autore_distribution.py` 加相同子命令和选项。
 

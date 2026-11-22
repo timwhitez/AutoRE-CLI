@@ -130,6 +130,23 @@ class InstallerSkillMarkerTests(unittest.TestCase):
     def test_update_refuses_nested_ordinary_user_file(self):
         self.assert_update_refuses_extra("notes.txt")
 
+    def test_update_refuses_unmanaged_empty_directories_without_changing_them(self):
+        for relative in ("local-empty", "local-nested/empty"):
+            extra = self.skill / relative
+            extra.mkdir(parents=True, mode=0o700)
+        before = self.snapshot()
+        modes = {path: path.stat().st_mode for path in self.skill.rglob("*")}
+        with self.assertRaisesRegex(installer.DistributionError,
+                                    "unmanaged skill directories"):
+            installer.preflight_skill_install(
+                self.source, self.skill, self.candidate, replace_unmanaged=False)
+        self.assertEqual(self.snapshot(), before)
+        self.assertEqual({path: path.stat().st_mode for path in self.skill.rglob("*")},
+                         modes)
+        # A same-version no-op keeps user directories without replacing the tree.
+        self.assertEqual(installer.preflight_skill_install(
+            self.skill, self.skill, self.marker, replace_unmanaged=False), "noop")
+
     def test_root_marker_remains_exempt(self):
         expected = hashlib.sha256(
             b"SKILL.md\0"
@@ -241,6 +258,76 @@ class InstallerSkillMarkerTests(unittest.TestCase):
 
 
 class InstallerPublicIntegrationTests(unittest.TestCase):
+    def release_fixture(self):
+        fixture = release_fixtures.ReleaseAssetsSafetyTests()
+        self.addCleanup(fixture.doCleanups)
+        fixture.setUp()
+        return fixture
+
+    @staticmethod
+    def install_args(**overrides):
+        values = dict(cli_only=False, skill_only=False, agents="both",
+                      install_dir=None, trae_home=None, codex_home=None,
+                      replace_unmanaged=False, dry_run=False)
+        values.update(overrides)
+        return argparse.Namespace(**values)
+
+    @unittest.skipIf(os.name == "nt", "POSIX executable permissions")
+    def test_reinstall_reports_missing_execute_permission_without_mutation(self):
+        fixture = self.release_fixture()
+        destination = fixture.work / "installed"
+        args = self.install_args(cli_only=True, install_dir=str(destination))
+        probe = subprocess.CompletedProcess([], 0, "auto-re-cli 0.1.3\n", "")
+        with mock.patch.object(installer, "distribution_root", return_value=fixture.root), \
+             mock.patch.object(installer, "host_target", return_value="linux-x86_64"), \
+             mock.patch.object(installer.subprocess, "run", return_value=probe):
+            # The packaged fixture is inert and the version probe is mocked.
+            installer.command_install(args)
+            binary = destination / "auto-re-cli"
+            marker = destination / installer.BINARY_MARKER
+            contents = binary.read_bytes(), marker.read_bytes()
+            binary.chmod(0o644)
+            for dry_run in (True, False):
+                with self.subTest(dry_run=dry_run):
+                    args.dry_run = dry_run
+                    with self.assertRaisesRegex(installer.DistributionError,
+                                                "execute permission"):
+                        installer.command_install(args)
+                    self.assertEqual((binary.read_bytes(), marker.read_bytes()), contents)
+                    self.assertEqual(binary.stat().st_mode & 0o777, 0o644)
+            binary.chmod(0o755)
+            args.dry_run = False
+            self.assertEqual(installer.command_install(args)["operations"][0]["operation"],
+                             "noop")
+
+    def test_install_dry_run_and_apply_reject_overlapping_agent_paths(self):
+        fixture = self.release_fixture()
+        same_home = fixture.work / "shared-home"
+        with mock.patch.object(installer, "distribution_root", return_value=fixture.root), \
+             mock.patch.object(installer._CommandTransaction, "capture") as capture:
+            for dry_run in (True, False):
+                with self.subTest(dry_run=dry_run):
+                    args = self.install_args(
+                        skill_only=True, trae_home=str(same_home),
+                        codex_home=str(same_home), dry_run=dry_run)
+                    with self.assertRaisesRegex(installer.DistributionError,
+                                                "overlapping command transaction paths"):
+                        installer.command_install(args)
+                    self.assertFalse(same_home.exists())
+            capture.assert_not_called()
+        # Independent targets remain valid in both planning and application.
+        trae_home, codex_home = fixture.work / "trae", fixture.work / "codex"
+        args = self.install_args(skill_only=True, trae_home=str(trae_home),
+                                 codex_home=str(codex_home), dry_run=True)
+        with mock.patch.object(installer, "distribution_root", return_value=fixture.root):
+            self.assertTrue(installer.command_install(args)["ok"])
+            self.assertFalse(trae_home.exists())
+            self.assertFalse(codex_home.exists())
+            args.dry_run = False
+            self.assertTrue(installer.command_install(args)["ok"])
+        self.assertTrue((trae_home / "skills/auto-re/SKILL.md").is_file())
+        self.assertTrue((codex_home / "skills/auto-re/SKILL.md").is_file())
+
     def test_late_capture_failure_keeps_foreign_object_without_mutation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

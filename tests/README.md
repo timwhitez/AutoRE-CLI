@@ -114,3 +114,6 @@ for those checks plus isolated host install/static-analysis/uninstall, or
 `--lane archives` for checks plus disposable archive build/readback. No workflow
 runs on GitHub Actions and no lane publishes a release. Run native acceptance
 on each intended host; mocked platform tests do not certify that host.
+
+Every lane also runs the offline package-manager and release-metadata regressions
+under `packaging/tests`. A failure in either test directory stops the lane.

@@ -902,11 +902,24 @@ _command_install_before_transaction = command_install
 _command_uninstall_before_transaction = command_uninstall
 
 
+def _validate_install_plan_paths(result: dict[str, Any]) -> None:
+    """Reject overlapping selected destinations without creating transaction state."""
+    paths: list[pathlib.Path] = []
+    for operation in result["operations"]:
+        destination = pathlib.Path(operation["path"])
+        paths.append(destination)
+        if operation["kind"] == "binary":
+            paths.append(destination.parent / BINARY_MARKER)
+    _validate_transaction_paths(paths)
+
+
 def command_install(args):
     """Preflight all selected components, then apply one command transaction."""
 
     if args.dry_run:
-        return _command_install_before_transaction(args)
+        result = _command_install_before_transaction(args)
+        _validate_install_plan_paths(result)
+        return result
 
     mutations: list[dict[str, Any]] = []
     preflight_originals: dict[str, Optional[dict[str, tuple]]] = {}
@@ -987,6 +1000,7 @@ def command_install(args):
     if not isinstance(result, dict) or result.get("dry_run") is not False:
         raise DistributionError("install preflight returned an invalid result")
     _bind_install_operations(mutations, result)
+    _validate_install_plan_paths(result)
     paths = _install_transaction_paths(mutations)
 
     def mutate() -> None:

@@ -78,7 +78,7 @@ object file. The object is analysis input and is never executed:
 ```sh
 cc -g -O1 -c examples/controlled/fixture.c \
   -o /tmp/autore-controlled-fixture.o
-mkdir -p analysis-results/controlled
+mkdir -p analysis-results/controlled/receipts
 auto-re-cli report /tmp/autore-controlled-fixture.o \
   --format json \
   --json-profile ai \
@@ -87,7 +87,17 @@ auto-re-cli report /tmp/autore-controlled-fixture.o \
   --bundle-dir analysis-results/controlled/report.bundle \
   --output analysis-results/controlled/report.bundle/manifest.json
 python3 skills/auto-re/scripts/verify_bundle.py \
-  analysis-results/controlled/report.bundle/manifest.json
+  analysis-results/controlled/report.bundle/manifest.json \
+  --receipt analysis-results/controlled/receipts/verification.json
+```
+
+Choose a new receipt filename in the existing `receipts` directory. Consume the
+verified copies listed in the receipt's `files[].path`, then clean their
+validator-owned tree after the final read:
+
+```sh
+python3 skills/auto-re/scripts/verify_bundle.py \
+  --cleanup-receipt analysis-results/controlled/receipts/verification.json
 ```
 
 In the checked macOS arm64 run, AutoRE-CLI validated a Mach-O AArch64
@@ -136,8 +146,10 @@ should not be confused with source availability.
 
 ## Try It
 
-The GitHub Releases page provides independently verifiable 7–8 MB archives for
-macOS arm64/x86-64, Linux arm64/x86-64, and Windows x86-64.
+The [GitHub Releases page](https://github.com/timwhitez/AutoRE-CLI/releases/latest)
+provides independently verifiable archives for macOS arm64/x86-64, Linux
+arm64/x86-64, and Windows x86-64. Check the selected release's asset list for
+current download sizes.
 
 Repository and controlled demo:
 

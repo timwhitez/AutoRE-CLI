@@ -81,6 +81,7 @@ def run_ci(lane):
         run_command([*python, str(ROOT / "scripts/autore_distribution.py"), "verify"], env)
         run_command([*python, str(ROOT / "scripts/quick_validate_skill.py"), str(ROOT / "skills/auto-re")], env)
         run_command([*python, "-m", "unittest", "discover", "-s", "tests", "-v"], env)
+        run_command([*python, "-m", "unittest", "discover", "-s", "packaging/tests", "-v"], env)
         if lane in {"all", "native"}:
             native_smoke(work, env)
         if lane in {"all", "archives"}:

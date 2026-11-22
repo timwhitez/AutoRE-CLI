@@ -550,7 +550,15 @@ def build_assets(output: pathlib.Path) -> dict[str, Any]:
     # Do not resolve away caller-supplied links before validating the path.
     output = validate_output_path(output)
     # A separate byte copy prevents later source edits from becoming new inputs.
-    with tempfile.TemporaryDirectory(prefix=".autore-release-input-", dir=ROOT.parent) as snapshot_text:
+    repository = ROOT.resolve()
+    snapshot_parent = pathlib.Path(tempfile.gettempdir()).resolve()
+    if snapshot_parent == repository or repository in snapshot_parent.parents:
+        # TMPDIR may itself point into the checkout. Prefer the output parent,
+        # then retain the sibling fallback for an in-repository output.
+        snapshot_parent = output.parent
+        if snapshot_parent == repository or repository in snapshot_parent.parents:
+            snapshot_parent = repository.parent
+    with tempfile.TemporaryDirectory(prefix=".autore-release-input-", dir=snapshot_parent) as snapshot_text:
         snapshot = pathlib.Path(snapshot_text)
         inventory, fixed_members = verify_input_distribution(snapshot)
         manifest = load_manifest(snapshot)

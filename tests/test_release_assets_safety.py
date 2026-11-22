@@ -820,6 +820,51 @@ class ReleaseAssetsSafetyTests(unittest.TestCase):
         self.assertFalse(any(".autore-release-" in n or "release-assets/" in n for n in names))
         self.assertFalse(list(self.root.glob(".autore-release-*")))
 
+    @unittest.skipIf(os.name == "nt", "POSIX directory write permissions")
+    def test_read_only_source_parent_uses_writable_temporary_directory(self) -> None:
+        sources = self.work / "sources"
+        sources.mkdir()
+        repository = sources / "repository"
+        self.root.rename(repository)
+        scratch = self.work / "temporary"
+        scratch.mkdir()
+        sources.chmod(0o555)
+        self.addCleanup(sources.chmod, 0o755)
+        if os.access(sources, os.W_OK):
+            self.skipTest("current user bypasses read-only directory permissions")
+        with mock.patch.object(builder, "ROOT", repository), \
+             mock.patch.dict(os.environ, {"TMPDIR": str(scratch),
+                                          "TEMP": str(scratch), "TMP": str(scratch)}), \
+             mock.patch.object(tempfile, "tempdir", None):
+            self.assertTrue(installer.verify_distribution(repository)["ok"])
+            result = builder.build_assets(self.output)
+            self.assertTrue(installer.verify_distribution(repository)["ok"])
+        self.assertTrue(result["ok"])
+        self.assertEqual(len(result["assets"]), 6)
+        self.assertEqual(list(scratch.iterdir()), [])
+        self.assertEqual(list(sources.iterdir()), [repository])
+
+    def test_snapshot_stays_outside_source_when_temporary_directory_is_inside(self) -> None:
+        # Even an excluded release-assets directory cannot contain the input snapshot.
+        scratch = self.root / "release-assets"
+        scratch.mkdir()
+        admitted = []
+        verify_input = builder.verify_input_distribution
+
+        def verify_external_snapshot(snapshot):
+            self.assertNotEqual(snapshot, self.root)
+            self.assertNotIn(self.root, snapshot.parents)
+            admitted.append(snapshot)
+            return verify_input(snapshot)
+
+        with mock.patch.object(tempfile, "tempdir", str(scratch)), \
+             mock.patch.object(builder, "verify_input_distribution",
+                               side_effect=verify_external_snapshot):
+            self.assertTrue(builder.build_assets(self.output)["ok"])
+        self.assertEqual(list(scratch.iterdir()), [])
+        self.assertEqual(len(admitted), 1)
+        self.assertFalse(admitted[0].exists())
+
 
 if __name__ == "__main__":
     unittest.main()

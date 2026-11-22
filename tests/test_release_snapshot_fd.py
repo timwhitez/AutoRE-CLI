@@ -11,6 +11,7 @@ import unittest
 from unittest import mock
 
 from test_release_assets_safety import builder, MODULE
+from subprocess_timeout import subprocess_timeout
 
 
 class SnapshotDescriptorTests(unittest.TestCase):
@@ -31,7 +32,7 @@ except builder.ReleaseAssetError as error:
     sys.exit(2)
 '''
             result = subprocess.run([sys.executable, '-B', '-c', code, str(MODULE), str(repository)],
-                                    capture_output=True, text=True, timeout=5)
+                                    capture_output=True, text=True, timeout=subprocess_timeout(5))
             self.assertEqual(result.returncode, 2, result.stderr)
             self.assertIn('not a stable regular file', result.stdout)
             self.assertFalse((root / 'output').exists())

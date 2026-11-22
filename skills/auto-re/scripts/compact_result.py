@@ -23,9 +23,13 @@ encoded = reader.exact_json
 
 
 def project(full, source):
-    if full.get('profile') != 'ai' or not isinstance(full.get('functions'), list):
+    if full.get('profile') != 'ai':
         raise ValueError('unsupported_ai_root')
-    reader.runner.validate_result_contract(full, command='report' if 'sections' in full else 'decompile')
+    # Contract admission uses native integer types; retain the original numeral
+    # wrappers in the projection, including a report's integer negative zero.
+    admission = {key: int(value) if isinstance(value, reader.ExactInt) else value
+                 for key, value in full.items()}
+    reader.runner.validate_result_contract(admission, command='report' if 'sections' in full else 'decompile')
     if any(key in full for key in ('compact_version', 'catalog', 'full_view')):
         raise ValueError('compact_field_collision')
     counts = {}

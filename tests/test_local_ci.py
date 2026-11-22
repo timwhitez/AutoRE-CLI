@@ -42,7 +42,30 @@ class LocalCiTests(unittest.TestCase):
         self.assertEqual([c[2] for c in calls[:2]], [str(self.root / "scripts/autore_distribution.py"), str(self.root / "scripts/quick_validate_skill.py")])
         self.assertIn("unittest", calls[2])
         self.assertIn("tests", calls[2])
+        self.assertIn("unittest", calls[3])
+        self.assertIn("packaging/tests", calls[3])
         self.assertFalse(list(self.root.glob("autore-local-ci-*")))
+
+    def test_packaging_test_failure_stops_every_lane_and_cleans_work(self):
+        for lane in ("all", "checks", "native", "archives"):
+            calls = []
+            def command(argv, env, capture=False):
+                calls.append(list(map(str, argv)))
+                if "packaging/tests" in argv:
+                    raise subprocess.CalledProcessError(1, argv)
+                return subprocess.CompletedProcess(argv, 0, "", "")
+            with self.subTest(lane=lane), \
+                 mock.patch.object(ci, "ROOT", self.root), \
+                 mock.patch.object(ci, "run_command", side_effect=command), \
+                 mock.patch.object(ci, "native_smoke") as native, \
+                 mock.patch.object(ci.tempfile, "tempdir", str(self.root)), \
+                 contextlib.redirect_stdout(io.StringIO()), \
+                 contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(ci.main(["--lane", lane]), 1)
+                self.assertIn("packaging/tests", calls[-1])
+                native.assert_not_called()
+                self.assertFalse(any("--output" in call for call in calls))
+                self.assertFalse(list(self.root.glob("autore-local-ci-*")))
 
     def test_failed_command_propagates_and_cleans_only_owned_tree(self):
         sentinel = self.root / "keep.txt"

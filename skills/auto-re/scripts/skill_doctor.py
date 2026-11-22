@@ -197,19 +197,28 @@ def is_auto_re_skill(path: pathlib.Path) -> bool:
     return bool(re.search(r"^name:\s*auto-re\s*$", text, re.MULTILINE))
 
 
-def default_candidate_roots(active_root: pathlib.Path) -> list[pathlib.Path]:
+def default_candidate_roots(
+    active_root: pathlib.Path, *, agent: Optional[str] = None,
+) -> list[pathlib.Path]:
     home = pathlib.Path.home()
-    candidates = [
-        active_root,
-        home / ".agents/skills/auto-re",
-        home / ".codex/skills/auto-re",
-    ]
-    codex_home = os.environ.get("CODEX_HOME")
-    if codex_home:
-        candidates.append(pathlib.Path(codex_home).expanduser() / "skills/auto-re")
+    trae_home = pathlib.Path(os.environ.get("TRAE_HOME") or home / ".trae").expanduser()
+    if agent is None and (
+        active_root == (trae_home / "skills/auto-re").resolve()
+        or active_root.parent.name == "skills" and active_root.parent.parent.name == ".trae"
+    ):
+        agent = "trae"
+    if agent == "trae":
+        candidates = [active_root, home / ".trae/skills/auto-re", trae_home / "skills/auto-re"]
+        project_root = ".trae"
+    else:
+        candidates = [active_root, home / ".agents/skills/auto-re", home / ".codex/skills/auto-re"]
+        codex_home = os.environ.get("CODEX_HOME")
+        if codex_home:
+            candidates.append(pathlib.Path(codex_home).expanduser() / "skills/auto-re")
+        project_root = ".agents"
     current = pathlib.Path.cwd().absolute()
     for parent in [current, *current.parents]:
-        candidates.append(parent / ".agents/skills/auto-re")
+        candidates.append(parent / project_root / "skills/auto-re")
         if (parent / ".git").exists():
             break
     return candidates
@@ -264,7 +273,7 @@ def diagnose(
     candidates = (
         candidate_roots
         if candidate_roots is not None
-        else default_candidate_roots(active_root)
+        else default_candidate_roots(active_root, agent=marker.get("agent") if marker else None)
     )
     roots = existing_skill_roots(candidates)
     alternatives = [path for path in roots if path != active_root]
